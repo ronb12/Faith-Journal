@@ -1,0 +1,282 @@
+{
+  "timestamp": 1749068911.696662,
+  "duration": 407.2770981788635,
+  "project_path": "/Users/ronellbradley/Desktop/FaithJournal",
+  "validation_results": {
+    "pbxproj_parsing": {
+      "task": "pbxproj_parsing",
+      "result": {
+        "file_references": 45,
+        "build_files": 48,
+        "groups": 18,
+        "targets": 11,
+        "configurations": 10,
+        "schemes": 0
+      },
+      "duration": 0.011481046676635742,
+      "status": "success"
+    },
+    "info_plist": {
+      "task": "info_plist",
+      "result": [
+        {
+          "path": "/Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Info.plist",
+          "valid": true,
+          "bundle_id": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+          "version": "1.0",
+          "build": "1",
+          "display_name": "Faith Journal",
+          "issues": []
+        },
+        {
+          "path": "/Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Faith Journal 3/Info.plist",
+          "valid": true,
+          "bundle_id": "com.faithjournal.app",
+          "version": "1.0",
+          "build": "1.0",
+          "display_name": "Faith Journal",
+          "issues": []
+        },
+        {
+          "path": "/Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Faith Journal 3/Faith Journal/Info.plist",
+          "valid": true,
+          "bundle_id": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+          "version": "1.0",
+          "build": "1",
+          "display_name": "Missing",
+          "issues": [
+            "Missing required key: CFBundleDisplayName"
+          ]
+        }
+      ],
+      "duration": 0.13683104515075684,
+      "status": "success"
+    },
+    "file_references": {
+      "task": "file_references",
+      "result": {
+        "referenced_files": 27,
+        "actual_files": 93,
+        "missing_references": [
+          "Faith Journal/Faith Journal 3/Faith JournalUITests/Faith_JournalUITests.swift",
+          "Faith Journal/Faith_JournalApp.swift",
+          "Faith Journal/Views/BadgesView.swift",
+          "Faith Journal/Models/BibleReadingPlan.swift",
+          "Faith Journal/Views/FaithStatsView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/AudioView.swift",
+          "Faith Journal/Faith Journal 3/ContentView.swift",
+          "Faith Journal/Components/TemplateSelectionView.swift",
+          "Faith Journal/Views/BiometricLockView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/ContentView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalFilterView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/SettingsView.swift",
+          "Faith Journal/Faith Journal 3/Views/Components/StreakView.swift",
+          "Faith Journal/Utils/Faith JournalTests/Faith_JournalTests.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Models/PrayerRequest.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/CalendarView.swift",
+          "Faith Journal/Views/Components/UserAvatarView.swift",
+          "Faith Journal/Faith Journal/Item.swift",
+          "Faith Journal/Views/OnboardingView.swift",
+          "Faith Journal/Models/Badge.swift",
+          "Faith Journal/Components/UserAvatarView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/DrawingView.swift",
+          "Faith Journal/BadgesView.swift",
+          "Faith Journal/Utils/Faith JournalUITests/Faith_JournalUITests.swift",
+          "Faith Journal/Models/JournalEntry.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalEntryDetailView.swift",
+          "Faith JournalTests/Faith_JournalTests.swift",
+          "Faith Journal/Models/AudioEntry.swift",
+          "Faith Journal/Views/Components/TagPickerView.swift",
+          "Faith Journal/Utils/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/FaithStatsView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Models/Devotional.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Models/Badge.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Models/AudioEntry.swift",
+          "Faith Journal/Faith Journal 3/Faith JournalTests/Faith_JournalTests.swift",
+          "Faith Journal/Components/TagPickerView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/AttachmentSelectionView.swift",
+          "Faith JournalTests/Models/VerseMemorizationTests.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/MainTabView.swift",
+          "Faith Journal/JournalFilterView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Faith_JournalApp.swift",
+          "Faith Journal/Faith Journal/ContentView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/NewJournalEntryView.swift",
+          "Faith Journal/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Models/Drawing.swift",
+          "Faith Journal/Faith JournalTests/Faith_JournalTests.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Item.swift",
+          "Faith Journal/Models/PrayerRequest.swift",
+          "Faith Journal/Models/ScriptureArt.swift",
+          "Faith Journal/Views/NewJournalEntryView.swift",
+          "Faith Journal/Faith JournalUITests/Faith_JournalUITests.swift",
+          "Faith Journal/Views/Components/AttachmentSelectionView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/HomeView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Models/JournalEntry.swift",
+          "Faith Journal/Models/User.swift",
+          "Faith Journal/Views/JournalView.swift",
+          "Faith Journal/Views/BibleReadingPlanView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/PrayerRequestsView.swift",
+          "Faith Journal/Views/MainTabView.swift",
+          "Faith Journal/Views/DevotionalsView.swift",
+          "Faith Journal/Views/VerseMemorizationView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/BiometricLockView.swift",
+          "Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/TagSelectionView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Models/User.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/DevotionalsView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Faith JournalApp.swift",
+          "Faith Journal/ContentView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/UserAvatarView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/BadgesView.swift",
+          "Faith Journal/Faith Journal 3/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+          "Faith Journal/Models/VerseMemorization.swift",
+          "Faith Journal/Faith Journal 3/Faith_JournalApp.swift",
+          "Faith JournalUITests/Faith_JournalUITests.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/OnboardingView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/MoodTrackerView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/ShareSheet.swift",
+          "Faith Journal/Faith Journal/Faith_JournalApp.swift",
+          "Faith Journal/Models/Devotional.swift",
+          "Faith Journal/Views/DrawingView.swift",
+          "Faith Journal/Views/HomeView.swift",
+          "Faith Journal/Views/Components/TemplateSelectionView.swift",
+          "Faith Journal/Components/AttachmentSelectionView.swift",
+          "Faith Journal/Views/JournalFilterView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/TemplateSelectionView.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/ImagePicker.swift",
+          "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/StreakView.swift",
+          "Faith Journal/Models/Drawing.swift",
+          "Faith Journal/Views/SettingsView.swift",
+          "Faith Journal/Views/PrayerRequestsView.swift",
+          "Faith Journal/Views/AudioRecordingView.swift",
+          "Faith Journal/SceneDelegate.swift"
+        ],
+        "orphaned_references": [
+          "Faith_JournalTests.swift",
+          "OnboardingView.swift",
+          "AudioEntry.swift",
+          "SceneDelegate.swift",
+          "AudioRecordingView.swift",
+          "sourcecode.swift",
+          "DevotionalsView.swift",
+          "PrayerRequest.swift",
+          "Faith_JournalUITestsLaunchTests.swift",
+          "SettingsView.swift",
+          "Badge.swift",
+          "Devotional.swift",
+          "HomeView.swift",
+          "JournalView.swift",
+          "MainTabView.swift",
+          "TagPickerView.swift",
+          "Faith_JournalApp.swift",
+          "PrayerRequestsView.swift",
+          "NewJournalEntryView.swift",
+          "JournalEntry.swift",
+          "BiometricLockView.swift",
+          "UserAvatarView.swift",
+          "User.swift",
+          "DrawingView.swift",
+          "Faith_JournalUITests.swift",
+          "TemplateSelectionView.swift",
+          "Drawing.swift"
+        ]
+      },
+      "duration": 0.20314788818359375,
+      "status": "success"
+    },
+    "app_icons": {
+      "task": "app_icons",
+      "result": {
+        "app_icons": [
+          {
+            "path": "/Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Assets.xcassets/AppIcon.appiconset",
+            "total_icons": 18,
+            "missing_icons": [],
+            "valid": true
+          },
+          {
+            "path": "/Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Faith Journal 3/Faith Journal/Assets.xcassets/AppIcon.appiconset",
+            "total_icons": 3,
+            "missing_icons": [],
+            "valid": true
+          },
+          {
+            "path": "/Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Faith Journal/Assets.xcassets/AppIcon.appiconset",
+            "total_icons": 3,
+            "missing_icons": [],
+            "valid": true
+          }
+        ]
+      },
+      "duration": 0.259397029876709,
+      "status": "success"
+    },
+    "project_structure": {
+      "task": "project_structure",
+      "result": {
+        "xcodeproj_exists": true,
+        "pbxproj_exists": true,
+        "xcschemes_exists": true,
+        "info_plist_exists": true,
+        "swift_files_exist": true,
+        "assets_exist": true
+      },
+      "duration": 0.35070109367370605,
+      "status": "success"
+    },
+    "schemes": {
+      "task": "schemes",
+      "result": [
+        {
+          "name": "Faith Journal",
+          "valid": true
+        },
+        {
+          "name": "Faith Journal",
+          "valid": true
+        }
+      ],
+      "duration": 407.1649260520935,
+      "status": "success"
+    },
+    "build_settings": {
+      "task": "build_settings",
+      "result": {
+        "error": "Timeout"
+      },
+      "duration": 407.18293714523315,
+      "status": "success"
+    },
+    "build_test": {
+      "task": "build_test",
+      "result": {
+        "success": false,
+        "return_code": 65,
+        "stdout_lines": 284,
+        "stderr_lines": 10,
+        "errors": [],
+        "warnings": []
+      },
+      "duration": 407.2563760280609,
+      "status": "success"
+    }
+  },
+  "recommendations": [
+    "Fix compilation errors before proceeding with development",
+    "Add missing Swift files to Xcode project",
+    "Remove orphaned file references from project",
+    "Fix Info.plist issues in /Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Faith Journal 3/Faith Journal/Info.plist",
+    "Consider using SwiftUI previews for faster development",
+    "Implement comprehensive unit tests",
+    "Set up continuous integration for automated testing",
+    "Review and optimize build settings for release builds",
+    "Ensure proper code signing configuration"
+  ],
+  "summary": {
+    "total_validations": 8,
+    "successful_validations": 8,
+    "failed_validations": 0,
+    "build_success": false
+  }
+}

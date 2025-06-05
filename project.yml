@@ -1,0 +1,102 @@
+name: Faith Journal
+options:
+  minimumXcodeGenVersion: 2.38.0
+  bundleIdPrefix: com.faithjournal
+  deploymentTarget:
+    iOS: 18.2
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+  transitivelyLinkDependencies: true
+  
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: 18.2
+    TARGETED_DEVICE_FAMILY: 1,2
+    SWIFT_VERSION: 5.0
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+    INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+    DEVELOPMENT_TEAM: "" # Add your team ID here
+    INFOPLIST_KEY_CFBundleDisplayName: Faith Journal
+    INFOPLIST_KEY_NSFaceIDUsageDescription: "We need Face ID to secure your journal entries"
+    INFOPLIST_KEY_NSMicrophoneUsageDescription: "We need microphone access for voice recordings"
+    INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "We need photo library access to attach images to your entries"
+    INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "We use your location to tag journal entries"
+
+targets:
+  Faith Journal:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.2"
+    sources:
+      - path: Faith Journal
+        excludes:
+          - "**/*.md"
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.faithjournal.app
+        DEVELOPMENT_TEAM: "" # Add your team ID here
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+        ENABLE_TESTABILITY: YES
+    info:
+      path: Faith Journal/Info.plist
+      properties:
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundleDisplayName: Faith Journal
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        UILaunchStoryboardName: LaunchScreen
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default Configuration
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
+    scheme:
+      testTargets:
+        - Faith JournalTests
+        - Faith JournalUITests
+      gatherCoverageData: true
+      coverageTargets:
+        - Faith Journal
+    dependencies:
+      - framework: SwiftUI
+      - framework: SwiftData
+      - framework: PencilKit
+      - framework: AVFoundation
+      - framework: LocalAuthentication
+      - framework: CoreLocation
+      - framework: PhotosUI
+    
+  Faith JournalTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.2"
+    sources:
+      - path: Faith JournalTests
+    dependencies:
+      - target: Faith Journal
+    settings:
+      base:
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Faith Journal.app/Faith Journal
+        
+  Faith JournalUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.2"
+    sources:
+      - path: Faith JournalUITests
+    dependencies:
+      - target: Faith Journal
+    settings:
+      base:
+        TEST_TARGET_NAME: Faith Journal 

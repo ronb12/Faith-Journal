@@ -1,0 +1,211 @@
+================================================================================
+Enhanced Faith Journal Project Assistant
+Multi-threaded analysis and optimization tool
+================================================================================
+[16:28:32] [INFO] [MainThread] Starting comprehensive Faith Journal project analysis
+[16:28:32] [SUCCESS] [MainThread] Project structure validation: PASSED
+[16:28:32] [INFO] [MainThread] Starting parallel analysis with 12 workers
+[16:28:32] [INFO] [MainThread] Found 93 Swift files, 2 storyboards, 6 plists
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to VerseMemorizationTests.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_0] Applied 0 fixes to Faith_JournalTests.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_2] Applied 0 fixes to JournalFilterView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_6] Applied 0 fixes to SceneDelegate.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to BadgesView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_5] Applied 0 fixes to Faith_JournalApp.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to Faith_JournalTests.swift
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalTests.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed VerseMemorizationTests.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalTests.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed SceneDelegate.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed BadgesView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalApp.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed JournalFilterView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_4] Applied 0 fixes to ContentView.swift
+[16:28:32] [INFO] [MainThread] Processed ContentView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_7] Applied 0 fixes to ContentView.swift
+[16:28:32] [INFO] [MainThread] Processed ContentView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_0] Applied 0 fixes to Faith_JournalTests.swift
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalTests.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_10] Applied 0 fixes to Item.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_8] Applied 0 fixes to Faith_JournalApp.swift
+[16:28:32] [INFO] [MainThread] Processed Item.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalApp.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_2] Applied 0 fixes to ContentView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_4] Applied 0 fixes to Drawing.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_7] Applied 0 fixes to JournalEntry.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_11] Applied 0 fixes to Faith JournalApp.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_5] Applied 0 fixes to User.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_9] Applied 0 fixes to Faith_JournalApp.swift
+[16:28:32] [INFO] [MainThread] Processed ContentView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Drawing.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed JournalEntry.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith JournalApp.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed User.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalApp.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to Badge.swift
+[16:28:32] [INFO] [MainThread] Processed Badge.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to Devotional.swift
+[16:28:32] [INFO] [MainThread] Processed Devotional.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_6] Applied 0 fixes to PrayerRequest.swift
+[16:28:32] [INFO] [MainThread] Processed PrayerRequest.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_10] Applied 0 fixes to MainTabView.swift
+[16:28:32] [INFO] [MainThread] Processed MainTabView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_0] Applied 0 fixes to AudioEntry.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_11] Applied 0 fixes to BadgesView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_9] Applied 0 fixes to HomeView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_8] Applied 0 fixes to SettingsView.swift
+[16:28:32] [INFO] [MainThread] Processed AudioEntry.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed BadgesView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed HomeView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed SettingsView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_5] Applied 0 fixes to DrawingView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_2] Applied 0 fixes to JournalEntryDetailView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to DevotionalsView.swift
+[16:28:32] [INFO] [MainThread] Processed DrawingView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed JournalEntryDetailView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed DevotionalsView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_7] Applied 0 fixes to JournalFilterView.swift
+[16:28:32] [INFO] [MainThread] Processed JournalFilterView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to JournalView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_11] Applied 0 fixes to AudioView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_8] Applied 0 fixes to OnboardingView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_6] Applied 0 fixes to FaithStatsView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_4] Applied 0 fixes to NewJournalEntryView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_10] Applied 0 fixes to MoodTrackerView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_9] Applied 0 fixes to BiometricLockView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to UserAvatarView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_2] Applied 0 fixes to TemplateSelectionView.swift
+[16:28:32] [INFO] [MainThread] Processed JournalView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed AudioView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed OnboardingView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed FaithStatsView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed NewJournalEntryView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed MoodTrackerView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed BiometricLockView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed UserAvatarView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed TemplateSelectionView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_5] Applied 0 fixes to CalendarView.swift
+[16:28:32] [INFO] [MainThread] Processed CalendarView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_7] Applied 0 fixes to AttachmentSelectionView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_0] Applied 0 fixes to PrayerRequestsView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to StreakView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_11] Applied 0 fixes to ImagePicker.swift
+[16:28:32] [INFO] [MainThread] Processed AttachmentSelectionView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed PrayerRequestsView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed StreakView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed ImagePicker.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_6] Applied 0 fixes to ShareSheet.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_4] Applied 0 fixes to StreakView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_10] Applied 0 fixes to Faith_JournalUITestsLaunchTests.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_8] Applied 0 fixes to TagSelectionView.swift
+[16:28:32] [INFO] [MainThread] Processed ShareSheet.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed StreakView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalUITestsLaunchTests.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed TagSelectionView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to Faith_JournalTests.swift
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalTests.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_5] Applied 0 fixes to Faith_JournalUITests.swift
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalUITests.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_2] Applied 0 fixes to Faith_JournalUITestsLaunchTests.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_9] Applied 0 fixes to Faith_JournalUITests.swift
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalUITestsLaunchTests.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalUITests.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_4] Applied 0 fixes to Devotional.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_0] Applied 0 fixes to User.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_10] Applied 0 fixes to Drawing.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_7] Applied 0 fixes to VerseMemorization.swift
+[16:28:32] [INFO] [MainThread] Processed Devotional.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed User.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Drawing.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed VerseMemorization.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to BibleReadingPlan.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_6] Applied 0 fixes to ScriptureArt.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_8] Applied 0 fixes to JournalEntry.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_11] Applied 0 fixes to PrayerRequest.swift
+[16:28:32] [INFO] [MainThread] Processed BibleReadingPlan.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed ScriptureArt.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed JournalEntry.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed PrayerRequest.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to Badge.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_5] Applied 0 fixes to AudioEntry.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_9] Applied 0 fixes to UserAvatarView.swift
+[16:28:32] [INFO] [MainThread] Processed Badge.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed AudioEntry.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed UserAvatarView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_2] Applied 0 fixes to TemplateSelectionView.swift
+[16:28:32] [INFO] [MainThread] Processed TemplateSelectionView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_6] Applied 0 fixes to MainTabView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_7] Applied 0 fixes to ContentView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_8] Applied 0 fixes to SettingsView.swift
+[16:28:32] [INFO] [MainThread] Processed MainTabView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed ContentView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed SettingsView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_4] Applied 0 fixes to AttachmentSelectionView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to Faith_JournalApp.swift
+[16:28:32] [INFO] [MainThread] Processed AttachmentSelectionView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalApp.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_0] Applied 0 fixes to TagPickerView.swift
+[16:28:32] [INFO] [MainThread] Processed TagPickerView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to JournalFilterView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_10] Applied 0 fixes to Item.swift
+[16:28:32] [INFO] [MainThread] Processed JournalFilterView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Item.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_9] Applied 0 fixes to DrawingView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_2] Applied 0 fixes to HomeView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_6] Applied 0 fixes to DevotionalsView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_8] Applied 0 fixes to FaithStatsView.swift
+[16:28:32] [INFO] [MainThread] Processed DrawingView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed HomeView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed DevotionalsView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed FaithStatsView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_4] Applied 0 fixes to AudioRecordingView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_5] Applied 0 fixes to BadgesView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_7] Applied 0 fixes to JournalView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to PrayerRequestsView.swift
+[16:28:32] [INFO] [MainThread] Processed AudioRecordingView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed BadgesView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed JournalView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed PrayerRequestsView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to BiometricLockView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_10] Applied 0 fixes to OnboardingView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_6] Applied 0 fixes to UserAvatarView.swift
+[16:28:32] [INFO] [MainThread] Processed BiometricLockView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed OnboardingView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed UserAvatarView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_4] Applied 0 fixes to TagPickerView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_8] Applied 0 fixes to AttachmentSelectionView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_9] Applied 0 fixes to VerseMemorizationView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_2] Applied 0 fixes to TemplateSelectionView.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_11] Applied 0 fixes to NewJournalEntryView.swift
+[16:28:32] [INFO] [MainThread] Processed TagPickerView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed AttachmentSelectionView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed VerseMemorizationView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed TemplateSelectionView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed NewJournalEntryView.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_5] Applied 0 fixes to Faith_JournalUITestsLaunchTests.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_7] Applied 0 fixes to Faith_JournalUITests.swift
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalUITestsLaunchTests.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalUITests.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_1] Applied 0 fixes to Faith_JournalUITestsLaunchTests.swift
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalUITestsLaunchTests.swift - 0 fixes applied
+[16:28:32] [INFO] [ThreadPoolExecutor-0_3] Applied 0 fixes to Faith_JournalUITests.swift
+[16:28:32] [INFO] [ThreadPoolExecutor-0_0] Applied 0 fixes to BibleReadingPlanView.swift
+[16:28:32] [INFO] [MainThread] Processed Faith_JournalUITests.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Processed BibleReadingPlanView.swift - 0 fixes applied
+[16:28:32] [INFO] [MainThread] Analysis complete: 93 files processed, 0 fixes applied
+[16:28:32] [SUCCESS] [MainThread] Project structure validation: PASSED
+[16:28:32] [INFO] [MainThread] Found 93 Swift files, 2 storyboards, 6 plists
+[16:32:03] [INFO] [MainThread] Full analysis complete. Report saved to /Users/ronellbradley/Desktop/FaithJournal/enhanced_analysis_report.json
+
+================================================================================
+ANALYSIS SUMMARY
+================================================================================
+Files processed: 93
+Fixes applied: 0
+Structure valid: True
+Build successful: False
+Total time: 210.95 seconds
+
+❌ Build failed - see report for compilation errors
+
+📊 Detailed report saved to: enhanced_analysis_report.json

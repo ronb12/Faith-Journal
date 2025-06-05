@@ -1,0 +1,2663 @@
+{
+  "timestamp": 1749070536.860943,
+  "structure_validation": {
+    "xcodeproj": true,
+    "main_app_folder": true,
+    "views_folder": true,
+    "models_folder": true,
+    "assets": true,
+    "info_plist": true,
+    "app_file": true,
+    "tests_folder": true,
+    "ui_tests_folder": true
+  },
+  "file_analysis": {
+    "files_processed": 90,
+    "fixes_applied": 0,
+    "results": [
+      {
+        "file": "Faith Journal/JournalFilterView.swift",
+        "analysis": {
+          "path": "Faith Journal/JournalFilterView.swift",
+          "lines": 70,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "JournalFilterView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "toggleTag"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith_JournalApp.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith_JournalApp.swift",
+          "lines": 52,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "Faith_JournalApp"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/ContentView.swift",
+        "analysis": {
+          "path": "Faith Journal/ContentView.swift",
+          "lines": 20,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "ContentView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith JournalTests/Faith_JournalTests.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith JournalTests/Faith_JournalTests.swift",
+          "lines": 20,
+          "imports": [
+            "Testing"
+          ],
+          "classes": [],
+          "structs": [
+            "Faith_JournalTests"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "example"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith JournalTests/Faith_JournalTests.swift",
+        "analysis": {
+          "path": "Faith JournalTests/Faith_JournalTests.swift",
+          "lines": 9,
+          "imports": [
+            "SwiftUI"
+          ],
+          "classes": [
+            "Faith_JournalTests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith JournalTests/Models/VerseMemorizationTests.swift",
+        "analysis": {
+          "path": "Faith JournalTests/Models/VerseMemorizationTests.swift",
+          "lines": 68,
+          "imports": [
+            "SwiftData",
+            "XCTest"
+          ],
+          "classes": [
+            "VerseMemorizationTests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "setUpWithError",
+            "tearDownWithError",
+            "testVerseCreation",
+            "testVerseReview",
+            "testProgressionToMastery"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/BadgesView.swift",
+        "analysis": {
+          "path": "Faith Journal/BadgesView.swift",
+          "lines": 280,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "BadgesView",
+            "BadgeCell",
+            "BadgeDetailView",
+            "BadgeUnlockAnimationView"
+          ],
+          "enums": [
+            "BadgeFilter",
+            "BadgeSort"
+          ],
+          "protocols": [],
+          "functions": [
+            "unlockBadge"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Models/PrayerRequest.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Models/PrayerRequest.swift",
+          "lines": 40,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "PrayerRequest"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/ContentView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/ContentView.swift",
+          "lines": 30,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "ContentView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith_JournalApp.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith_JournalApp.swift",
+          "lines": 14,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "Faith_JournalApp"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Item.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Item.swift",
+          "lines": 19,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "Item"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/SceneDelegate.swift",
+        "analysis": {
+          "path": "Faith Journal/SceneDelegate.swift",
+          "lines": 23,
+          "imports": [
+            "SwiftUI",
+            "UIKit"
+          ],
+          "classes": [
+            "SceneDelegate"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "scene",
+            "sceneDidDisconnect",
+            "sceneDidBecomeActive",
+            "sceneWillResignActive",
+            "sceneWillEnterForeground",
+            "sceneDidEnterBackground"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Faith_JournalApp.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Faith_JournalApp.swift",
+          "lines": 52,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "Faith_JournalApp"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith JournalTests/Faith_JournalTests.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith JournalTests/Faith_JournalTests.swift",
+          "lines": 29,
+          "imports": [
+            "SwiftData",
+            "SwiftUI",
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalTests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "setUpWithError",
+            "tearDownWithError",
+            "testExample"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Faith JournalApp.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Faith JournalApp.swift",
+          "lines": 15,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "Faith_JournalApp"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/ContentView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/ContentView.swift",
+          "lines": 36,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "ContentView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Models/User.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Models/User.swift",
+          "lines": 69,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "User"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Models/Badge.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Models/Badge.swift",
+          "lines": 51,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "Badge"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "updateProgress"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Models/Devotional.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Models/Devotional.swift",
+          "lines": 48,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "Devotional"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "markAsRead"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Models/AudioEntry.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Models/AudioEntry.swift",
+          "lines": 31,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "AudioEntry"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Models/Drawing.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Models/Drawing.swift",
+          "lines": 35,
+          "imports": [
+            "Foundation",
+            "PencilKit",
+            "SwiftData"
+          ],
+          "classes": [
+            "Drawing"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Models/JournalEntry.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Models/JournalEntry.swift",
+          "lines": 66,
+          "imports": [
+            "CoreLocation",
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "JournalEntry"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "updateWordCount"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/SettingsView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/SettingsView.swift",
+          "lines": 861,
+          "imports": [
+            "Foundation",
+            "LocalAuthentication",
+            "SwiftData",
+            "SwiftUI",
+            "UIKit",
+            "UserNotifications"
+          ],
+          "classes": [],
+          "structs": [
+            "SettingsView",
+            "ProfileEditorView",
+            "ExportOptionsView",
+            "DataManagementView",
+            "DataRow",
+            "AboutView",
+            "FeatureItem",
+            "ContactItem"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "authenticateBiometric",
+            "requestNotificationPermission",
+            "deleteAllData",
+            "saveProfile",
+            "exportJournalEntries",
+            "exportPrayerRequests",
+            "exportDevotionals",
+            "exportAllData",
+            "createJournalExport",
+            "createPrayerExport",
+            "createDevotionalExport",
+            "createCompleteExport",
+            "resetBadgeProgress",
+            "clearCache"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/MainTabView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/MainTabView.swift",
+          "lines": 93,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "MainTabView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/NewJournalEntryView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/NewJournalEntryView.swift",
+          "lines": 244,
+          "imports": [
+            "CoreLocation",
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [
+            "AudioRecorder"
+          ],
+          "structs": [
+            "NewJournalEntryView",
+            "SaveConfirmationView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "setupLocationAndWeather",
+            "toggleRecording",
+            "saveEntry",
+            "startRecording",
+            "stopRecording"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalEntryDetailView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalEntryDetailView.swift",
+          "lines": 279,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI",
+            "UIKit"
+          ],
+          "classes": [],
+          "structs": [
+            "JournalEntryDetailView",
+            "AttachmentViewer"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "saveChanges",
+            "cancelEditing",
+            "toggleFavorite",
+            "togglePin",
+            "deleteEntry",
+            "createShareText"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/FaithStatsView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/FaithStatsView.swift",
+          "lines": 514,
+          "imports": [
+            "Charts",
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "FaithStatsView",
+            "StatCard",
+            "InsightRow",
+            "ChartData",
+            "MoodData",
+            "GoalsView"
+          ],
+          "enums": [
+            "TimeRange"
+          ],
+          "protocols": [],
+          "functions": [
+            "getChartData",
+            "getMoodData",
+            "colorForMood",
+            "getAverageWordCount",
+            "getMostUsedTag",
+            "getMostActiveDay",
+            "getBestMoodDay",
+            "getPrayerAnswerRate",
+            "getAverageResponseTime",
+            "getMostPrayedForCategory"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/DrawingView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/DrawingView.swift",
+          "lines": 317,
+          "imports": [
+            "Foundation",
+            "PencilKit",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "DrawingView",
+            "EmptyDrawingStateView",
+            "DrawingRow",
+            "DrawingCard",
+            "DrawingEditorView",
+            "CanvasView"
+          ],
+          "enums": [
+            "ViewMode"
+          ],
+          "protocols": [],
+          "functions": [
+            "deleteDrawings",
+            "setupCanvas",
+            "previousPage",
+            "nextPage",
+            "saveCurrentPage",
+            "loadPage",
+            "saveDrawing",
+            "makeUIView",
+            "updateUIView"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/HomeView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/HomeView.swift",
+          "lines": 168,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "HomeView",
+            "QuickActionButton",
+            "RecentEntryCard"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "loadVerseOfTheDay"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalFilterView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalFilterView.swift",
+          "lines": 105,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "JournalFilterView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/DevotionalsView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/DevotionalsView.swift",
+          "lines": 420,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "DevotionalsView",
+            "EmptyDevotionalStateView",
+            "DevotionalCard",
+            "DevotionalDetailView",
+            "VerseOfTheDayView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "loadSampleDevotionals",
+            "loadVerseOfTheDay"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/AudioView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/AudioView.swift",
+          "lines": 399,
+          "imports": [
+            "AVFoundation",
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [
+            "AudioRecorderManager",
+            "AudioPlayerManager"
+          ],
+          "structs": [
+            "AudioView",
+            "AudioEntryRow",
+            "RecordingView",
+            "EmptyStateView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "deleteEntry",
+            "formatDuration",
+            "toggleRecording",
+            "startRecording",
+            "stopRecording",
+            "saveRecording",
+            "cancelRecording",
+            "formatDuration",
+            "setupAudioSession",
+            "startRecording",
+            "stopRecording",
+            "deleteRecording",
+            "play",
+            "pause",
+            "stop"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/MoodTrackerView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/MoodTrackerView.swift",
+          "lines": 213,
+          "imports": [
+            "Charts",
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "MoodTrackerView",
+            "StatCard"
+          ],
+          "enums": [
+            "TimeRange"
+          ],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/JournalView.swift",
+          "lines": 274,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "JournalView",
+            "FilterChip",
+            "JournalEntryRow",
+            "JournalEntryCard",
+            "EmptyStateView"
+          ],
+          "enums": [
+            "ViewMode"
+          ],
+          "protocols": [],
+          "functions": [
+            "deleteEntries"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/PrayerRequestsView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/PrayerRequestsView.swift",
+          "lines": 898,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI",
+            "UserNotifications"
+          ],
+          "classes": [],
+          "structs": [
+            "PrayerRequestsView",
+            "StatPill",
+            "PrayerCard",
+            "NewPrayerRequestView",
+            "PrayerDetailView",
+            "EditPrayerRequestView",
+            "PrayerTagSelectionView",
+            "EmptyPrayersView"
+          ],
+          "enums": [
+            "FilterOption"
+          ],
+          "protocols": [],
+          "functions": [
+            "toggleArchiveStatus",
+            "markAsAnswered",
+            "deletePrayer",
+            "requestNotificationPermission",
+            "cancelNotification",
+            "savePrayerRequest",
+            "scheduleNotification",
+            "markAsAnswered",
+            "createShareText",
+            "savePrayerRequest",
+            "scheduleNotification",
+            "addNewTag",
+            "toggleTag"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/BiometricLockView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/BiometricLockView.swift",
+          "lines": 69,
+          "imports": [
+            "LocalAuthentication",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "BiometricLockView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "authenticate"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/ShareSheet.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/ShareSheet.swift",
+          "lines": 35,
+          "imports": [
+            "SwiftUI",
+            "UIKit"
+          ],
+          "classes": [],
+          "structs": [
+            "ShareSheet"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "makeUIViewController",
+            "updateUIViewController"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/TemplateSelectionView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/TemplateSelectionView.swift",
+          "lines": 169,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "TemplateSelectionView",
+            "JournalTemplate"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "selectTemplate"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/StreakView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/StreakView.swift",
+          "lines": 136,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "StreakView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/BadgesView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/BadgesView.swift",
+          "lines": 761,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "BadgesView",
+            "BadgeCard",
+            "BadgeDetailView",
+            "EmptyBadgesView"
+          ],
+          "enums": [
+            "BadgeCategory",
+            "SortOption"
+          ],
+          "protocols": [],
+          "functions": [
+            "createDefaultBadgesIfNeeded",
+            "updateBadgeProgress",
+            "getCurrentStreak",
+            "getTipForBadge"
+          ],
+          "issues": [
+            "High number of force unwraps (7)"
+          ],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/CalendarView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/CalendarView.swift",
+          "lines": 256,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "CalendarView",
+            "CalendarDayCell",
+            "EntryPreviewCard"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "startOfWeek",
+            "daysInMonth",
+            "previousMonth",
+            "nextMonth"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/UserAvatarView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/UserAvatarView.swift",
+          "lines": 31,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI",
+            "UIKit"
+          ],
+          "classes": [],
+          "structs": [
+            "UserAvatarView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/OnboardingView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/OnboardingView.swift",
+          "lines": 137,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI",
+            "UIKit"
+          ],
+          "classes": [],
+          "structs": [
+            "OnboardingView",
+            "OnboardingPage"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "completeOnboarding"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/TagSelectionView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/TagSelectionView.swift",
+          "lines": 136,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "TagSelectionView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "addNewTag",
+            "toggleTag",
+            "suggestTags"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Views/Components/StreakView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Views/Components/StreakView.swift",
+          "lines": 8,
+          "imports": [
+            "Foundation",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "StreakView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/AttachmentSelectionView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/AttachmentSelectionView.swift",
+          "lines": 158,
+          "imports": [
+            "Foundation",
+            "PhotosUI",
+            "SwiftData",
+            "SwiftUI",
+            "UIKit"
+          ],
+          "classes": [
+            "Coordinator"
+          ],
+          "structs": [
+            "AttachmentSelectionView",
+            "AttachmentRow",
+            "DocumentPicker"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "makeUIViewController",
+            "updateUIViewController",
+            "makeCoordinator",
+            "documentPicker"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/ImagePicker.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith Journal/Views/Components/ImagePicker.swift",
+          "lines": 74,
+          "imports": [
+            "Foundation",
+            "PhotosUI",
+            "SwiftData",
+            "SwiftUI",
+            "UIKit"
+          ],
+          "classes": [
+            "Coordinator"
+          ],
+          "structs": [
+            "ImagePicker",
+            "ModernImagePicker"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "makeUIViewController",
+            "updateUIViewController",
+            "makeCoordinator",
+            "imagePickerController",
+            "imagePickerControllerDidCancel"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/VerseMemorization.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/VerseMemorization.swift",
+          "lines": 151,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [
+            "VerseMemorization"
+          ],
+          "structs": [
+            "ReviewRecord"
+          ],
+          "enums": [
+            "MemorizationStage"
+          ],
+          "protocols": [],
+          "functions": [
+            "review",
+            "updateNextReviewDate",
+            "setReminder",
+            "scheduleReminder",
+            "cancelReminder"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/ScriptureArt.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/ScriptureArt.swift",
+          "lines": 104,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [
+            "ScriptureArt"
+          ],
+          "structs": [],
+          "enums": [
+            "TemplateStyle"
+          ],
+          "protocols": [],
+          "functions": [
+            "setBackground",
+            "saveRenderedImage",
+            "share"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/User.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/User.swift",
+          "lines": 39,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "User"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith JournalUITests/Faith_JournalUITests.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith JournalUITests/Faith_JournalUITests.swift",
+          "lines": 48,
+          "imports": [
+            "SwiftData",
+            "SwiftUI",
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalUITests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "setUpWithError",
+            "tearDownWithError",
+            "testExample",
+            "testLaunchPerformance"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/Devotional.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/Devotional.swift",
+          "lines": 47,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "Devotional"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/BibleReadingPlan.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/BibleReadingPlan.swift",
+          "lines": 139,
+          "imports": [
+            "Foundation",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [
+            "BibleReadingPlan"
+          ],
+          "structs": [
+            "BibleReading"
+          ],
+          "enums": [
+            "PlanType"
+          ],
+          "protocols": [],
+          "functions": [
+            "markReadingComplete",
+            "updateStreak",
+            "setReminder",
+            "scheduleReminders",
+            "cancelReminders"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal 3/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal 3/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+          "lines": 38,
+          "imports": [
+            "SwiftData",
+            "SwiftUI",
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalUITestsLaunchTests",
+            "var"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "setUpWithError",
+            "testLaunch"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/PrayerRequest.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/PrayerRequest.swift",
+          "lines": 40,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "PrayerRequest"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/Drawing.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/Drawing.swift",
+          "lines": 35,
+          "imports": [
+            "Foundation",
+            "PencilKit",
+            "SwiftData"
+          ],
+          "classes": [
+            "Drawing"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "getPKDrawing"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal/ContentView.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal/ContentView.swift",
+          "lines": 64,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "ContentView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "addItem",
+            "deleteItems"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/AudioEntry.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/AudioEntry.swift",
+          "lines": 28,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "AudioEntry"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Components/AttachmentSelectionView.swift",
+        "analysis": {
+          "path": "Faith Journal/Components/AttachmentSelectionView.swift",
+          "lines": 143,
+          "imports": [
+            "PhotosUI",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "AttachmentSelectionView",
+            "PreviewWrapper"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Components/UserAvatarView.swift",
+        "analysis": {
+          "path": "Faith Journal/Components/UserAvatarView.swift",
+          "lines": 36,
+          "imports": [
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "UserAvatarView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/JournalEntry.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/JournalEntry.swift",
+          "lines": 67,
+          "imports": [
+            "Foundation",
+            "PencilKit",
+            "SwiftData"
+          ],
+          "classes": [
+            "JournalEntry"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Components/TemplateSelectionView.swift",
+        "analysis": {
+          "path": "Faith Journal/Components/TemplateSelectionView.swift",
+          "lines": 68,
+          "imports": [
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "JournalTemplate",
+            "TemplateSelectionView",
+            "PreviewWrapper"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal/Item.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal/Item.swift",
+          "lines": 21,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "Item"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/SettingsView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/SettingsView.swift",
+          "lines": 137,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "SettingsView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith Journal/Faith_JournalApp.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith Journal/Faith_JournalApp.swift",
+          "lines": 35,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "Faith_JournalApp"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Models/Badge.swift",
+        "analysis": {
+          "path": "Faith Journal/Models/Badge.swift",
+          "lines": 66,
+          "imports": [
+            "Foundation",
+            "SwiftData"
+          ],
+          "classes": [
+            "Badge"
+          ],
+          "structs": [
+            "PredefinedBadges"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/MainTabView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/MainTabView.swift",
+          "lines": 102,
+          "imports": [
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "MainTabView"
+          ],
+          "enums": [
+            "Tab"
+          ],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Components/TagPickerView.swift",
+        "analysis": {
+          "path": "Faith Journal/Components/TagPickerView.swift",
+          "lines": 90,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "TagPickerView",
+            "PreviewWrapper"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "addNewTag"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/NewJournalEntryView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/NewJournalEntryView.swift",
+          "lines": 377,
+          "imports": [
+            "PhotosUI",
+            "SwiftData",
+            "SwiftUI",
+            "UniformTypeIdentifiers"
+          ],
+          "classes": [],
+          "structs": [
+            "NewJournalEntryView",
+            "DrawingThumbnail",
+            "AudioThumbnail",
+            "AttachmentThumbnail"
+          ],
+          "enums": [
+            "JournalTemplate"
+          ],
+          "protocols": [],
+          "functions": [
+            "saveEntry",
+            "formatDuration",
+            "getSystemImage"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/JournalFilterView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/JournalFilterView.swift",
+          "lines": 70,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "JournalFilterView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "toggleTag"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Consider adding #Preview for better development experience"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/DevotionalsView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/DevotionalsView.swift",
+          "lines": 211,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "DevotionalsView",
+            "DevotionalRow",
+            "DevotionalDetailView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "addSampleDevotionalsIfNeeded"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/HomeView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/HomeView.swift",
+          "lines": 192,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "HomeView",
+            "for",
+            "QuickActionCard",
+            "for",
+            "HighlightCard"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/DrawingView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/DrawingView.swift",
+          "lines": 119,
+          "imports": [
+            "PencilKit",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "DrawingView",
+            "PKCanvasViewRepresentable",
+            "PreviewWrapper"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "saveDrawing",
+            "makeUIView",
+            "updateUIView"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/BadgesView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/BadgesView.swift",
+          "lines": 280,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "BadgesView",
+            "BadgeCell",
+            "BadgeDetailView",
+            "BadgeUnlockAnimationView"
+          ],
+          "enums": [
+            "BadgeFilter",
+            "BadgeSort"
+          ],
+          "protocols": [],
+          "functions": [
+            "unlockBadge"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/VerseMemorizationView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/VerseMemorizationView.swift",
+          "lines": 512,
+          "imports": [
+            "Charts",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "VerseMemorizationView",
+            "VerseCard",
+            "ProgressBadge",
+            "NewVerseView",
+            "VerseDetailView",
+            "VerseReviewView",
+            "ReviewCompleteView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "deleteVerses",
+            "saveVerse",
+            "toggleEditNotes",
+            "reviewVerse",
+            "recordReview"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments",
+            "Complex view hierarchy - consider breaking into smaller views"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/BibleReadingPlanView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/BibleReadingPlanView.swift",
+          "lines": 270,
+          "imports": [
+            "Charts",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "BibleReadingPlanView",
+            "ReadingPlanCard",
+            "NewReadingPlanView",
+            "ReadingPlanDetailView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "deletePlans",
+            "createPlan",
+            "markComplete"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/JournalView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/JournalView.swift",
+          "lines": 186,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "JournalView",
+            "JournalEntryRow",
+            "JournalEntryDetailView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "deleteEntries"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/AudioRecordingView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/AudioRecordingView.swift",
+          "lines": 281,
+          "imports": [
+            "AVFoundation",
+            "SwiftUI"
+          ],
+          "classes": [
+            "AudioRecorderManager",
+            "AudioPlayerManager"
+          ],
+          "structs": [
+            "AudioRecordingView",
+            "PreviewWrapper"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "startRecording",
+            "stopRecording",
+            "audioRecorderDidFinishRecording",
+            "cleanupTemporaryFile",
+            "startPlayback",
+            "stopPlayback",
+            "audioPlayerDidFinishPlaying",
+            "startTimer",
+            "stopTimer",
+            "formatDuration"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/BiometricLockView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/BiometricLockView.swift",
+          "lines": 80,
+          "imports": [
+            "LocalAuthentication",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "BiometricLockView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "authenticate"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/OnboardingView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/OnboardingView.swift",
+          "lines": 108,
+          "imports": [
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "OnboardingView",
+            "OnboardingPage",
+            "OnboardingPageView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/PrayerRequestsView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/PrayerRequestsView.swift",
+          "lines": 220,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "PrayerRequestsView",
+            "PrayerRequestRow"
+          ],
+          "enums": [
+            "PrayerStatusFilter"
+          ],
+          "protocols": [],
+          "functions": [
+            "deletePrayer"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/FaithStatsView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/FaithStatsView.swift",
+          "lines": 260,
+          "imports": [
+            "Charts",
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "FaithStatsView",
+            "SectionBox",
+            "StatCard",
+            "GoalProgressView",
+            "ActivityDataPoint",
+            "MoodDataPoint"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "isDateInCurrentWeek"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/Components/AttachmentSelectionView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/Components/AttachmentSelectionView.swift",
+          "lines": 143,
+          "imports": [
+            "PhotosUI",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "AttachmentSelectionView",
+            "PreviewWrapper"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/Components/TagPickerView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/Components/TagPickerView.swift",
+          "lines": 90,
+          "imports": [
+            "SwiftData",
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "TagPickerView",
+            "PreviewWrapper"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "addNewTag"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+        "analysis": {
+          "path": "Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+          "lines": 8,
+          "imports": [
+            "SwiftUI",
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalUITestsLaunchTests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/Components/UserAvatarView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/Components/UserAvatarView.swift",
+          "lines": 36,
+          "imports": [
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "UserAvatarView"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Views/Components/TemplateSelectionView.swift",
+        "analysis": {
+          "path": "Faith Journal/Views/Components/TemplateSelectionView.swift",
+          "lines": 68,
+          "imports": [
+            "SwiftUI"
+          ],
+          "classes": [],
+          "structs": [
+            "JournalTemplate",
+            "TemplateSelectionView",
+            "PreviewWrapper"
+          ],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+          "lines": 36,
+          "imports": [
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalUITestsLaunchTests",
+            "var"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "setUpWithError",
+            "testLaunch"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith JournalUITests/Faith_JournalUITests.swift",
+        "analysis": {
+          "path": "Faith JournalUITests/Faith_JournalUITests.swift",
+          "lines": 8,
+          "imports": [
+            "SwiftUI",
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalUITests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "Faith Journal/Faith JournalUITests/Faith_JournalUITests.swift",
+        "analysis": {
+          "path": "Faith Journal/Faith JournalUITests/Faith_JournalUITests.swift",
+          "lines": 46,
+          "imports": [
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalUITests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [
+            "setUpWithError",
+            "tearDownWithError",
+            "testExample",
+            "testLaunchPerformance"
+          ],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      }
+    ],
+    "summary": "{\n  \"project_analysis\": {\n    \"timestamp\": 1749070506.196811,\n    \"workers\": 12,\n    \"files_analyzed\": 0,\n    \"issues_found\": 0,\n    \"fixes_applied\": 0,\n    \"recommendations\": []\n  },\n  \"structure_validation\": {\n    \"xcodeproj\": true,\n    \"main_app_folder\": true,\n    \"views_folder\": true,\n    \"models_folder\": true,\n    \"assets\": true,\n    \"info_plist\": true,\n    \"app_file\": true,\n    \"tests_folder\": true,\n    \"ui_tests_folder\": true\n  },\n  \"files_found\": {\n    \"swift\": 90,\n    \"storyboard\": 2,\n    \"plist\": 6,\n    \"xcassets\": 0,\n    \"other\": 65\n  },\n  \"recommendations\": [\n    \"Consider implementing SwiftUI previews for all views\",\n    \"Add unit tests for all models and business logic\",\n    \"Implement proper error handling throughout the app\",\n    \"Consider using dependency injection for better testability\",\n    \"Add accessibility labels for better app accessibility\",\n    \"Implement proper data persistence error handling\",\n    \"Consider using structured concurrency (async/await) for network operations\"\n  ]\n}"
+  },
+  "build_analysis": {
+    "success": false,
+    "output": "Command line invocation:\n    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project \"Faith Journal.xcodeproj\" -scheme \"Faith Journal\" -configuration Debug clean build\n\nUser defaults from command line:\n    IDEPackageSupportUseBuiltinSCM = YES\n\n\n** CLEAN SUCCEEDED **\n\nPrepare packages\n\nComputeTargetDependencyGraph\nnote: Building targets in dependency order\nnote: Target dependency graph (1 target)\n    Target 'Faith Journal' in project 'Faith Journal' (no dependencies)\n\nGatherProvisioningInputs\n\nCreateBuildDescription\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Assets.xcassets /Users/ronellbradley/Desktop/FaithJournal/Faith Journal/Preview Content/Preview Assets.xcassets\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.2.sdk -x c -c /dev/null\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details\n\nBuild description signature: 19bbd0dc4467e734686f54a6b30c3762\nBuild description path: /Users/ronellbradley/Library/Developer/Xcode/DerivedData/Faith_Journal-gtwwhqwukpfnqraysxjimeyqxgfu/Build/Intermediates.noindex/XCBuildData/19bbd0dc4467e734686f54a6b30c3762.xcbuilddata\n/Users/ronellbradley/Desktop/FaithJournal/Faith Journal.xcodeproj: error: Signing for \"Faith Journal\" requires a development team. Select a development team in the Signing & Capabilities editor. (in target 'Faith Journal' from project 'Faith Journal' at path '/Users/ronellbradley/Desktop/FaithJournal/Faith Journal.xcodeproj')\n",
+    "errors": "--- xcodebuild: WARNING: Using the first of multiple matching destinations:\n{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }\n{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }\n--- xcodebuild: WARNING: Using the first of multiple matching destinations:\n{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }\n{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }\n** BUILD FAILED **\n\n\nThe following build commands failed:\n\tBuilding project Faith Journal with scheme Faith Journal and configuration Debug\n(1 failure)\n",
+    "compilation_errors": []
+  },
+  "summary": {
+    "files_processed": 90,
+    "fixes_applied": 0,
+    "structure_valid": true,
+    "build_successful": false
+  }
+}
