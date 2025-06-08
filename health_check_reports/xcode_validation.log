@@ -1,0 +1,35 @@
+================================================================================
+Xcode Project Validator for Faith Journal
+Multi-threaded validation with 12 workers
+================================================================================
+[14:36:50] [INFO] [MainThread] Starting comprehensive Xcode project validation
+[14:36:50] [INFO] [MainThread] Starting parallel validation with 12 workers
+[14:36:50] [INFO] [ThreadPoolExecutor-0_7] Starting test build...
+[14:36:50] [INFO] [ThreadPoolExecutor-0_1] Project contains: 11 targets, 43 file references
+[14:36:50] [INFO] [MainThread] Completed pbxproj_parsing in 0.04s
+[14:36:50] [INFO] [MainThread] Completed info_plist in 0.09s
+[14:36:50] [INFO] [MainThread] Completed app_icons in 0.08s
+[14:36:50] [INFO] [ThreadPoolExecutor-0_0] Project structure validation: 4/6 checks passed
+[14:36:50] [INFO] [MainThread] Completed project_structure in 0.10s
+[14:36:50] [INFO] [MainThread] Completed file_references in 0.15s
+[14:37:09] [INFO] [ThreadPoolExecutor-0_5] Found 1 schemes
+[14:37:09] [INFO] [MainThread] Completed schemes in 18.84s
+[14:37:12] [INFO] [ThreadPoolExecutor-0_2] Extracted build settings for 1 targets
+[14:37:12] [INFO] [MainThread] Completed build_settings in 21.66s
+[14:38:09] [ERROR] [ThreadPoolExecutor-0_7] Build test FAILED with 1 errors
+[14:38:09] [INFO] [MainThread] Completed build_test in 78.94s
+[14:38:09] [INFO] [MainThread] Validation complete in 78.97s. Report saved to /Users/ronellbradley/Desktop/Faith Journal/xcode_validation_report.json
+
+================================================================================
+VALIDATION SUMMARY
+================================================================================
+Total validations: 8
+Successful: 8
+Failed: 0
+Build successful: False
+Duration: 78.97 seconds
+
+❌ Project has build issues - check the report
+
+📊 Detailed report saved to: xcode_validation_report.json
+🔧 9 recommendations generated

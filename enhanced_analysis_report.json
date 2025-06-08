@@ -1,0 +1,123 @@
+{
+  "timestamp": 1749407908.349469,
+  "structure_validation": {
+    "xcodeproj": true,
+    "main_app_folder": true,
+    "views_folder": false,
+    "models_folder": false,
+    "assets": false,
+    "info_plist": false,
+    "app_file": false,
+    "tests_folder": true,
+    "ui_tests_folder": true
+  },
+  "file_analysis": {
+    "files_processed": 4,
+    "fixes_applied": 1,
+    "results": [
+      {
+        "file": "/Users/ronellbradley/Desktop/Faith Journal/Faith JournalTests/Faith_JournalTests.swift",
+        "analysis": {
+          "path": "/Users/ronellbradley/Desktop/Faith Journal/Faith JournalTests/Faith_JournalTests.swift",
+          "lines": 10,
+          "imports": [
+            "SwiftUI"
+          ],
+          "classes": [
+            "Faith_JournalTests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "/Users/ronellbradley/Desktop/Faith Journal/Package.swift",
+        "analysis": {
+          "path": "/Users/ronellbradley/Desktop/Faith Journal/Package.swift",
+          "lines": 27,
+          "imports": [
+            "PackageDescription"
+          ],
+          "classes": [],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": []
+        },
+        "fixes_applied": 1,
+        "status": "success"
+      },
+      {
+        "file": "/Users/ronellbradley/Desktop/Faith Journal/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+        "analysis": {
+          "path": "/Users/ronellbradley/Desktop/Faith Journal/Faith JournalUITests/Faith_JournalUITestsLaunchTests.swift",
+          "lines": 9,
+          "imports": [
+            "SwiftUI",
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalUITestsLaunchTests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      },
+      {
+        "file": "/Users/ronellbradley/Desktop/Faith Journal/Faith JournalUITests/Faith_JournalUITests.swift",
+        "analysis": {
+          "path": "/Users/ronellbradley/Desktop/Faith Journal/Faith JournalUITests/Faith_JournalUITests.swift",
+          "lines": 9,
+          "imports": [
+            "SwiftUI",
+            "XCTest"
+          ],
+          "classes": [
+            "Faith_JournalUITests"
+          ],
+          "structs": [],
+          "enums": [],
+          "protocols": [],
+          "functions": [],
+          "issues": [],
+          "suggestions": [
+            "Consider adding documentation comments"
+          ]
+        },
+        "fixes_applied": 0,
+        "status": "success"
+      }
+    ],
+    "summary": "{\n  \"project_analysis\": {\n    \"timestamp\": 1749407890.377134,\n    \"workers\": 12,\n    \"files_analyzed\": 0,\n    \"issues_found\": 0,\n    \"fixes_applied\": 0,\n    \"recommendations\": []\n  },\n  \"structure_validation\": {\n    \"xcodeproj\": true,\n    \"main_app_folder\": true,\n    \"views_folder\": false,\n    \"models_folder\": false,\n    \"assets\": false,\n    \"info_plist\": false,\n    \"app_file\": false,\n    \"tests_folder\": true,\n    \"ui_tests_folder\": true\n  },\n  \"files_found\": {\n    \"swift\": 4,\n    \"storyboard\": 0,\n    \"plist\": 1,\n    \"xcassets\": 0,\n    \"other\": 49\n  },\n  \"recommendations\": [\n    \"Consider implementing SwiftUI previews for all views\",\n    \"Add unit tests for all models and business logic\",\n    \"Implement proper error handling throughout the app\",\n    \"Consider using dependency injection for better testability\",\n    \"Add accessibility labels for better app accessibility\",\n    \"Implement proper data persistence error handling\",\n    \"Consider using structured concurrency (async/await) for network operations\"\n  ]\n}"
+  },
+  "build_analysis": {
+    "success": false,
+    "output": "Command line invocation:\n    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project \"Faith Journal.xcodeproj\" -scheme \"Faith Journal\" -configuration Debug clean build\n\nUser defaults from command line:\n    IDEPackageSupportUseBuiltinSCM = YES\n\n\n** CLEAN SUCCEEDED **\n\nPrepare packages\n\nComputeTargetDependencyGraph\nnote: Building targets in dependency order\nnote: Target dependency graph (1 target)\n    Target 'Faith Journal' in project 'Faith Journal' (no dependencies)\n\nGatherProvisioningInputs\n\nCreateBuildDescription\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.2.sdk -x c -c /dev/null\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Users/ronellbradley/Desktop/Faith Journal/Faith Journal/Faith Journal/Assets.xcassets /Users/ronellbradley/Desktop/Faith Journal/Faith Journal/Faith Journal/Preview Content/Preview Assets.xcassets\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version\n\nExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details\n\nBuild description signature: e3b4032566519885a93a9c053c4d9f65\nBuild description path: /Users/ronellbradley/Library/Developer/Xcode/DerivedData/Faith_Journal-hjgnptgwneuadsdruasthkuajlex/Build/Intermediates.noindex/XCBuildData/e3b4032566519885a93a9c053c4d9f65.xcbuilddata\n/Users/ronellbradley/Desktop/Faith Journal/Faith Journal.xcodeproj: error: Signing for \"Faith Journal\" requires a development team. Select a development team in the Signing & Capabilities editor. (in target 'Faith Journal' from project 'Faith Journal')\n",
+    "errors": "2025-06-08 14:38:19.612 xcodebuild[8520:4534560] [MT] IDEFileReferenceDebug: [Load] <Xcode3FileReference, 0x7f814130d7f0 (Represents: <PBXFileReference:0x7f814108a630:672A9D46C2F018ADE6E613FB:name='Faith Journal.xcodeproj'>)> Failed to load container at path: /Users/ronellbradley/Desktop/Faith Journal/Faith Journal/Faith Journal.xcodeproj, Error: Error Domain=Xcode3ProjectErrorDomain Code=2 \"Project /Users/ronellbradley/Desktop/Faith Journal/Faith Journal/Faith Journal.xcodeproj cannot be opened because it is missing its project.pbxproj file.\" UserInfo={NSLocalizedDescription=Project /Users/ronellbradley/Desktop/Faith Journal/Faith Journal/Faith Journal.xcodeproj cannot be opened because it is missing its project.pbxproj file.}\n--- xcodebuild: WARNING: Using the first of multiple matching destinations:\n{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }\n{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }\n{ platform:iOS, arch:arm64, id:00008101-000369E9119A601E, name:ronell\u2019s iPad }\n--- xcodebuild: WARNING: Using the first of multiple matching destinations:\n{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }\n{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }\n{ platform:iOS Simulator, id:E8922DB1-1E1E-4D28-B274-9264AF3421D6, OS:18.3.1, name:iPad (10th generation) }\n{ platform:iOS Simulator, id:84D51B1A-D928-47FE-87BC-82CC5099C912, OS:18.3.1, name:iPad (A16) }\n{ platform:iOS Simulator, id:A08CDF00-FF28-4305-941B-402A72CEDE88, OS:18.3.1, name:iPad Air 11-inch (M2) }\n{ platform:iOS Simulator, id:C5F16B6D-C234-4195-BAA8-23A3BBF8952C, OS:18.3.1, name:iPad Air 11-inch (M3) }\n{ platform:iOS Simulator, id:8B7CD969-0BD3-4108-A1D3-6A1246DAF4A4, OS:18.3.1, name:iPad Air 13-inch (M2) }\n{ platform:iOS Simulator, id:087414D3-3F11-4063-9F98-BC6121F16824, OS:18.3.1, name:iPad Air 13-inch (M3) }\n{ platform:iOS Simulator, id:5934A470-66B2-4A3E-A18E-067694C088E9, OS:18.3.1, name:iPad Pro 11-inch (M4) }\n{ platform:iOS Simulator, id:6AE079D9-96E5-4883-B883-34563C88DB79, OS:18.3.1, name:iPad Pro 13-inch (M4) }\n{ platform:iOS Simulator, id:F7D8EC98-0F13-406B-A746-78A574DAFDAE, OS:18.3.1, name:iPad mini (A17 Pro) }\n{ platform:iOS Simulator, id:974E5B53-B0A0-4165-93C2-734F0A03037F, OS:18.3.1, name:iPhone 16 }\n{ platform:iOS Simulator, id:E64E1BA8-CF2F-4911-8258-3D0AF53BD433, OS:18.3.1, name:iPhone 16 Plus }\n{ platform:iOS Simulator, id:0BD1EADE-C376-4006-B204-2BE73C0137FF, OS:18.3.1, name:iPhone 16 Pro }\n{ platform:iOS Simulator, id:957E36C8-9FA9-40F9-9101-360DEB8AA52C, OS:18.3.1, name:iPhone 16 Pro Max }\n{ platform:iOS Simulator, id:C00192B7-8184-49D2-96A7-D5D224CE4691, OS:18.3.1, name:iPhone 16e }\n{ platform:iOS Simulator, id:E3330A64-4CFE-425B-A071-639CD04D2E61, OS:18.3.1, name:iPhone SE (3rd generation) }\n{ platform:iOS Simulator, id:FE6F819F-0644-4012-8926-DFDF354BEF9F, OS:18.3.1, name:iPhone Xs Max }\n{ platform:iOS, arch:arm64, id:00008101-000369E9119A601E, name:ronell\u2019s iPad }\n** BUILD FAILED **\n\n\nThe following build commands failed:\n\tBuilding project Faith Journal with scheme Faith Journal and configuration Debug\n(1 failure)\n",
+    "compilation_errors": []
+  },
+  "summary": {
+    "files_processed": 4,
+    "fixes_applied": 1,
+    "structure_valid": false,
+    "build_successful": false
+  }
+}
