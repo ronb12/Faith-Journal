@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct PrayerView: View {
-    @Query(sort: [SortDescriptor(\.date, order: .reverse)]) var requests: [PrayerRequest]
+    @Query(sort: [SortDescriptor(\PrayerRequest.date, order: .reverse)]) var requests: [PrayerRequest]
     @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.modelContext) private var modelContext
     @State private var showingNewRequest = false
@@ -17,7 +17,7 @@ struct PrayerView: View {
         if !searchText.isEmpty {
             filtered = filtered.filter { request in
                 request.title.localizedCaseInsensitiveContains(searchText) ||
-                request.description.localizedCaseInsensitiveContains(searchText) ||
+                request.details.localizedCaseInsensitiveContains(searchText) ||
                 request.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
             }
         }
@@ -79,16 +79,49 @@ struct PrayerView: View {
                 .padding()
                 .background(Color(.systemBackground))
                 
-                // Prayer Requests List
-                List {
-                    ForEach(filteredRequests) { request in
-                        NavigationLink(destination: PrayerRequestDetailView(request: request)) {
-                            PrayerRequestRow(request: request)
+                if filteredRequests.isEmpty {
+                    VStack(spacing: 20) {
+                        Image(systemName: "hands.sparkles")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        
+                        Text("No Prayer Requests")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        Text("Begin your prayer journey by adding your first prayer request")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        Button(action: { showingNewRequest = true }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Add First Prayer")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.purple)
+                            .cornerRadius(10)
                         }
                     }
-                    .onDelete(perform: deleteRequest)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
+                } else {
+                    // Prayer Requests List
+                    List {
+                        ForEach(filteredRequests) { request in
+                            NavigationLink(destination: PrayerRequestDetailView(request: request)) {
+                                PrayerRequestRow(request: request)
+                            }
+                        }
+                        .onDelete(perform: deleteRequest)
+                    }
+                    .listStyle(PlainListStyle())
                 }
-                .listStyle(PlainListStyle())
             }
             .navigationTitle("Prayer Requests")
             .toolbar {
@@ -102,6 +135,12 @@ struct PrayerView: View {
                 NewPrayerRequestView()
             }
         }
+        .onAppear {
+            // Create sample data if no requests exist
+            if requests.isEmpty {
+                createSamplePrayers()
+            }
+        }
     }
     
     private func deleteRequest(at offsets: IndexSet) {
@@ -109,6 +148,41 @@ struct PrayerView: View {
             let request = filteredRequests[index]
             modelContext.delete(request)
         }
+        try? modelContext.save()
+    }
+    
+    private func createSamplePrayers() {
+        let samplePrayers = [
+            PrayerRequest(
+                title: "Guidance for Career Decision",
+                details: "I'm facing a major career decision and need God's wisdom to choose the right path. Please pray that I would clearly hear His voice and have the courage to follow where He leads.",
+                tags: ["career", "guidance", "wisdom"],
+                isPrivate: false
+            ),
+            PrayerRequest(
+                title: "Healing for Family Member",
+                details: "My mother is dealing with health issues and I'm praying for her complete healing. I trust in God's power to restore her health and bring peace to our family during this difficult time.",
+                tags: ["healing", "family", "health"],
+                isPrivate: true
+            ),
+            PrayerRequest(
+                title: "Financial Provision",
+                details: "We're facing some financial challenges and need God's provision. I'm praying for wisdom in managing our resources and for God to open doors of opportunity.",
+                tags: ["finances", "provision", "trust"],
+                isPrivate: false
+            )
+        ]
+        
+        // Make one prayer answered as an example
+        samplePrayers[0].status = .answered
+        samplePrayers[0].isAnswered = true
+        samplePrayers[0].answerDate = Date().addingTimeInterval(-86400) // Yesterday
+        samplePrayers[0].answerNotes = "God provided clear guidance through a conversation with a mentor. I feel confident about the direction He's leading me."
+        
+        for prayer in samplePrayers {
+            modelContext.insert(prayer)
+        }
+        
         try? modelContext.save()
     }
 }
@@ -150,7 +224,7 @@ struct PrayerRequestRow: View {
                 }
             }
             
-            Text(request.description)
+            Text(request.details)
                 .font(.body)
                 .lineLimit(3)
                 .foregroundColor(themeManager.colors.textSecondary)
@@ -189,25 +263,6 @@ struct PrayerRequestRow: View {
             }
         }
         .padding(.vertical, 6)
-    }
-}
-
-struct FilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color.purple : Color(.systemGray5))
-                .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(16)
-        }
     }
 }
 
@@ -277,7 +332,7 @@ struct NewPrayerRequestView: View {
         
         let request = PrayerRequest(
             title: title,
-            description: description,
+            details: description,
             tags: allTags,
             isPrivate: isPrivate
         )
@@ -347,7 +402,7 @@ struct PrayerRequestDetailView: View {
                 }
                 
                 // Description
-                Text(request.description)
+                Text(request.details)
                     .font(.body)
                     .lineSpacing(4)
                 
@@ -523,7 +578,7 @@ struct EditPrayerRequestView: View {
     init(request: PrayerRequest) {
         self.request = request
         _title = State(initialValue: request.title)
-        _description = State(initialValue: request.description)
+        _description = State(initialValue: request.details)
         _tags = State(initialValue: request.tags.joined(separator: ", "))
         _isPrivate = State(initialValue: request.isPrivate)
         _selectedCategory = State(initialValue: request.tags.first ?? "")
@@ -581,7 +636,7 @@ struct EditPrayerRequestView: View {
         }
         
         request.title = title
-        request.description = description
+        request.details = description
         request.tags = allTags
         request.isPrivate = isPrivate
         request.updatedAt = Date()

@@ -4,7 +4,7 @@ import PhotosUI
 import AVFoundation
 
 struct JournalView: View {
-    @Query(sort: [SortDescriptor(\.date, order: .reverse)]) var entries: [JournalEntry]
+    @Query(sort: [SortDescriptor(\JournalEntry.date, order: .reverse)]) var entries: [JournalEntry]
     @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.modelContext) private var modelContext
     @State private var showingNewEntry = false
@@ -17,81 +17,85 @@ struct JournalView: View {
         
         // Apply search filter
         if !searchText.isEmpty {
-            filtered = filtered.filter { entry in
-                entry.title.localizedCaseInsensitiveContains(searchText) ||
-                entry.content.localizedCaseInsensitiveContains(searchText) ||
-                entry.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
-            }
+            filtered = applySearchFilter(to: filtered)
         }
         
         // Apply category filter
-        switch selectedFilter {
-        case .all:
-            break
-        case .private:
-            filtered = filtered.filter { $0.isPrivate }
-        case .public:
-            filtered = filtered.filter { !$0.isPrivate }
-        case .withMedia:
-            filtered = filtered.filter { !$0.photoURLs.isEmpty || $0.audioURL != nil || $0.drawingData != nil }
-        case .mood(let mood):
-            filtered = filtered.filter { $0.mood == mood }
-        }
+        filtered = applyCategoryFilter(to: filtered)
         
         return filtered
+    }
+    
+    private func applySearchFilter(to entries: [JournalEntry]) -> [JournalEntry] {
+        return entries.filter { entry in
+            entry.title.localizedCaseInsensitiveContains(searchText) ||
+            entry.content.localizedCaseInsensitiveContains(searchText) ||
+            entry.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+    
+    private func applyCategoryFilter(to entries: [JournalEntry]) -> [JournalEntry] {
+        switch selectedFilter {
+        case .all:
+            return entries
+        case .private:
+            return entries.filter { $0.isPrivate }
+        case .public:
+            return entries.filter { !$0.isPrivate }
+        case .withMedia:
+            return entries.filter { !$0.photoURLs.isEmpty || $0.audioURL != nil || $0.drawingData != nil }
+        case .mood(let mood):
+            return entries.filter { $0.mood == mood }
+        }
     }
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Search and Filter Bar
-                VStack(spacing: 8) {
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                        TextField("Search entries...", text: $searchText)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(10)
-                    
-                    HStack {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                FilterChip(title: "All", isSelected: selectedFilter == .all) {
-                                    selectedFilter = .all
-                                }
-                                FilterChip(title: "Private", isSelected: selectedFilter == .private) {
-                                    selectedFilter = .private
-                                }
-                                FilterChip(title: "With Media", isSelected: selectedFilter == .withMedia) {
-                                    selectedFilter = .withMedia
-                                }
-                                FilterChip(title: "Happy", isSelected: selectedFilter == .mood("Happy")) {
-                                    selectedFilter = .mood("Happy")
-                                }
-                                FilterChip(title: "Grateful", isSelected: selectedFilter == .mood("Grateful")) {
-                                    selectedFilter = .mood("Grateful")
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                }
+                JournalSearchAndFilterBar(
+                    searchText: $searchText,
+                    selectedFilter: $selectedFilter
+                )
                 .padding()
                 .background(Color(.systemBackground))
                 
-                // Entries List
-                List {
-                    ForEach(filteredEntries) { entry in
-                        NavigationLink(destination: JournalEntryDetailView(entry: entry)) {
-                            JournalEntryRow(entry: entry)
+                if filteredEntries.isEmpty {
+                    VStack(spacing: 20) {
+                        Image(systemName: "book.closed")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        
+                        Text("No Journal Entries")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        Text("Start your faith journey by creating your first journal entry")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        Button(action: { showingNewEntry = true }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                Text("Create First Entry")
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(10)
                         }
                     }
-                    .onDelete(perform: deleteEntry)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
+                } else {
+                    JournalEntriesList(
+                        entries: filteredEntries,
+                        deleteEntry: deleteEntry
+                    )
                 }
-                .listStyle(PlainListStyle())
             }
             .navigationTitle("Journal")
             .toolbar {
@@ -105,6 +109,12 @@ struct JournalView: View {
                 NewJournalEntryView()
             }
         }
+        .onAppear {
+            // Create sample data if no entries exist
+            if entries.isEmpty {
+                createSampleEntries()
+            }
+        }
     }
     
     private func deleteEntry(at offsets: IndexSet) {
@@ -112,6 +122,38 @@ struct JournalView: View {
             let entry = filteredEntries[index]
             modelContext.delete(entry)
         }
+        try? modelContext.save()
+    }
+    
+    private func createSampleEntries() {
+        let sampleEntries = [
+            JournalEntry(
+                title: "God's Faithfulness Today",
+                content: "Today I experienced God's faithfulness in a beautiful way. Despite the challenges I faced, I felt His presence guiding me through each moment. I'm reminded that He is always with me, even in the smallest details of life.",
+                tags: ["faithfulness", "gratitude", "daily-blessings"],
+                mood: "Grateful",
+                isPrivate: false
+            ),
+            JournalEntry(
+                title: "Prayer Answered",
+                content: "After weeks of praying for guidance about my career decision, I finally received clarity today. God opened a door I never expected, and I can see His hand in the timing of everything. This reminds me that His timing is always perfect.",
+                tags: ["prayer", "guidance", "answered-prayers"],
+                mood: "Hopeful",
+                isPrivate: true
+            ),
+            JournalEntry(
+                title: "Learning to Trust",
+                content: "I'm learning that trust in God isn't about having all the answers, but about believing that He has them. Today's uncertainty taught me to lean on Him more deeply and to find peace in the unknown.",
+                tags: ["trust", "faith", "growth"],
+                mood: "Reflective",
+                isPrivate: false
+            )
+        ]
+        
+        for entry in sampleEntries {
+            modelContext.insert(entry)
+        }
+        
         try? modelContext.save()
     }
 }
@@ -181,26 +223,7 @@ struct JournalEntryRow: View {
     }
 }
 
-struct FilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color.blue : Color(.systemGray5))
-                .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(16)
-        }
-    }
-}
-
-enum JournalFilter {
+enum JournalFilter: Equatable {
     case all, `private`, `public`, withMedia, mood(String)
 }
 
@@ -696,5 +719,66 @@ struct EditJournalEntryView: View {
         
         try? modelContext.save()
         dismiss()
+    }
+}
+
+// MARK: - Subviews
+
+struct JournalSearchAndFilterBar: View {
+    @Binding var searchText: String
+    @Binding var selectedFilter: JournalFilter
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("Search entries...", text: $searchText)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.systemGray6))
+            .cornerRadius(10)
+            
+            HStack {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        FilterChip(title: "All", isSelected: selectedFilter == .all) {
+                            selectedFilter = .all
+                        }
+                        FilterChip(title: "Private", isSelected: selectedFilter == .private) {
+                            selectedFilter = .private
+                        }
+                        FilterChip(title: "With Media", isSelected: selectedFilter == .withMedia) {
+                            selectedFilter = .withMedia
+                        }
+                        FilterChip(title: "Happy", isSelected: selectedFilter == .mood("Happy")) {
+                            selectedFilter = .mood("Happy")
+                        }
+                        FilterChip(title: "Grateful", isSelected: selectedFilter == .mood("Grateful")) {
+                            selectedFilter = .mood("Grateful")
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+        }
+    }
+}
+
+struct JournalEntriesList: View {
+    let entries: [JournalEntry]
+    let deleteEntry: (IndexSet) -> Void
+    
+    var body: some View {
+        List {
+            ForEach(entries) { entry in
+                NavigationLink(destination: JournalEntryDetailView(entry: entry)) {
+                    JournalEntryRow(entry: entry)
+                }
+            }
+            .onDelete(perform: deleteEntry)
+        }
+        .listStyle(PlainListStyle())
     }
 } 

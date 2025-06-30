@@ -1,0 +1,51 @@
+import Foundation
+import SwiftUI
+
+struct BibleVerse: Identifiable, Codable {
+    let id = UUID()
+    let reference: String
+    let text: String
+    let translation: String
+}
+
+class BibleVerseOfTheDayManager: ObservableObject {
+    @Published var currentVerse: BibleVerse?
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    private let verses = [
+        BibleVerse(reference: "John 3:16", text: "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.", translation: "NIV"),
+        BibleVerse(reference: "Philippians 4:13", text: "I can do all this through him who gives me strength.", translation: "NIV"),
+        BibleVerse(reference: "Jeremiah 29:11", text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", translation: "NIV"),
+        BibleVerse(reference: "Psalm 23:1", text: "The Lord is my shepherd, I lack nothing.", translation: "NIV"),
+        BibleVerse(reference: "Romans 8:28", text: "And we know that in all things God works for the good of those who love him, who have been called according to his purpose.", translation: "NIV"),
+        BibleVerse(reference: "Isaiah 40:31", text: "But those who hope in the Lord will renew their strength. They will soar on wings like eagles; they will run and not grow weary, they will walk and not be faint.", translation: "NIV"),
+        BibleVerse(reference: "Matthew 28:20", text: "And surely I am with you always, to the very end of the age.", translation: "NIV"),
+        BibleVerse(reference: "2 Corinthians 5:17", text: "Therefore, if anyone is in Christ, the new creation has come: The old has gone, the new is here!", translation: "NIV"),
+        BibleVerse(reference: "Galatians 5:22-23", text: "But the fruit of the Spirit is love, joy, peace, forbearance, kindness, goodness, faithfulness, gentleness and self-control. Against such things there is no law.", translation: "NIV"),
+        BibleVerse(reference: "1 Peter 5:7", text: "Cast all your anxiety on him because he cares for you.", translation: "NIV")
+    ]
+    
+    init() {
+        loadTodaysVerse()
+    }
+    
+    func loadTodaysVerse() {
+        isLoading = true
+        errorMessage = nil
+        
+        // Simulate network delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Use date to select a consistent verse for the day
+            let calendar = Calendar.current
+            let dayOfYear = calendar.ordinality(of: .day, in: .year, for: Date()) ?? 1
+            let verseIndex = (dayOfYear - 1) % self.verses.count
+            self.currentVerse = self.verses[verseIndex]
+            self.isLoading = false
+        }
+    }
+    
+    func refreshVerse() {
+        loadTodaysVerse()
+    }
+}
