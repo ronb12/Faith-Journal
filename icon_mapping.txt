@@ -1,0 +1,44 @@
+CORRECT APP ICON MAPPING FOR XCODE:
+
+iPhone App Icons:
+- 60pt @2x (120x120) → AppIcon-120x120.png
+- 60pt @3x (180x180) → AppIcon-180x180.png
+
+iPhone Settings Icons:
+- 29pt @2x (58x58) → AppIcon-58x58.png
+- 29pt @3x (87x87) → AppIcon-87x87.png
+
+iPhone Spotlight Icons:
+- 40pt @2x (80x80) → AppIcon-80x80.png
+- 40pt @3x (120x120) → AppIcon-120x120.png
+
+iPhone Notifications:
+- 20pt @2x (40x40) → AppIcon-40x40.png
+- 20pt @3x (60x60) → AppIcon-60x60.png
+
+iPad App Icons:
+- 76pt @1x (76x76) → AppIcon-76x76.png
+- 76pt @2x (152x152) → AppIcon-152x152.png
+
+iPad Pro App Icons:
+- 83.5pt @2x (167x167) → AppIcon-167x167.png
+
+iPad Settings Icons:
+- 29pt @1x (29x29) → AppIcon-29x29.png
+- 29pt @2x (58x58) → AppIcon-58x58.png
+
+iPad Spotlight Icons:
+- 40pt @1x (40x40) → AppIcon-40x40.png
+- 40pt @2x (80x80) → AppIcon-80x80.png
+
+iPad Notifications:
+- 20pt @1x (20x20) → AppIcon-20x20.png
+- 20pt @2x (40x40) → AppIcon-40x40.png
+
+App Store:
+- 1024pt @1x (1024x1024) → AppIcon-1024x1024.png
+
+INSTRUCTIONS:
+1. In Xcode, go to Assets.xcassets → AppIcon
+2. Drag each PNG file to its corresponding slot above
+3. Make sure no slots are empty or showing warnings 

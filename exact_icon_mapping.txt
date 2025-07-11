@@ -1,0 +1,46 @@
+EXACT APP ICON MAPPING FOR XCODE - DRAG EACH FILE TO ITS CORRESPONDING SLOT:
+
+iPhone App Icons:
+- AppIcon-120x120.png → iPhone App 60pt @2x (120x120)
+- AppIcon-180x180.png → iPhone App 60pt @3x (180x180)
+
+iPhone Settings Icons:
+- AppIcon-58x58.png → iPhone Settings 29pt @2x (58x58)
+- AppIcon-87x87.png → iPhone Settings 29pt @3x (87x87)
+
+iPhone Spotlight Icons:
+- AppIcon-80x80.png → iPhone Spotlight 40pt @2x (80x80)
+- AppIcon-120x120.png → iPhone Spotlight 40pt @3x (120x120)
+
+iPhone Notifications:
+- AppIcon-40x40.png → iPhone Notifications 20pt @2x (40x40)
+- AppIcon-60x60.png → iPhone Notifications 20pt @3x (60x60)
+
+iPad App Icons:
+- AppIcon-76x76.png → iPad App 76pt @1x (76x76)
+- AppIcon-152x152.png → iPad App 76pt @2x (152x152)
+
+iPad Pro App Icons:
+- AppIcon-167x167.png → iPad Pro App 83.5pt @2x (167x167)
+
+iPad Settings Icons:
+- AppIcon-29x29.png → iPad Settings 29pt @1x (29x29)
+- AppIcon-58x58.png → iPad Settings 29pt @2x (58x58)
+
+iPad Spotlight Icons:
+- AppIcon-40x40.png → iPad Spotlight 40pt @1x (40x40)
+- AppIcon-80x80.png → iPad Spotlight 40pt @2x (80x80)
+
+iPad Notifications:
+- AppIcon-20x20.png → iPad Notifications 20pt @1x (20x20)
+- AppIcon-40x40.png → iPad Notifications 20pt @2x (40x40)
+
+App Store:
+- AppIcon-1024x1024.png → App Store 1024pt @1x (1024x1024)
+
+IMPORTANT NOTES:
+1. Some icons are used for multiple slots (like AppIcon-120x120.png for both iPhone App 2x and iPhone Spotlight 3x)
+2. Make sure to drag the SAME file to BOTH slots when needed
+3. The 20x20 icon is only used for iPad Notifications 1x
+4. Clear ALL slots first, then assign one by one
+5. If a slot shows a warning, it means the wrong size is assigned 
