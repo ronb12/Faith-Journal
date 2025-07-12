@@ -20,7 +20,11 @@ let package = Package(
         .target(
             name: "Faith Journal",
             dependencies: [],
+<<<<<<< HEAD
             path: "Faith Journal/Faith Journal"),
+=======
+            path: "Sources"),
+>>>>>>> 5032e386757d61b607f69b96e9ac6ae9aac5e187
         .testTarget(
             name: "Faith JournalTests",
             dependencies: ["Faith Journal"],
