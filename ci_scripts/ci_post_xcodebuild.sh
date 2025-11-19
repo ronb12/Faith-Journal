@@ -40,5 +40,17 @@ else
     echo "⚠️  Warning checker script not found at scripts/check_and_fix_warnings.sh"
 fi
 
+# Check if ready for TestFlight distribution
+echo ""
+echo "🚀 Checking TestFlight distribution readiness..."
+if [ -f "scripts/auto_testflight_distribute.sh" ]; then
+    chmod +x scripts/auto_testflight_distribute.sh
+    ./scripts/auto_testflight_distribute.sh || {
+        echo "⚠️  TestFlight check encountered issues (non-fatal)"
+    }
+else
+    echo "⚠️  TestFlight distribution script not found"
+fi
+
 echo "✅ Post-build script completed!"
 
