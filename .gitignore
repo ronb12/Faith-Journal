@@ -49,4 +49,8 @@ ExportOptions.plist
 *.swp
 
 # Scripts (optional - uncomment if you don't want to track scripts)
-# scripts/ 
+# scripts/
+
+# Xcode Cloud - Keep CI scripts
+!ci_scripts/
+!.xcode-version 
