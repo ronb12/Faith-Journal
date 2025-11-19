@@ -15,9 +15,19 @@ struct Faith_JournalApp: App {
             JournalEntry.self,
             PrayerRequest.self,
             UserProfile.self,
-            MoodEntry.self
+            MoodEntry.self,
+            BibleVerseOfTheDay.self,
+            LiveSession.self,
+            LiveSessionParticipant.self,
+            Subscription.self,
+            ChatMessage.self,
+            SessionInvitation.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .automatic
+        )
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])

@@ -35,4 +35,18 @@ fastlane/test_output/
 
 # User-specific
 *.DS_Store
-*.env 
+*.env
+
+# Build artifacts
+build.log
+ExportOptions.plist
+
+# Backup files
+*.backup
+*.backup2
+*.backup3
+*.niv.backup
+*.swp
+
+# Scripts (optional - uncomment if you don't want to track scripts)
+# scripts/ 
