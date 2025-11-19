@@ -1,0 +1,31 @@
+name: Xcode Cloud Compatibility Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check Xcode Cloud files
+        run: |
+          echo "Checking Xcode Cloud configuration..."
+          test -f .xcode-version && echo "✅ .xcode-version exists" || echo "❌ .xcode-version missing"
+          test -d ci_scripts && echo "✅ ci_scripts directory exists" || echo "❌ ci_scripts directory missing"
+          test -f ci_scripts/ci_pre_xcodebuild.sh && echo "✅ Pre-build script exists" || echo "❌ Pre-build script missing"
+          test -f ci_scripts/ci_post_xcodebuild.sh && echo "✅ Post-build script exists" || echo "❌ Post-build script missing"
+          
+      - name: Verify script permissions
+        run: |
+          if [ -f ci_scripts/ci_pre_xcodebuild.sh ]; then
+            test -x ci_scripts/ci_pre_xcodebuild.sh && echo "✅ Pre-build script is executable" || echo "❌ Pre-build script not executable"
+          fi
+          if [ -f ci_scripts/ci_post_xcodebuild.sh ]; then
+            test -x ci_scripts/ci_post_xcodebuild.sh && echo "✅ Post-build script is executable" || echo "❌ Post-build script not executable"
+          fi
+
