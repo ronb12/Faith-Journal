@@ -91,11 +91,19 @@ class CloudKitUserService: ObservableObject {
     }
     
     var userIdentifier: String {
-        currentUserID ?? UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        // Always return a valid identifier - never nil
+        if let id = currentUserID, !id.isEmpty {
+            return id
+        }
+        return UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
     }
     
     var displayName: String {
-        currentUserName ?? UIDevice.current.name
+        // Always return a valid name - never nil
+        if let name = currentUserName, !name.isEmpty {
+            return name
+        }
+        return UIDevice.current.name
     }
 }
 

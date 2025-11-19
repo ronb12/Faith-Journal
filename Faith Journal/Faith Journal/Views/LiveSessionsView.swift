@@ -72,6 +72,16 @@ struct LiveSessionsView: View {
         return filtered
     }
     
+    var pendingInvitationCount: Int {
+        // Safely access userIdentifier with fallback
+        let userId = userService.userIdentifier
+        return allInvitations.filter { invitation in
+            (invitation.invitedUserId == userId || invitation.invitedEmail != nil) &&
+            invitation.status == .pending &&
+            !invitation.isExpired
+        }.count
+    }
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -163,14 +173,8 @@ struct LiveSessionsView: View {
                             Image(systemName: "envelope.fill")
                                 .fontWeight(.semibold)
                             
-                            let pendingCount = allInvitations.filter { invitation in
-                                (invitation.invitedUserId == userService.userIdentifier || invitation.invitedEmail != nil) &&
-                                invitation.status == .pending &&
-                                !invitation.isExpired
-                            }.count
-                            
-                            if pendingCount > 0 {
-                                Text("\(pendingCount)")
+                            if pendingInvitationCount > 0 {
+                                Text("\(pendingInvitationCount)")
                                     .font(.caption2)
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
@@ -200,8 +204,13 @@ struct LiveSessionsView: View {
                 LiveSessionDetailView(session: session)
             }
             .onAppear {
-                loadPublicSessions()
-                setupSubscriptions()
+                // Ensure CloudKit services are initialized before use
+                Task { @MainActor in
+                    // Give services a moment to initialize
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                    loadPublicSessions()
+                    setupSubscriptions()
+                }
             }
             .refreshable {
                 await refreshPublicSessions()
@@ -215,20 +224,26 @@ struct LiveSessionsView: View {
             do {
                 // Wait a bit for CloudKit to initialize if needed
                 if !userService.isAuthenticated {
-                    // CloudKit might still be initializing
-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                    // CloudKit might still be initializing - wait and recheck
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    // Re-check authentication after delay
+                    await userService.checkAuthentication()
                 }
                 
-                guard userService.isAuthenticated else {
-                    isLoadingPublicSessions = false
-                    return
+                // Even if not authenticated, we can still show local sessions
+                // Only fetch public sessions if authenticated
+                if userService.isAuthenticated {
+                    let sessions = try await syncService.fetchPublicSessions()
+                    publicSessions = sessions
+                } else {
+                    // Not authenticated - just use local sessions
+                    publicSessions = []
                 }
-                
-                let sessions = try await syncService.fetchPublicSessions()
-                publicSessions = sessions
                 isLoadingPublicSessions = false
             } catch {
                 print("Error loading public sessions: \(error.localizedDescription)")
+                // On error, just use local sessions - don't crash
+                publicSessions = []
                 isLoadingPublicSessions = false
             }
         }
@@ -252,15 +267,20 @@ struct LiveSessionsView: View {
             do {
                 // Wait a bit for CloudKit to initialize if needed
                 if !userService.isAuthenticated {
-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    // Re-check authentication after delay
+                    await userService.checkAuthentication()
                 }
                 
+                // Only set up subscriptions if authenticated
                 guard userService.isAuthenticated else {
+                    print("CloudKit not authenticated - skipping subscriptions")
                     return
                 }
                 
                 try await syncService.subscribeToSessions()
             } catch {
+                // Don't crash on subscription errors - just log
                 print("Error setting up subscriptions: \(error.localizedDescription)")
             }
         }
@@ -511,7 +531,9 @@ struct LiveSessionDetailView: View {
     }
     
     var isHost: Bool {
-        session.hostId == userService.userIdentifier
+        // Safely check if current user is host
+        let userId = userService.userIdentifier
+        return session.hostId == userId
     }
     
     var sessionInvitations: [SessionInvitation] {
