@@ -569,7 +569,7 @@ struct InfoRow: View {
                 Text(date, style: style)
                     .fontWeight(.medium)
             } else {
-                Text("\(value)")
+                Text(String(describing: value))
                     .fontWeight(.medium)
             }
         }
@@ -675,7 +675,7 @@ struct JoinByCodeView: View {
                 }
             )
             
-            if let existingParticipant = try? modelContext.fetch(participantQuery).first {
+            if (try? modelContext.fetch(participantQuery).first) != nil {
                 errorMessage = "You've already joined this session"
                 showingError = true
                 return

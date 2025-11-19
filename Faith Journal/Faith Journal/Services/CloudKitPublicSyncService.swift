@@ -78,7 +78,8 @@ class CloudKitPublicSyncService: ObservableObject {
             return nil
         }
         
-        guard let sessionId = UUID(uuidString: record.recordID.recordName) else {
+        // Session ID from CloudKit record (not used, sessions get new IDs)
+        guard UUID(uuidString: record.recordID.recordName) != nil else {
             return nil
         }
         
@@ -86,7 +87,7 @@ class CloudKitPublicSyncService: ObservableObject {
         let currentParticipants = record["currentParticipants"] as? Int ?? 1
         let tags = record["tags"] as? [String] ?? []
         let isPrivate = record["isPrivate"] as? Bool ?? false
-        let createdAt = record["createdAt"] as? Date ?? startTime
+        let _ = record["createdAt"] as? Date ?? startTime
         let endTime = record["endTime"] as? Date
         
         let session = LiveSession(
@@ -168,7 +169,7 @@ class CloudKitPublicSyncService: ObservableObject {
               let userId = record["userId"] as? String,
               let userName = record["userName"] as? String,
               let message = record["message"] as? String,
-              let timestamp = record["timestamp"] as? Date,
+              let _ = record["timestamp"] as? Date,
               let messageTypeString = record["messageType"] as? String,
               let messageType = ChatMessage.MessageType(rawValue: messageTypeString) else {
             return nil
@@ -240,7 +241,7 @@ class CloudKitPublicSyncService: ObservableObject {
               let inviteCode = record["inviteCode"] as? String,
               let statusString = record["status"] as? String,
               let status = SessionInvitation.InvitationStatus(rawValue: statusString),
-              let createdAt = record["createdAt"] as? Date else {
+              let _ = record["createdAt"] as? Date else {
             return nil
         }
         
