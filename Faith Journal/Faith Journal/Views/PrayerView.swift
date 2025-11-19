@@ -640,4 +640,27 @@ struct EditPrayerRequestView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTraili
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") { saveChanges() }
+                        .disabled(title.isEmpty || description.isEmpty)
+                }
+            }
+        }
+    }
+    
+    private func saveChanges() {
+        var allTags = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        if !selectedCategory.isEmpty {
+            allTags.insert(selectedCategory, at: 0)
+        }
+        
+        request.title = title
+        request.details = description
+        request.tags = allTags
+        request.isPrivate = isPrivate
+        request.updatedAt = Date()
+        
+        try? modelContext.save()
+        dismiss()
+    }
+} 

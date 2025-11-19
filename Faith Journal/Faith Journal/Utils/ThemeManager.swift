@@ -108,4 +108,25 @@ class ThemeManager: ObservableObject {
                 cardBackground: Color.white,
                 text: Color(red: 0.3, green: 0.1, blue: 0.2),
                 textSecondary: Color(red: 0.6, green: 0.4, blue: 0.5)
-      
+            )
+        }
+    }
+}
+
+struct ThemeColors {
+    let primary: Color
+    let secondary: Color
+    let accent: Color
+    let background: Color
+    let cardBackground: Color
+    let text: Color
+    let textSecondary: Color
+    
+    var primaryGradient: LinearGradient {
+        LinearGradient(colors: [primary, secondary], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    
+    var accentGradient: LinearGradient {
+        LinearGradient(colors: [accent, primary], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+} 

@@ -179,4 +179,207 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                                 .font(.caption)
                         }
-     
+                    }
+                }
+                
+                Section(header: Text("App Info")) {
+                    HStack {
+                        Text("Version")
+                        Spacer()
+                        Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Contact Support")
+                        Spacer()
+                        Link("Email", destination: URL(string: "mailto:support@faithjournal.app")!)
+                    }
+                    HStack {
+                        Text("About")
+                        Spacer()
+                        Text("Faith Journal helps you grow in faith, one day at a time.")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Settings")
+            .fullScreenCover(isPresented: $showAuthLock) {
+                BiometricLockView(isAuthenticated: $isAuthenticated)
+            }
+            .sheet(isPresented: $showingProfileEdit) {
+                ProfileEditView(profile: userProfile)
+            }
+            .sheet(isPresented: $showingTermsOfService) {
+                TermsOfServiceView()
+            }
+            .sheet(isPresented: $showingPrivacyPolicy) {
+                PrivacyPolicyView()
+            }
+            .onAppear {
+                ensureUserProfileExists()
+            }
+        }
+    }
+    
+    private func ensureUserProfileExists() {
+        if userProfiles.isEmpty {
+            // Create default profile if none exists
+            let defaultName = UIDevice.current.name
+            let profile = UserProfile(name: defaultName)
+            modelContext.insert(profile)
+            try? modelContext.save()
+        }
+    }
+    
+    // REMINDERS
+    func scheduleDailyReminder(at date: Date) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Faith Journal"
+            content.body = "Don't forget to reflect and journal today!"
+            content.sound = .default
+            let dateComponents = Calendar.current.dateComponents([.hour, .minute], from: date)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+            let request = UNNotificationRequest(identifier: "dailyReminder", content: content, trigger: trigger)
+            center.add(request)
+        }
+    }
+    func cancelDailyReminder() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["dailyReminder"])
+    }
+    
+    // BIOMETRIC
+    struct BiometricLockView: View {
+        @Binding var isAuthenticated: Bool
+        @Environment(\.dismiss) var dismiss
+        @State private var errorMessage: String?
+        var body: some View {
+            VStack(spacing: 24) {
+                Text("Unlock Faith Journal")
+                    .font(.title)
+                    .fontWeight(.bold)
+                Button("Unlock with Face ID / Touch ID") {
+                    authenticate()
+                }
+                if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                }
+            }
+            .onAppear(perform: authenticate)
+        }
+        func authenticate() {
+            let context = LAContext()
+            var error: NSError?
+            if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+                context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Unlock Faith Journal") { success, authError in
+                    DispatchQueue.main.async {
+                        if success {
+                            isAuthenticated = true
+                            dismiss()
+                        } else {
+                            errorMessage = "Authentication failed. Try again."
+                        }
+                    }
+                }
+            } else {
+                errorMessage = "Biometric authentication not available."
+            }
+        }
+    }
+    
+    // EXPORT DATA
+    func exportAllData() -> String {
+        // This function should be called with modelContext to access actual data
+        // For now, return a template that can be enhanced
+        let exportInfo = """
+        Faith Journal Export
+        Generated: \(Date().formatted())
+        
+        Note: Full data export requires modelContext access.
+        This is a simplified export template.
+        """
+        return exportInfo
+    }
+    
+    func exportData(context: ModelContext) -> String {
+        do {
+            var exportContent = "Faith Journal Data Export\n"
+            exportContent += "Generated: \(Date().formatted())\n\n"
+            
+            // Export Journal Entries
+            let entryDescriptor = FetchDescriptor<JournalEntry>()
+            let entries = try context.fetch(entryDescriptor)
+            exportContent += "=== JOURNAL ENTRIES (\(entries.count)) ===\n"
+            for entry in entries {
+                exportContent += """
+                
+                Title: \(entry.title)
+                Date: \(entry.date.formatted())
+                Content: \(entry.content.prefix(200))
+                Tags: \(entry.tags.joined(separator: ", "))
+                Mood: \(entry.mood ?? "N/A")
+                Private: \(entry.isPrivate ? "Yes" : "No")
+                ---
+                """
+            }
+            
+            // Export Prayer Requests
+            let prayerDescriptor = FetchDescriptor<PrayerRequest>()
+            let prayers = try context.fetch(prayerDescriptor)
+            exportContent += "\n\n=== PRAYER REQUESTS (\(prayers.count)) ===\n"
+            for prayer in prayers {
+                exportContent += """
+                
+                Title: \(prayer.title)
+                Status: \(prayer.status.rawValue)
+                Date: \(prayer.date.formatted())
+                Answered: \(prayer.isAnswered ? "Yes" : "No")
+                Details: \(prayer.details.prefix(200))
+                Tags: \(prayer.tags.joined(separator: ", "))
+                ---
+                """
+            }
+            
+            // Export Mood Entries
+            let moodDescriptor = FetchDescriptor<MoodEntry>()
+            let moods = try context.fetch(moodDescriptor)
+            exportContent += "\n\n=== MOOD ENTRIES (\(moods.count)) ===\n"
+            for mood in moods {
+                exportContent += """
+                
+                Mood: \(mood.mood)
+                Intensity: \(mood.intensity)/10
+                Date: \(mood.date.formatted())
+                Notes: \(mood.notes ?? "None")
+                ---
+                """
+            }
+            
+            return exportContent
+        } catch {
+            return "Error exporting data: \(error.localizedDescription)"
+        }
+    }
+    
+    // RESET DATA
+    func resetAllData() {
+        let domain = Bundle.main.bundleIdentifier!
+        UserDefaults.standard.removePersistentDomain(forName: domain)
+        UserDefaults.standard.synchronize()
+        // TODO: Also delete all SwiftData/CoreData if used
+    }
+}
+
+struct ActivityView: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    let applicationActivities: [UIActivity]? = nil
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+} 

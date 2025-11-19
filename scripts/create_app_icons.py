@@ -210,4 +210,117 @@ def create_icon(size, filename):
         b = int(PURPLE_DARK[2] * (1 - ratio * 0.3) + PURPLE_MEDIUM[2] * ratio * 0.3)
         draw.line([(0, y), (size, y)], fill=(r, g, b))
     
-    # Draw praying ha
+    # Draw praying hands (in upper portion)
+    hands_center_y = int(size * 0.4)
+    draw_praying_hands(draw, size // 2, hands_center_y, size, WHITE)
+    
+    # Try to use system font, fallback to default
+    try:
+        # Try to find a nice font
+        font_size_large = max(12, int(size * 0.13))
+        font_size_small = max(8, int(size * 0.09))
+        
+        # Try different font paths
+        font_paths = [
+            '/System/Library/Fonts/Helvetica.ttc',
+            '/System/Library/Fonts/Supplemental/Arial Bold.ttf',
+            '/Library/Fonts/Arial.ttf',
+        ]
+        
+        font_large = None
+        font_small = None
+        
+        for font_path in font_paths:
+            try:
+                if os.path.exists(font_path):
+                    font_large = ImageFont.truetype(font_path, font_size_large)
+                    font_small = ImageFont.truetype(font_path, font_size_small)
+                    break
+            except:
+                pass
+        
+        if font_large is None:
+            font_large = ImageFont.load_default()
+            font_small = ImageFont.load_default()
+    except:
+        font_large = ImageFont.load_default()
+        font_small = ImageFont.load_default()
+    
+    # Add text "Faith Journal" underneath the hands
+    text_y = int(size * 0.72)
+    
+    # Get text dimensions
+    try:
+        bbox = draw.textbbox((0, 0), "FAITH", font=font_large)
+        text_width = bbox[2] - bbox[0]
+        text_x = (size - text_width) // 2
+        draw.text((text_x, text_y), "FAITH", fill=WHITE, font=font_large, anchor="lt")
+        
+        bbox2 = draw.textbbox((0, 0), "JOURNAL", font=font_small)
+        text_width2 = bbox2[2] - bbox2[0]
+        text_x2 = (size - text_width2) // 2
+        text_y2 = text_y + int(size * 0.16)
+        draw.text((text_x2, text_y2), "JOURNAL", fill=CREAM, font=font_small, anchor="lt")
+    except:
+        # Fallback if text drawing fails
+        text = "FAITH\nJOURNAL"
+        text_x = size // 2
+        draw.multiline_text((text_x, text_y), text, fill=WHITE, font=font_large, anchor="mm", align="center")
+    
+    # Save the icon
+    iconset_path = "/Users/ronellbradley/Desktop/Faith Journal/Faith Journal/Resources/Assets.xcassets/AppIcon.appiconset"
+    output_path = f"{iconset_path}/{filename}"
+    img.save(output_path, 'PNG')
+    print(f"Created: {filename} ({size}x{size})")
+
+def main():
+    """Create all required app icon sizes"""
+    iconset_path = "/Users/ronellbradley/Desktop/Faith Journal/Faith Journal/Resources/Assets.xcassets/AppIcon.appiconset"
+    
+    # Ensure directory exists
+    os.makedirs(iconset_path, exist_ok=True)
+    
+    # Define all required icon sizes based on Contents.json
+    icon_sizes = [
+        # iPad icons
+        (20, "AppIcon-20x20.png"),
+        (40, "AppIcon-20x20@2x.png"),  # 20pt @2x = 40px
+        (29, "AppIcon-29x29.png"),
+        (58, "AppIcon-29x29@2x.png"),  # 29pt @2x = 58px
+        (40, "AppIcon-40x40.png"),
+        (80, "AppIcon-40x40@2x.png"),  # 40pt @2x = 80px
+        (76, "AppIcon-76x76.png"),
+        (152, "AppIcon-76x76@2x.png"),  # 76pt @2x = 152px
+        (167, "AppIcon-83.5x83.5@2x.png"),  # 83.5pt @2x = 167px
+        
+        # iPhone icons
+        (58, "AppIcon-29x29@2x.png"),  # 29pt @2x = 58px (same as iPad)
+        (87, "AppIcon-29x29@3x.png"),  # 29pt @3x = 87px
+        (80, "AppIcon-40x40@2x.png"),  # 40pt @2x = 80px (same as iPad)
+        (120, "AppIcon-40x40@3x.png"),  # 40pt @3x = 120px
+        (120, "AppIcon-60x60@2x.png"),  # 60pt @2x = 120px (REQUIRED)
+        (180, "AppIcon-60x60@3x.png"),  # 60pt @3x = 180px
+        
+        # App Store
+        (1024, "AppIcon-1024x1024.png"),  # REQUIRED
+    ]
+    
+    # Remove duplicates (some filenames are used multiple times)
+    seen = set()
+    unique_sizes = []
+    for size, filename in icon_sizes:
+        if filename not in seen:
+            seen.add(filename)
+            unique_sizes.append((size, filename))
+    
+    print("Creating app icons for Faith Journal...")
+    print(f"Output directory: {iconset_path}\n")
+    
+    for size, filename in unique_sizes:
+        create_icon(size, filename)
+    
+    print(f"\n✅ Successfully created {len(unique_sizes)} icon files!")
+    print("Icons are ready in the AppIcon.appiconset folder.")
+
+if __name__ == "__main__":
+    main()
