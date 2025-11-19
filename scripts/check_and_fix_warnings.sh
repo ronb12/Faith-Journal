@@ -73,14 +73,19 @@ WARNINGS=$(grep -E "warning:" "$WARNINGS_FILE" || true)
 ERRORS=$(grep -E "error:" "$WARNINGS_FILE" || true)
 
 # Count warnings
-WARNING_COUNT=$(echo "$WARNINGS" | grep -c "warning:" 2>/dev/null || echo "0" | head -1)
-ERROR_COUNT=$(echo "$ERRORS" | grep -c "error:" 2>/dev/null || echo "0" | head -1)
+if [ -z "$WARNINGS" ] || [ "$WARNINGS" = "" ]; then
+    WARNING_COUNT=0
+else
+    WARNING_COUNT=$(echo "$WARNINGS" | wc -l | tr -d ' ')
+fi
 
-# Clean up counts (remove newlines)
-WARNING_COUNT=$(echo "$WARNING_COUNT" | tr -d '\n' | head -1)
-ERROR_COUNT=$(echo "$ERROR_COUNT" | tr -d '\n' | head -1)
+if [ -z "$ERRORS" ] || [ "$ERRORS" = "" ]; then
+    ERROR_COUNT=0
+else
+    ERROR_COUNT=$(echo "$ERRORS" | wc -l | tr -d ' ')
+fi
 
-# Ensure counts are numeric
+# Ensure counts are numeric (default to 0 if empty)
 WARNING_COUNT=${WARNING_COUNT:-0}
 ERROR_COUNT=${ERROR_COUNT:-0}
 
