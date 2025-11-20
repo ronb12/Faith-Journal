@@ -19,6 +19,9 @@ class BibleStudyService: ObservableObject {
     private let calendar = Calendar.current
     private let bibleService = BibleService.shared
     
+    // Stored topics (from SwiftData) - user's saved progress
+    private var storedTopics: [BibleStudyTopic] = []
+    
     private init() {
         // Initialize with 365 topics across categories
         topicLibrary = BibleStudyService.createTopicLibrary()
@@ -26,9 +29,30 @@ class BibleStudyService: ObservableObject {
         loadFavorites()
     }
     
-    // Get all topics
+    // Set stored topics from SwiftData
+    func setStoredTopics(_ topics: [BibleStudyTopic]) {
+        storedTopics = topics
+        loadFavorites()
+    }
+    
+    // Get all topics (merged with stored data)
     func getAllTopics() -> [BibleStudyTopic] {
-        return topicLibrary
+        // Merge with stored topics to preserve user progress
+        let merged = topicLibrary.map { topic -> BibleStudyTopic in
+            // Check if this topic has stored data
+            if let stored = storedTopics.first(where: { $0.id == topic.id || $0.title == topic.title }) {
+                // Merge stored data (favorites, completion, answers, notes)
+                topic.isFavorite = stored.isFavorite
+                topic.isCompleted = stored.isCompleted
+                topic.completedDate = stored.completedDate
+                topic.lastViewedDate = stored.lastViewedDate
+                topic.questionAnswers = stored.questionAnswers
+                topic.discussionAnswers = stored.discussionAnswers
+                topic.notes = stored.notes
+            }
+            return topic
+        }
+        return merged
     }
     
     // Get today's topic based on day of year (1-365)
@@ -45,17 +69,73 @@ class BibleStudyService: ObservableObject {
     
     // Get topics by category
     func getTopics(for category: BibleStudyTopic.TopicCategory) -> [BibleStudyTopic] {
-        return topicLibrary.filter { $0.category == category }
+        return getAllTopics().filter { $0.category == category }
     }
     
-    // Search topics
+    // Enhanced search - includes verses, questions, and application points
     func searchTopics(query: String) -> [BibleStudyTopic] {
         let lowerQuery = query.lowercased()
-        return topicLibrary.filter { topic in
+        return getAllTopics().filter { topic in
+            // Search in title, description, category
             topic.title.lowercased().contains(lowerQuery) ||
             topic.topicDescription.lowercased().contains(lowerQuery) ||
-            topic.category.rawValue.lowercased().contains(lowerQuery)
+            topic.category.rawValue.lowercased().contains(lowerQuery) ||
+            // Search in verses
+            topic.keyVerses.contains { $0.lowercased().contains(lowerQuery) } ||
+            topic.verseTexts.contains { $0.lowercased().contains(lowerQuery) } ||
+            // Search in questions
+            topic.studyQuestions.contains { $0.lowercased().contains(lowerQuery) } ||
+            // Search in application points
+            topic.applicationPoints.contains { $0.lowercased().contains(lowerQuery) }
         }
+    }
+    
+    // Get favorite topics
+    func getFavoriteTopics() -> [BibleStudyTopic] {
+        return getAllTopics().filter { $0.isFavorite }
+    }
+    
+    // Get recently viewed topics
+    func getRecentTopics(limit: Int = 10) -> [BibleStudyTopic] {
+        return getAllTopics()
+            .filter { $0.lastViewedDate != nil }
+            .sorted { ($0.lastViewedDate ?? Date.distantPast) > ($1.lastViewedDate ?? Date.distantPast) }
+            .prefix(limit)
+            .map { $0 }
+    }
+    
+    // Get completed topics
+    func getCompletedTopics() -> [BibleStudyTopic] {
+        return getAllTopics().filter { $0.isCompleted }
+    }
+    
+    // Get progress statistics
+    func getProgressStats() -> (total: Int, completed: Int, favorites: Int, percentComplete: Double) {
+        let all = getAllTopics()
+        let completed = all.filter { $0.isCompleted }.count
+        let favorites = all.filter { $0.isFavorite }.count
+        let percent = all.isEmpty ? 0.0 : Double(completed) / Double(all.count) * 100.0
+        return (total: all.count, completed: completed, favorites: favorites, percentComplete: percent)
+    }
+    
+    // Get related topics
+    func getRelatedTopics(for topic: BibleStudyTopic, limit: Int = 5) -> [BibleStudyTopic] {
+        let all = getAllTopics()
+        // Find topics with same category or related topic titles
+        var related = all.filter { $0.category == topic.category && $0.id != topic.id }
+        
+        // Also check if topic has related topic titles defined
+        if !topic.relatedTopics.isEmpty {
+            for relatedTitle in topic.relatedTopics {
+                if let found = all.first(where: { $0.title == relatedTitle && $0.id != topic.id }) {
+                    if !related.contains(where: { $0.id == found.id }) {
+                        related.append(found)
+                    }
+                }
+            }
+        }
+        
+        return Array(related.prefix(limit))
     }
     
     // Get topics for live session (filtered for Bible Study)
@@ -117,15 +197,59 @@ class BibleStudyService: ObservableObject {
     }
     
     func loadFavorites() {
-        favoriteTopics = topicLibrary.filter { $0.isCompleted }
+        favoriteTopics = getAllTopics().filter { $0.isFavorite }
     }
     
     func toggleFavorite(_ topic: BibleStudyTopic) {
+        topic.isFavorite.toggle()
+        loadFavorites()
+    }
+    
+    func markAsViewed(_ topic: BibleStudyTopic) {
+        topic.lastViewedDate = Date()
+    }
+    
+    func toggleCompletion(_ topic: BibleStudyTopic) {
         topic.isCompleted.toggle()
         if topic.isCompleted {
             topic.completedDate = Date()
+        } else {
+            topic.completedDate = nil
         }
-        loadFavorites()
+    }
+    
+    func updateQuestionAnswer(_ topic: BibleStudyTopic, questionIndex: Int, answer: String) {
+        // Ensure questionAnswers array is properly sized
+        while topic.questionAnswers.count < topic.studyQuestions.count {
+            topic.questionAnswers.append("")
+        }
+        if questionIndex >= 0 && questionIndex < topic.studyQuestions.count {
+            topic.questionAnswers[questionIndex] = answer
+        }
+    }
+    
+    func getQuestionAnswer(_ topic: BibleStudyTopic, questionIndex: Int) -> String {
+        if questionIndex >= 0 && questionIndex < topic.questionAnswers.count {
+            return topic.questionAnswers[questionIndex]
+        }
+        return ""
+    }
+    
+    func updateDiscussionAnswer(_ topic: BibleStudyTopic, promptIndex: Int, answer: String) {
+        // Ensure discussionAnswers array is properly sized
+        while topic.discussionAnswers.count < topic.discussionPrompts.count {
+            topic.discussionAnswers.append("")
+        }
+        if promptIndex >= 0 && promptIndex < topic.discussionPrompts.count {
+            topic.discussionAnswers[promptIndex] = answer
+        }
+    }
+    
+    func getDiscussionAnswer(_ topic: BibleStudyTopic, promptIndex: Int) -> String {
+        if promptIndex >= 0 && promptIndex < topic.discussionAnswers.count {
+            return topic.discussionAnswers[promptIndex]
+        }
+        return ""
     }
     
     // Create topic library with 365 topics (one for each day of the year)
@@ -1450,6 +1574,7 @@ class BibleStudyService: ObservableObject {
         let studyQuestions: [String]
         let discussionPrompts: [String]
         let applicationPoints: [String]
+        // Note: answers are stored in SwiftData, not in UserDefaults
     }
     
     struct TopicTemplate {

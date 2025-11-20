@@ -3,18 +3,18 @@ import SwiftData
 
 @Model
 final class PrayerRequest {
-    var id: UUID
-    var title: String
-    var details: String
-    var date: Date
-    var status: PrayerStatus
-    var isAnswered: Bool
+    var id: UUID = UUID()
+    var title: String = ""
+    var details: String = ""
+    var date: Date = Date()
+    var status: PrayerStatus = PrayerRequest.PrayerStatus.active
+    var isAnswered: Bool = false
     var answerDate: Date?
     var answerNotes: String?
-    var isPrivate: Bool
-    var tags: [String]
-    var createdAt: Date
-    var updatedAt: Date
+    var isPrivate: Bool = false
+    var tags: [String] = []
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
     
     enum PrayerStatus: String, CaseIterable, Codable {
         case active = "Active"

@@ -3,14 +3,14 @@ import SwiftData
 
 @Model
 final class LiveSessionParticipant {
-    var id: UUID
-    var sessionId: UUID
-    var userId: String
-    var userName: String
-    var joinedAt: Date
+    var id: UUID = UUID()
+    var sessionId: UUID = UUID()
+    var userId: String = ""
+    var userName: String = ""
+    var joinedAt: Date = Date()
     var leftAt: Date?
-    var isHost: Bool
-    var isActive: Bool
+    var isHost: Bool = false
+    var isActive: Bool = true
     
     init(sessionId: UUID, userId: String, userName: String, isHost: Bool = false) {
         self.id = UUID()

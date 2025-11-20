@@ -10,17 +10,17 @@ import SwiftData
 
 @Model
 final class SessionInvitation {
-    var id: UUID
-    var sessionId: UUID
-    var sessionTitle: String
-    var hostId: String
-    var hostName: String
+    var id: UUID = UUID()
+    var sessionId: UUID = UUID()
+    var sessionTitle: String = ""
+    var hostId: String = ""
+    var hostName: String = ""
     var invitedUserId: String?
     var invitedUserName: String?
     var invitedEmail: String?
-    var inviteCode: String
-    var status: InvitationStatus
-    var createdAt: Date
+    var inviteCode: String = ""
+    var status: InvitationStatus = SessionInvitation.InvitationStatus.pending
+    var createdAt: Date = Date()
     var respondedAt: Date?
     var expiresAt: Date?
     

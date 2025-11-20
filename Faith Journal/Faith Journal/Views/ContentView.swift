@@ -65,12 +65,26 @@ struct ContentView: View {
                 }
                 .tag(5)
             
+            ReadingPlansView()
+                .tabItem {
+                    Image(systemName: "book.closed.fill")
+                    Text("Reading Plans")
+                }
+                .tag(6)
+            
+            BibleStudyView()
+                .tabItem {
+                    Image(systemName: "book.pages.fill")
+                    Text("Bible Study")
+                }
+                .tag(7)
+            
             SettingsView()
                 .tabItem {
                     Image(systemName: "gear")
                     Text("Settings")
                 }
-                .tag(6)
+                .tag(8)
         }
         .accentColor(themeManager.colors.primary)
         .alert("Quick Action", isPresented: $showingAlert) {

@@ -17,12 +17,16 @@ final class BibleStudyTopic {
     var keyVerses: [String] = [] // Verse references like "John 3:16"
     var verseTexts: [String] = [] // Full verse texts
     var studyQuestions: [String] = []
+    var questionAnswers: [String] = [] // Answers to study questions (indexed to match studyQuestions)
     var discussionPrompts: [String] = []
+    var discussionAnswers: [String] = [] // Answers to discussion prompts (indexed to match discussionPrompts)
     var applicationPoints: [String] = []
     var relatedTopics: [String] = []
     var createdAt: Date = Date()
     var isCompleted: Bool = false
     var completedDate: Date?
+    var isFavorite: Bool = false
+    var lastViewedDate: Date?
     var notes: String = ""
     
     enum TopicCategory: String, CaseIterable, Codable {

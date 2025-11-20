@@ -3,13 +3,13 @@ import SwiftData
 
 @Model
 final class ChatMessage {
-    var id: UUID
-    var sessionId: UUID
-    var userId: String
-    var userName: String
-    var message: String
-    var timestamp: Date
-    var messageType: MessageType
+    var id: UUID = UUID()
+    var sessionId: UUID = UUID()
+    var userId: String = ""
+    var userName: String = ""
+    var message: String = ""
+    var timestamp: Date = Date()
+    var messageType: MessageType = ChatMessage.MessageType.text
     
     enum MessageType: String, CaseIterable, Codable {
         case text = "Text"

@@ -3,15 +3,15 @@ import SwiftData
 
 @Model
 final class UserProfile {
-    var id: UUID
-    var name: String
+    var id: UUID = UUID()
+    var name: String = ""
     var email: String?
-    var preferredTheme: String
-    var notificationsEnabled: Bool
-    var biometricEnabled: Bool
-    var privacyLevel: PrivacyLevel
-    var createdAt: Date
-    var updatedAt: Date
+    var preferredTheme: String = "default"
+    var notificationsEnabled: Bool = true
+    var biometricEnabled: Bool = false
+    var privacyLevel: PrivacyLevel = UserProfile.PrivacyLevel.private
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
     
     enum PrivacyLevel: String, CaseIterable, Codable {
         case `public` = "Public"

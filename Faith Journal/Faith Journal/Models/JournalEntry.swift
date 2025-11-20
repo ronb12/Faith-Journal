@@ -3,19 +3,19 @@ import SwiftData
 
 @Model
 final class JournalEntry {
-    var id: UUID
-    var title: String
-    var content: String
-    var date: Date
-    var tags: [String]
+    var id: UUID = UUID()
+    var title: String = ""
+    var content: String = ""
+    var date: Date = Date()
+    var tags: [String] = []
     var mood: String?
     var location: String?
-    var isPrivate: Bool
+    var isPrivate: Bool = false
     var audioURL: URL?
-    var photoURLs: [URL]
+    var photoURLs: [URL] = []
     var drawingData: Data?
-    var createdAt: Date
-    var updatedAt: Date
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
     
     init(title: String, content: String, tags: [String] = [], mood: String? = nil, location: String? = nil, isPrivate: Bool = false) {
         self.id = UUID()

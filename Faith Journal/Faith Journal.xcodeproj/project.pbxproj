@@ -388,6 +388,7 @@
 				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleIconName = AppIcon;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Faith Journal needs access to your camera to take photos for journal entries and prayer requests.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Faith Journal uses Face ID to securely access your private journal entries.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Faith Journal needs access to your microphone to record voice notes for journal entries and prayer requests.";
@@ -427,6 +428,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleIconName = AppIcon;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Faith Journal needs access to your camera to take photos for journal entries and prayer requests.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Faith Journal uses Face ID to securely access your private journal entries.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Faith Journal needs access to your microphone to record voice notes for journal entries and prayer requests.";

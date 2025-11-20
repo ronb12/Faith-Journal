@@ -3,13 +3,13 @@ import SwiftData
 
 @Model
 final class Subscription {
-    var id: UUID
-    var type: SubscriptionType
-    var startDate: Date
+    var id: UUID = UUID()
+    var type: SubscriptionType = Subscription.SubscriptionType.free
+    var startDate: Date = Date()
     var endDate: Date?
-    var isActive: Bool
-    var autoRenew: Bool
-    var createdAt: Date
+    var isActive: Bool = true
+    var autoRenew: Bool = false
+    var createdAt: Date = Date()
     
     enum SubscriptionType: String, CaseIterable, Codable {
         case free = "Free"

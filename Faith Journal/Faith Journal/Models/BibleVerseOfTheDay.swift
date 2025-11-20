@@ -3,14 +3,14 @@ import SwiftData
 
 @Model
 final class BibleVerseOfTheDay {
-    var id: UUID
-    var verse: String
-    var reference: String
-    var translation: String
-    var date: Date
-    var isFavorite: Bool
+    var id: UUID = UUID()
+    var verse: String = ""
+    var reference: String = ""
+    var translation: String = "NIV"
+    var date: Date = Date()
+    var isFavorite: Bool = false
     var notes: String?
-    var createdAt: Date
+    var createdAt: Date = Date()
     
     init(verse: String, reference: String, translation: String = "NIV") {
         self.id = UUID()

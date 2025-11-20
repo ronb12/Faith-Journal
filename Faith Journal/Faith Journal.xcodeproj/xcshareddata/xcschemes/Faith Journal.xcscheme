@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Scheme
    LastUpgradeVersion = "1500"
-   version = "1.7">
+   version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
       buildImplicitDependencies = "YES">
@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "47201A9D2E11CDF700540883"
-               BuildableName = "Faith Journal.app"
+               BuildableName = "Faith Journal"
                BlueprintName = "Faith Journal"
                ReferencedContainer = "container:Faith Journal.xcodeproj">
             </BuildableReference>
@@ -26,8 +26,7 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.llvm"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES"
-      codeCoverageEnabled = "NO">
+      shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
          <TestableReference
             skipped = "NO"
@@ -35,8 +34,8 @@
             testExecutionOrdering = "random">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "47201AAD2E11CDFC00540883"
-               BuildableName = "Faith JournalTests.xctest"
+               BlueprintIdentifier = "47201AAF2E11CDFC00540883"
+               BuildableName = "Faith JournalTests"
                BlueprintName = "Faith JournalTests"
                ReferencedContainer = "container:Faith Journal.xcodeproj">
             </BuildableReference>
@@ -47,8 +46,8 @@
             testExecutionOrdering = "random">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "47201AB72E11CDFC00540883"
-               BuildableName = "Faith JournalUITests.xctest"
+               BlueprintIdentifier = "47201AB92E11CDFC00540883"
+               BuildableName = "Faith JournalUITests"
                BlueprintName = "Faith JournalUITests"
                ReferencedContainer = "container:Faith Journal.xcodeproj">
             </BuildableReference>
@@ -70,7 +69,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "47201A9D2E11CDF700540883"
-            BuildableName = "Faith Journal.app"
+            BuildableName = "Faith Journal"
             BlueprintName = "Faith Journal"
             ReferencedContainer = "container:Faith Journal.xcodeproj">
          </BuildableReference>
@@ -87,7 +86,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "47201A9D2E11CDF700540883"
-            BuildableName = "Faith Journal.app"
+            BuildableName = "Faith Journal"
             BlueprintName = "Faith Journal"
             ReferencedContainer = "container:Faith Journal.xcodeproj">
          </BuildableReference>
@@ -98,8 +97,7 @@
    </AnalyzeAction>
    <ArchiveAction
       buildConfiguration = "Release"
-      revealArchiveInOrganizer = "YES"
-      customArchiveName = "Faith Journal">
+      customArchiveName = "Faith Journal"
+      revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>
-
