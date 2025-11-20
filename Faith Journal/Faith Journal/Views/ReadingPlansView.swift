@@ -134,6 +134,8 @@ struct PlanDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @State private var showingStartPlan = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
     
     var body: some View {
         ScrollView {
@@ -201,19 +203,54 @@ struct PlanDetailView: View {
         }
         .navigationTitle("Plan Details")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage)
+        }
     }
     
     private func startPlan() {
+        // Create the plan with proper initialization
         let plan = ReadingPlan(
             title: planTemplate.title,
             description: planTemplate.description,
-            duration: planTemplate.duration
+            duration: planTemplate.duration,
+            startDate: Date()
         )
+        
+        // Set readings before inserting into context
         plan.readings = planTemplate.readings
         
-        modelContext.insert(plan)
-        try? modelContext.save()
-        dismiss()
+        // Verify readings were set correctly
+        guard !plan.readings.isEmpty else {
+            errorMessage = "Failed to set readings for the plan. Please try again."
+            showingError = true
+            print("❌ Error: Readings array is empty after assignment")
+            return
+        }
+        
+        do {
+            // Insert into context
+            modelContext.insert(plan)
+            
+            // Save to persist
+            try modelContext.save()
+            
+            print("✅ Successfully started plan: \(plan.title) with \(plan.readings.count) readings")
+            
+            // Dismiss the view
+            dismiss()
+        } catch {
+            let errorMsg = "Failed to start reading plan: \(error.localizedDescription)"
+            errorMessage = errorMsg
+            showingError = true
+            print("❌ Error starting reading plan: \(error)")
+            print("   Full error: \(error)")
+            
+            // Try to undo the insert if save failed
+            modelContext.delete(plan)
+        }
     }
 }
 

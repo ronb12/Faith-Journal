@@ -187,7 +187,7 @@ struct SectionView: View {
             
             Text(content)
                 .font(.body)
-                .foregroundColor(themeManager.colors.text)
+                .foregroundColor(.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 4)

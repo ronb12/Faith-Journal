@@ -32,21 +32,32 @@ struct SettingsView: View {
                     HStack {
                         if let profile = userProfile, !profile.name.isEmpty {
                             // Profile Avatar
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [themeManager.colors.primary, themeManager.colors.secondary],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                            if let avatarURL = profile.avatarPhotoURL,
+                               let imageData = try? Data(contentsOf: avatarURL),
+                               let avatarImage = UIImage(data: imageData) {
+                                Image(uiImage: avatarImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                            } else {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [themeManager.colors.primary, themeManager.colors.secondary],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
                                     )
-                                )
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Text(String(profile.name.prefix(1).uppercased()))
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.white)
-                                )
+                                    .frame(width: 40, height: 40)
+                                    .overlay(
+                                        Text(String(profile.name.prefix(1).uppercased()))
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white)
+                                    )
+                            }
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(profile.name)

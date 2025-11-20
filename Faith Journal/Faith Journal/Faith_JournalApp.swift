@@ -86,7 +86,7 @@ struct Faith_JournalApp: App {
     
     private func setupNotifications() {
         Task {
-            await notificationService.requestAuthorization()
+            _ = await notificationService.requestAuthorization()
             // Schedule daily prompt notification at 9 AM
             var dateComponents = DateComponents()
             dateComponents.hour = 9

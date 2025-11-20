@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ContentView: View {
     @StateObject private var bibleVerseManager = BibleVerseOfTheDayManager()
@@ -152,21 +153,11 @@ struct HomeView: View {
                             
                             // Profile Avatar/Initial
                             if let profile = userProfile, !profile.name.isEmpty {
-                                Circle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [themeManager.colors.primary, themeManager.colors.secondary],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .frame(width: 50, height: 50)
-                                    .overlay(
-                                        Text(String(profile.name.prefix(1).uppercased()))
-                                            .font(.title3)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.white)
-                                    )
+                                ProfileAvatarView(
+                                    profile: profile,
+                                    size: 50,
+                                    themeManager: themeManager
+                                )
                             }
                         }
                     }
@@ -873,6 +864,71 @@ struct MoodCheckinView: View {
             
             // Remove the entry if save failed
             modelContext.delete(moodEntry)
+        }
+    }
+}
+
+// Profile Avatar View Component that reacts to UserProfile changes
+struct ProfileAvatarView: View {
+    let profile: UserProfile
+    let size: CGFloat
+    let themeManager: ThemeManager
+    @State private var avatarImage: UIImage?
+    
+    var body: some View {
+        Group {
+            if let avatarImage = avatarImage {
+                Image(uiImage: avatarImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            } else {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [themeManager.colors.primary, themeManager.colors.secondary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: size, height: size)
+                    .overlay(
+                        Text(String(profile.name.prefix(1).uppercased()))
+                            .font(size > 40 ? .title3 : .headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                    )
+            }
+        }
+        .id(profile.avatarPhotoURL?.absoluteString ?? "no-avatar-\(profile.id)")
+        .onAppear {
+            loadAvatar()
+        }
+        .onChange(of: profile.avatarPhotoURL) { _, _ in
+            loadAvatar()
+        }
+    }
+    
+    private func loadAvatar() {
+        guard let avatarURL = profile.avatarPhotoURL else {
+            avatarImage = nil
+            return
+        }
+        
+        // Load image asynchronously to avoid blocking UI
+        Task {
+            if let imageData = try? Data(contentsOf: avatarURL),
+               let image = UIImage(data: imageData) {
+                await MainActor.run {
+                    avatarImage = image
+                }
+            } else {
+                await MainActor.run {
+                    avatarImage = nil
+                }
+            }
         }
     }
 }

@@ -823,7 +823,7 @@ struct VerseCard: View {
     let text: String
     @State private var isLoading = false
     @State private var loadedText: String?
-    @StateObject private var bibleService = BibleService.shared
+    @StateObject private var bibleService: BibleService = BibleService.shared
     
     var displayText: String {
         if let loaded = loadedText {
@@ -872,18 +872,30 @@ struct VerseCard: View {
         guard !isLoading else { return }
         isLoading = true
         
-        Task {
+        Task { @MainActor in
+            // First try to find in local verses database
+            let localVerses = bibleService.getAllLocalVerses()
+            if let localVerse = localVerses.first(where: { verse in
+                // Try to match the reference - be flexible with matching
+                verse.reference.lowercased().contains(reference.lowercased()) ||
+                reference.lowercased().contains(verse.reference.lowercased()) ||
+                // Try matching just the verse number part (remove spaces for comparison)
+                reference.lowercased().replacingOccurrences(of: " ", with: "").contains(verse.reference.lowercased().replacingOccurrences(of: " ", with: ""))
+            }) {
+                loadedText = localVerse.text
+                isLoading = false
+                return
+            }
+            
+            // If not found locally, try to fetch from API
             do {
                 let response = try await bibleService.fetchVerse(reference: reference)
-                await MainActor.run {
-                    loadedText = response.text
-                    isLoading = false
-                }
+                loadedText = response.text
+                isLoading = false
             } catch {
                 print("⚠️ Could not load verse \(reference): \(error.localizedDescription)")
-                await MainActor.run {
-                    isLoading = false
-                }
+                isLoading = false
+                // Verse text not available will be shown
             }
         }
     }
@@ -1124,28 +1136,34 @@ struct BibleStudyProgressView: View {
         // Update stored topics in service (only once)
         studyService.setStoredTopics(storedTopics)
         
-        // Compute stats on background thread
-        DispatchQueue.global(qos: .userInitiated).async {
+        // Get topics on main actor (since BibleStudyService is @MainActor)
+        Task { @MainActor in
             let all = studyService.getAllTopics()
-            let completed = all.filter { $0.isCompleted }.count
-            let favorites = all.filter { $0.isFavorite }.count
-            let percent = all.isEmpty ? 0.0 : Double(completed) / Double(all.count) * 100.0
+            let allTopicsCopy = all  // Create a copy to use off the main actor
+            let storedTopicsCopy = storedTopics  // Capture storedTopics for use off main actor
             
-            let stats = (total: all.count, completed: completed, favorites: favorites, percentComplete: percent)
-            
-            // Compute completed by category
-            let categories = BibleStudyTopic.TopicCategory.allCases
-            let categoryStats = categories.map { category in
-                let completed = storedTopics.filter { $0.category == category && $0.isCompleted }.count
-                return (category.rawValue, completed)
-            }.filter { $0.1 > 0 }
-            .sorted { $0.1 > $1.1 }
-            
-            // Update UI on main thread
-            DispatchQueue.main.async {
-                self.currentStats = stats
-                self.completedByCategory = categoryStats
-                self.isLoading = false
+            // Compute stats on background thread
+            Task.detached(priority: .userInitiated) {
+                let completed = allTopicsCopy.filter { $0.isCompleted }.count
+                let favorites = allTopicsCopy.filter { $0.isFavorite }.count
+                let percent = allTopicsCopy.isEmpty ? 0.0 : Double(completed) / Double(allTopicsCopy.count) * 100.0
+                
+                let stats = (total: allTopicsCopy.count, completed: completed, favorites: favorites, percentComplete: percent)
+                
+                // Compute completed by category
+                let categories = BibleStudyTopic.TopicCategory.allCases
+                let categoryStats = categories.map { category in
+                    let completed = storedTopicsCopy.filter { $0.category == category && $0.isCompleted }.count
+                    return (category.rawValue, completed)
+                }.filter { $0.1 > 0 }
+                .sorted { $0.1 > $1.1 }
+                
+                // Update UI on main thread
+                await Task { @MainActor in
+                    self.currentStats = stats
+                    self.completedByCategory = categoryStats
+                    self.isLoading = false
+                }.value
             }
         }
     }

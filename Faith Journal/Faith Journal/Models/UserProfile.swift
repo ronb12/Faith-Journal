@@ -6,6 +6,7 @@ final class UserProfile {
     var id: UUID = UUID()
     var name: String = ""
     var email: String?
+    var avatarPhotoURL: URL? // URL to saved avatar photo
     var preferredTheme: String = "default"
     var notificationsEnabled: Bool = true
     var biometricEnabled: Bool = false
