@@ -1,6 +1,52 @@
 {
   "images" : [
     {
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "20x20"
+    },
+    {
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "AppIcon-29x29@2x.png",
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "AppIcon-29x29@3x.png",
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "AppIcon-40x40@2x.png",
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "40x40"
+    },
+    {
+      "filename" : "iPhone_120x120.png",
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "40x40"
+    },
+    {
+      "filename" : "AppIcon-60x60@2x.png",
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "60x60"
+    },
+    {
+      "filename" : "AppIcon-60x60@3x.png",
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "60x60"
+    },
+    {
       "filename" : "AppIcon-20x20.png",
       "idiom" : "ipad",
       "scale" : "1x",
@@ -53,42 +99,6 @@
       "idiom" : "ipad",
       "scale" : "2x",
       "size" : "83.5x83.5"
-    },
-    {
-      "filename" : "AppIcon-29x29@2x.png",
-      "idiom" : "iphone",
-      "scale" : "2x",
-      "size" : "29x29"
-    },
-    {
-      "filename" : "AppIcon-29x29@3x.png",
-      "idiom" : "iphone",
-      "scale" : "3x",
-      "size" : "29x29"
-    },
-    {
-      "filename" : "AppIcon-40x40@2x.png",
-      "idiom" : "iphone",
-      "scale" : "2x",
-      "size" : "40x40"
-    },
-    {
-      "filename" : "AppIcon-40x40@3x.png",
-      "idiom" : "iphone",
-      "scale" : "3x",
-      "size" : "40x40"
-    },
-    {
-      "filename" : "AppIcon-60x60@2x.png",
-      "idiom" : "iphone",
-      "scale" : "2x",
-      "size" : "60x60"
-    },
-    {
-      "filename" : "AppIcon-60x60@3x.png",
-      "idiom" : "iphone",
-      "scale" : "3x",
-      "size" : "60x60"
     },
     {
       "filename" : "AppIcon-1024x1024.png",
