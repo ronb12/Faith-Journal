@@ -1,16 +1,20 @@
 # Privacy Policy
 
-**Last Updated:** November 20, 2025
+**Last Updated:** November 21, 2025
 
 ## 1. Introduction
 
-We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use the Faith Journal app ("App").
+We are committed to protecting your privacy. This Privacy Policy explains how your data is stored and used when you use the Faith Journal app ("App").
+
+**Important:** According to Apple's App Store definition, we do **NOT** collect data that is transmitted off your device in a way that allows us or third-party partners to access it. All data you create is stored locally on your device and may be synced to Apple's iCloud (if you enable it). We do not have access to your data stored in iCloud, and we do not use third-party analytics or advertising services.
 
 By using the App, you consent to the data practices described in this policy.
 
-## 2. Information We Collect
+## 2. Information Storage and Usage
 
-We collect the following types of information:
+**Important Note:** According to Apple's App Store definition, we do **NOT** collect data that is transmitted off your device in a way that allows us or third-party partners to access it. All data you create is stored locally on your device and synced via Apple's iCloud service (if you enable iCloud sync). We do not have access to your data stored in iCloud.
+
+The App stores the following information **locally on your device** for app functionality:
 
 **Personal Information:**
 - Name and email address (if you choose to provide them)
@@ -19,34 +23,48 @@ We collect the following types of information:
 **Usage Data:**
 - Journal entries, prayer requests, and mood entries you create
 - Preferences and settings you configure
-- App usage patterns and interactions
+- App usage patterns and interactions (stored locally)
 
 **Device Information:**
-- Device type and operating system
-- Unique device identifiers
-- App version and crash reports
+- Device type and operating system (for app functionality)
+- Unique device identifiers (for iCloud syncing only)
+- App version and crash reports (stored locally)
+
+**Data Access:**
+- We do **NOT** have access to your iCloud data
+- We do **NOT** transmit your data to our servers
+- We do **NOT** use third-party analytics or advertising services
+- We do **NOT** share your data with third-party partners
+- All data remains under your control on your device and in your iCloud account
 
 ## 3. How We Use Your Information
 
-We use the information we collect to:
+Since we do not have access to your data stored in iCloud, all information you create is used **locally on your device** to:
 - Provide and maintain the App's functionality
-- Sync your data across your devices via iCloud
-- Improve and personalize your experience
+- Sync your data across your devices via iCloud (Apple handles this)
+- Personalize your experience within the App
 - Send you notifications (if you opt in)
-- Respond to your support requests
-- Analyze usage patterns to enhance the App
+- Respond to your support requests (only if you contact us directly)
+
+**We do NOT:**
+- Access your data from our servers
+- Analyze usage patterns remotely
+- Use your data for advertising or marketing
+- Share your data with third parties
 
 ## 4. Data Storage and iCloud
 
-Your data is stored locally on your device and synced to Apple's iCloud service when you enable iCloud sync.
+**Data Storage:**
+Your data is stored **locally on your device** first. When you enable iCloud sync, your data is synced to Apple's iCloud service.
 
-By using iCloud sync:
-- Your data is encrypted in transit and at rest
-- Your data is stored on Apple's servers
-- Your data is subject to Apple's iCloud Terms and Conditions
-- You can disable iCloud sync at any time in your device settings
+**Important:** We do **NOT** collect or have access to your data according to Apple's App Store definition. The data you create:
+- Is stored locally on your device
+- May be synced to Apple's iCloud (if you enable it)
+- Is encrypted in transit and at rest
+- Is stored on Apple's servers (subject to Apple's iCloud Terms and Conditions)
+- Can be disabled at any time in your device settings
 
-We do not have direct access to your iCloud data. Apple handles all iCloud storage and security.
+**We do NOT have access to your iCloud data.** Apple handles all iCloud storage and security. We cannot see, access, or retrieve your data from iCloud.
 
 ## 5. CloudKit and Public Data
 
@@ -91,9 +109,9 @@ To exercise these rights, use the App's settings or contact us through support c
 
 ## 9. Children's Privacy
 
-The App is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13.
+The App is not intended for children under the age of 13. Since we do not collect or have access to user data, we do not knowingly gather personal information from children under 13.
 
-If you are a parent or guardian and believe your child has provided us with personal information, please contact us immediately.
+If you are a parent or guardian and have concerns about your child's use of the App, please contact us immediately.
 
 ## 10. Third-Party Services
 
