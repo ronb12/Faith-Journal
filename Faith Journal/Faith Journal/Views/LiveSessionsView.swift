@@ -206,6 +206,7 @@ struct LiveSessionsView: View {
             }
             .onAppear {
                 // Ensure CloudKit services are initialized before use
+                // Note: App works fully without CloudKit - this is optional for multi-user features
                 Task { @MainActor in
                     // Give services a moment to initialize
                     try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
