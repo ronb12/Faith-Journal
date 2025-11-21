@@ -874,7 +874,8 @@ struct VerseCard: View {
         
         Task { @MainActor in
             // First try to find in local verses database
-            let localVerses = bibleService.getAllLocalVerses()
+            let service = self.bibleService
+            let localVerses = service.getAllLocalVerses()
             if let localVerse = localVerses.first(where: { verse in
                 // Try to match the reference - be flexible with matching
                 verse.reference.lowercased().contains(reference.lowercased()) ||
@@ -882,19 +883,19 @@ struct VerseCard: View {
                 // Try matching just the verse number part (remove spaces for comparison)
                 reference.lowercased().replacingOccurrences(of: " ", with: "").contains(verse.reference.lowercased().replacingOccurrences(of: " ", with: ""))
             }) {
-                loadedText = localVerse.text
-                isLoading = false
+                self.loadedText = localVerse.text
+                self.isLoading = false
                 return
             }
             
             // If not found locally, try to fetch from API
             do {
-                let response = try await bibleService.fetchVerse(reference: reference)
-                loadedText = response.text
-                isLoading = false
+                let response = try await service.fetchVerse(reference: reference)
+                self.loadedText = response.text
+                self.isLoading = false
             } catch {
                 print("⚠️ Could not load verse \(reference): \(error.localizedDescription)")
-                isLoading = false
+                self.isLoading = false
                 // Verse text not available will be shown
             }
         }
