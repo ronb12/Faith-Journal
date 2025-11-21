@@ -10,8 +10,16 @@ struct SettingsView: View {
     @Query var userProfiles: [UserProfile]
     @AppStorage("selectedTheme") private var selectedTheme: String = "System"
     @AppStorage("reminderEnabled") private var reminderEnabled: Bool = false
-    @AppStorage("reminderTime") private var reminderTime: Date = Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) ?? Date()
+    @AppStorage("reminderTimeInterval") private var reminderTimeInterval: Double = Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date())?.timeIntervalSince1970 ?? Date().timeIntervalSince1970
     @AppStorage("biometricEnabled") private var biometricEnabled: Bool = false
+    
+    // State for DatePicker (synced with AppStorage)
+    @State private var reminderTime: Date = Date()
+    
+    // Computed property to sync Date with AppStorage
+    private func updateReminderTime() {
+        reminderTime = Date(timeIntervalSince1970: reminderTimeInterval)
+    }
     @State private var showResetAlert = false
     @State private var showExportSheet = false
     @State private var exportData: String = ""
@@ -130,11 +138,16 @@ struct SettingsView: View {
                     if reminderEnabled {
                         DatePicker("Time", selection: $reminderTime, displayedComponents: .hourAndMinute)
                             .onChange(of: reminderTime) { _, newTime in
+                                reminderTimeInterval = newTime.timeIntervalSince1970
                                 if reminderEnabled {
                                     scheduleDailyReminder(at: newTime)
                                 }
                             }
                     }
+                }
+                .onAppear {
+                    // Sync DatePicker with stored value (iOS 17.0 compatible)
+                    reminderTime = Date(timeIntervalSince1970: reminderTimeInterval)
                 }
                 
                 Section(header: Text("Privacy & Security")) {
