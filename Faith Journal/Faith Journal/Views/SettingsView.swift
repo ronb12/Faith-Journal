@@ -377,10 +377,67 @@ struct SettingsView: View {
     
     // RESET DATA
     func resetAllData() {
+        // Clear UserDefaults
         let domain = Bundle.main.bundleIdentifier!
         UserDefaults.standard.removePersistentDomain(forName: domain)
         UserDefaults.standard.synchronize()
-        // TODO: Also delete all SwiftData/CoreData if used
+        
+        // Delete all SwiftData models
+        do {
+            // Delete all Journal Entries
+            let journalDescriptor = FetchDescriptor<JournalEntry>()
+            let journalEntries = try modelContext.fetch(journalDescriptor)
+            for entry in journalEntries {
+                modelContext.delete(entry)
+            }
+            
+            // Delete all Prayer Requests
+            let prayerDescriptor = FetchDescriptor<PrayerRequest>()
+            let prayers = try modelContext.fetch(prayerDescriptor)
+            for prayer in prayers {
+                modelContext.delete(prayer)
+            }
+            
+            // Delete all Mood Entries
+            let moodDescriptor = FetchDescriptor<MoodEntry>()
+            let moods = try modelContext.fetch(moodDescriptor)
+            for mood in moods {
+                modelContext.delete(mood)
+            }
+            
+            // Delete all User Profiles
+            let profileDescriptor = FetchDescriptor<UserProfile>()
+            let profiles = try modelContext.fetch(profileDescriptor)
+            for profile in profiles {
+                modelContext.delete(profile)
+            }
+            
+            // Delete all Bible Verse of the Day entries
+            let verseDescriptor = FetchDescriptor<BibleVerseOfTheDay>()
+            let verses = try modelContext.fetch(verseDescriptor)
+            for verse in verses {
+                modelContext.delete(verse)
+            }
+            
+            // Delete all Reading Plans
+            let planDescriptor = FetchDescriptor<ReadingPlan>()
+            let plans = try modelContext.fetch(planDescriptor)
+            for plan in plans {
+                modelContext.delete(plan)
+            }
+            
+            // Delete all Bookmarked Verses
+            let bookmarkDescriptor = FetchDescriptor<BookmarkedVerse>()
+            let bookmarks = try modelContext.fetch(bookmarkDescriptor)
+            for bookmark in bookmarks {
+                modelContext.delete(bookmark)
+            }
+            
+            // Save changes
+            try modelContext.save()
+        } catch {
+            print("Error resetting SwiftData: \(error.localizedDescription)")
+        }
     }
 }
 
