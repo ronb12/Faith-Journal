@@ -51,7 +51,7 @@ struct JournalView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 JournalSearchAndFilterBar(
                     searchText: $searchText,
@@ -247,7 +247,7 @@ struct NewJournalEntryView: View {
     let moods = ["", "Happy", "Grateful", "Peaceful", "Reflective", "Challenged", "Hopeful", "Anxious", "Joyful"]
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Title")) {
                     TextField("Title", text: $title)
@@ -404,7 +404,7 @@ struct DrawingView: View {
     @State private var drawing = PKDrawing()
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 PencilKitCanvas(drawing: $drawing)
                     .background(Color.white)
@@ -719,7 +719,7 @@ struct EditJournalEntryView: View {
     let moods = ["", "Happy", "Grateful", "Peaceful", "Reflective", "Challenged", "Hopeful", "Anxious", "Joyful"]
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Title")) {
                     TextField("Title", text: $title)
