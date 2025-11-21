@@ -39,22 +39,39 @@ class CloudKitUserService: ObservableObject {
             let status = try await container.accountStatus()
             switch status {
             case .available:
+                // Only fetch CloudKit user ID if account is available
+                // This prevents triggering Apple ID sign-in prompt
                 isAuthenticated = true
                 await fetchUserID()
             case .noAccount:
+                // No iCloud account - app works fine without it
+                // Use device identifier instead (no sign-in required)
                 isAuthenticated = false
                 currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                currentUserName = UIDevice.current.name
             case .couldNotDetermine:
+                // Can't determine status - use device identifier (no sign-in required)
                 isAuthenticated = false
+                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                currentUserName = UIDevice.current.name
             case .restricted:
+                // Restricted - use device identifier (no sign-in required)
                 isAuthenticated = false
+                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                currentUserName = UIDevice.current.name
             case .temporarilyUnavailable:
+                // Temporarily unavailable - use device identifier (no sign-in required)
                 isAuthenticated = false
+                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                currentUserName = UIDevice.current.name
             @unknown default:
+                // Unknown status - use device identifier (no sign-in required)
                 isAuthenticated = false
+                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+                currentUserName = UIDevice.current.name
             }
         } catch {
-            // If CloudKit fails, use fallback values
+            // If CloudKit fails, use fallback values (no sign-in required)
             isAuthenticated = false
             currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
             currentUserName = UIDevice.current.name
@@ -62,6 +79,15 @@ class CloudKitUserService: ObservableObject {
     }
     
     func fetchUserID() async {
+        // Only fetch CloudKit user ID if we're authenticated
+        // This prevents triggering Apple ID sign-in prompt
+        guard isAuthenticated else {
+            // Not authenticated - use device identifier (no sign-in required)
+            currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+            currentUserName = UIDevice.current.name
+            return
+        }
+        
         do {
             let recordID = try await container.userRecordID()
             // Use CloudKit record ID as unique user identifier
@@ -84,7 +110,7 @@ class CloudKitUserService: ObservableObject {
                 currentUserName = UIDevice.current.name
             }
         } catch {
-            // Fallback to device identifier
+            // Fallback to device identifier (no sign-in required)
             currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
             currentUserName = UIDevice.current.name
         }
