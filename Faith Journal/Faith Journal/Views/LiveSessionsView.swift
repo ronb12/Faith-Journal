@@ -83,7 +83,7 @@ struct LiveSessionsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Search Bar
                 HStack {
@@ -405,7 +405,7 @@ struct CreateLiveSessionView: View {
     let categories = ["Prayer", "Bible Study", "Devotional", "Testimony", "Fellowship", "Other"]
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Session Details")) {
                     TextField("Session Title", text: $title)

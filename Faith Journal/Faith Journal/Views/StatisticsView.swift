@@ -82,7 +82,7 @@ struct StatisticsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
                     // Summary Cards
@@ -269,7 +269,6 @@ struct StatisticsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Statistics")
-            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .background(Color(.systemGroupedBackground))
             .sheet(isPresented: $showingMoodAnalytics) {
                 MoodAnalyticsView()

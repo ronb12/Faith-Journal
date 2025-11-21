@@ -34,7 +34,7 @@ struct SettingsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Profile")) {
                     HStack {
@@ -227,7 +227,6 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .fullScreenCover(isPresented: $showAuthLock) {
                 BiometricLockView(isAuthenticated: $isAuthenticated)
             }

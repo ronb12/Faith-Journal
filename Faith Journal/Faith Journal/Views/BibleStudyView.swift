@@ -35,7 +35,7 @@ struct BibleStudyView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Progress Stats Card
                 progressStatsCard
@@ -64,7 +64,6 @@ struct BibleStudyView: View {
                 }
             }
             .navigationTitle("Bible Study")
-            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .searchable(text: $searchText, prompt: "Search topics, verses, questions...")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {

@@ -99,7 +99,6 @@ struct JournalView: View {
                 }
             }
             .navigationTitle("Journal")
-            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingNewEntry = true }) {

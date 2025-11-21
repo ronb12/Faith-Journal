@@ -132,7 +132,7 @@ struct HomeView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     // Personalized Welcome Header
@@ -188,7 +188,6 @@ struct HomeView: View {
                 .padding()
             }
             .navigationBarHidden(true)
-            .navigationViewStyle(.stack) // Force full-width layout on iPad
         }
     }
 }
@@ -500,7 +499,7 @@ struct DevotionalsView: View {
     @State private var selectedDevotional: Devotional?
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Category Filter
                 ScrollView(.horizontal, showsIndicators: false) {

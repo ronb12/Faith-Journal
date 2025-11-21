@@ -42,7 +42,7 @@ struct PrayerView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Search and Filter Bar
                 VStack(spacing: 8) {
@@ -124,7 +124,6 @@ struct PrayerView: View {
                 }
             }
             .navigationTitle("Prayer Requests")
-            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingNewRequest = true }) {
