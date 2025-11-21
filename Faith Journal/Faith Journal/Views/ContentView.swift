@@ -188,6 +188,7 @@ struct HomeView: View {
                 .padding()
             }
             .navigationBarHidden(true)
+            .navigationViewStyle(.stack) // Force full-width layout on iPad
         }
     }
 }

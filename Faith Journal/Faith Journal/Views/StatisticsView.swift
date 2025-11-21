@@ -269,6 +269,7 @@ struct StatisticsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Statistics")
+            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .background(Color(.systemGroupedBackground))
             .sheet(isPresented: $showingMoodAnalytics) {
                 MoodAnalyticsView()

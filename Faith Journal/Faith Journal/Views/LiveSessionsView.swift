@@ -166,6 +166,7 @@ struct LiveSessionsView: View {
                 }
             }
             .navigationTitle("Live Sessions")
+            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { showingInvitations = true }) {

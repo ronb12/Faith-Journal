@@ -54,6 +54,7 @@ struct ReadingPlansView: View {
                 }
             }
             .navigationTitle("Reading Plans")
+            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingCreatePlan = true }) {

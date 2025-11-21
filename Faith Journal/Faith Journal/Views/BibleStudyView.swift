@@ -64,6 +64,7 @@ struct BibleStudyView: View {
                 }
             }
             .navigationTitle("Bible Study")
+            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .searchable(text: $searchText, prompt: "Search topics, verses, questions...")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {

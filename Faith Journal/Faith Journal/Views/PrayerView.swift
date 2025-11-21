@@ -124,6 +124,7 @@ struct PrayerView: View {
                 }
             }
             .navigationTitle("Prayer Requests")
+            .navigationViewStyle(.stack) // Force full-width layout on iPad
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingNewRequest = true }) {
