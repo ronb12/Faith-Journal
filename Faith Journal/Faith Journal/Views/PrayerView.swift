@@ -145,10 +145,17 @@ struct PrayerView: View {
     
     private func deleteRequest(at offsets: IndexSet) {
         for index in offsets {
+            guard index < filteredRequests.count else { continue }
             let request = filteredRequests[index]
             modelContext.delete(request)
         }
-        try? modelContext.save()
+        
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ Error deleting prayer request: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.deleteFailed)
+        }
     }
     
     private func createSamplePrayers() {
@@ -173,17 +180,24 @@ struct PrayerView: View {
             )
         ]
         
-        // Make one prayer answered as an example
-        samplePrayers[0].status = .answered
-        samplePrayers[0].isAnswered = true
-        samplePrayers[0].answerDate = Date().addingTimeInterval(-86400) // Yesterday
-        samplePrayers[0].answerNotes = "God provided clear guidance through a conversation with a mentor. I feel confident about the direction He's leading me."
+        // Make one prayer answered as an example (safely check array bounds)
+        if !samplePrayers.isEmpty {
+            samplePrayers[0].status = .answered
+            samplePrayers[0].isAnswered = true
+            samplePrayers[0].answerDate = Date().addingTimeInterval(-86400) // Yesterday
+            samplePrayers[0].answerNotes = "God provided clear guidance through a conversation with a mentor. I feel confident about the direction He's leading me."
+        }
         
         for prayer in samplePrayers {
             modelContext.insert(prayer)
         }
         
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ Error creating sample prayers: \(error.localizedDescription)")
+            // Don't show error to user for sample data, just log it
+        }
     }
 }
 
@@ -337,8 +351,14 @@ struct NewPrayerRequestView: View {
             isPrivate: isPrivate
         )
         modelContext.insert(request)
-        try? modelContext.save()
-        dismiss()
+        
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ Error saving prayer request: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.saveFailed)
+        }
     }
 }
 
@@ -519,7 +539,12 @@ struct PrayerRequestDetailView: View {
         .alert("Delete Prayer Request", isPresented: $showingDeleteAlert) {
             Button("Delete", role: .destructive) {
                 modelContext.delete(request)
-                try? modelContext.save()
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("❌ Error deleting prayer request: \(error.localizedDescription)")
+                    ErrorHandler.shared.handle(.deleteFailed)
+                }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
@@ -530,13 +555,25 @@ struct PrayerRequestDetailView: View {
     private func archiveRequest() {
         request.status = .archived
         request.updatedAt = Date()
-        try? modelContext.save()
+        
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ Error archiving prayer request: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.saveFailed)
+        }
     }
     
     private func activateRequest() {
         request.status = .active
         request.updatedAt = Date()
-        try? modelContext.save()
+        
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ Error activating prayer request: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.saveFailed)
+        }
     }
 }
 
@@ -579,8 +616,13 @@ struct AnswerPrayerRequestView: View {
         request.answerNotes = answerNotes.isEmpty ? nil : answerNotes
         request.updatedAt = Date()
         
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ Error saving prayer answer: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.saveFailed)
+        }
     }
 }
 
@@ -660,7 +702,12 @@ struct EditPrayerRequestView: View {
         request.isPrivate = isPrivate
         request.updatedAt = Date()
         
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ Error saving prayer request changes: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.saveFailed)
+        }
     }
 } 

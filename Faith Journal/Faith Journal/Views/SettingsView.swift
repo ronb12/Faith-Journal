@@ -251,7 +251,13 @@ struct SettingsView: View {
             let defaultName = UIDevice.current.name
             let profile = UserProfile(name: defaultName)
             modelContext.insert(profile)
-            try? modelContext.save()
+            
+            do {
+                try modelContext.save()
+            } catch {
+                print("❌ Error creating default profile: \(error.localizedDescription)")
+                ErrorHandler.shared.handle(.saveFailed)
+            }
         }
     }
     

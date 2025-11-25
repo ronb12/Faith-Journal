@@ -242,7 +242,12 @@ struct InviteUsersView: View {
             inviteCode: String(code)
         )
         modelContext.insert(invitation)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ Error creating invitation: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.saveFailed)
+        }
         return String(code)
     }
     
@@ -493,7 +498,12 @@ struct InviteCodeView: View {
             inviteCode: String(code)
         )
         modelContext.insert(invitation)
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ Error saving invitation code: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.saveFailed)
+        }
         return String(code)
     }
 }

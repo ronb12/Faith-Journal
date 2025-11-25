@@ -843,7 +843,12 @@ struct LiveSessionDetailView: View {
                 inviteCode: String(code)
             )
             modelContext.insert(invitation)
-            try? modelContext.save()
+            do {
+                try modelContext.save()
+            } catch {
+                print("❌ Error saving invitation: \(error.localizedDescription)")
+                ErrorHandler.shared.handle(.saveFailed)
+            }
         }
     }
 }

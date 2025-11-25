@@ -919,12 +919,20 @@ struct ProfileAvatarView: View {
         
         // Load image asynchronously to avoid blocking UI
         Task {
-            if let imageData = try? Data(contentsOf: avatarURL),
-               let image = UIImage(data: imageData) {
-                await MainActor.run {
-                    avatarImage = image
+            do {
+                let imageData = try Data(contentsOf: avatarURL)
+                if let image = UIImage(data: imageData) {
+                    await MainActor.run {
+                        avatarImage = image
+                    }
+                } else {
+                    await MainActor.run {
+                        avatarImage = nil
+                    }
                 }
-            } else {
+            } catch {
+                // Silently fail for avatar loading - not critical
+                print("⚠️ Could not load avatar image: \(error.localizedDescription)")
                 await MainActor.run {
                     avatarImage = nil
                 }

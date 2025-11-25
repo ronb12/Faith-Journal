@@ -718,7 +718,12 @@ struct JoinByCodeView: View {
         } else {
             errorMessage = "This session is no longer active or has been deleted"
             invitation.status = .expired
-            try? modelContext.save()
+            
+            do {
+                try modelContext.save()
+            } catch {
+                print("❌ Error updating invitation status: \(error.localizedDescription)")
+            }
             showingError = true
         }
     }

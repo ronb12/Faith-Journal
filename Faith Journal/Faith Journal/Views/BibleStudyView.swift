@@ -51,7 +51,12 @@ struct BibleStudyView: View {
                     DailyTopicCard(topic: dailyTopic) {
                         selectedTopic = dailyTopic
                         studyService.markAsViewed(dailyTopic)
-                        try? modelContext.save()
+                        do {
+                            try modelContext.save()
+                        } catch {
+                            print("❌ Error saving daily topic view: \(error.localizedDescription)")
+                            ErrorHandler.shared.handle(.saveFailed)
+                        }
                     }
                     .padding()
                 }
@@ -261,7 +266,12 @@ struct BibleStudyView: View {
                     selectedTopic = topic
                     studyService.markAsViewed(topic)
                     topic.lastViewedDate = Date()
-                    try? modelContext.save()
+                    do {
+                        try modelContext.save()
+                    } catch {
+                        print("❌ Error saving topic view: \(error.localizedDescription)")
+                        ErrorHandler.shared.handle(.saveFailed)
+                    }
                 }
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
             }
@@ -469,7 +479,12 @@ struct TopicDetailView: View {
                             
                             Button(action: {
                                 studyService.toggleFavorite(topic)
-                                try? modelContext.save()
+                                do {
+                                    try modelContext.save()
+                                } catch {
+                                    print("❌ Error toggling favorite: \(error.localizedDescription)")
+                                    ErrorHandler.shared.handle(.saveFailed)
+                                }
                             }) {
                                 Image(systemName: topic.isFavorite ? "heart.fill" : "heart")
                                     .foregroundColor(topic.isFavorite ? .red : .secondary)
@@ -493,7 +508,12 @@ struct TopicDetailView: View {
                             
                             Button(action: {
                                 studyService.toggleCompletion(topic)
-                                try? modelContext.save()
+                                do {
+                                    try modelContext.save()
+                                } catch {
+                                    print("❌ Error toggling completion: \(error.localizedDescription)")
+                                    ErrorHandler.shared.handle(.saveFailed)
+                                }
                             }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: topic.isCompleted ? "checkmark.circle.fill" : "checkmark.circle")
@@ -641,8 +661,13 @@ struct TopicDetailView: View {
                     Button("Done") {
                         topic.notes = notes
                         topic.lastViewedDate = Date()
-                        try? modelContext.save()
-                        dismiss()
+                        do {
+                            try modelContext.save()
+                            dismiss()
+                        } catch {
+                            print("❌ Error saving topic notes: \(error.localizedDescription)")
+                            ErrorHandler.shared.handle(.saveFailed)
+                        }
                     }
                 }
             }
@@ -658,9 +683,14 @@ struct TopicDetailView: View {
                             studyService.updateQuestionAnswer(topic, questionIndex: selectedQuestionIndex, answer: editingAnswer)
                         }
                         topic.lastViewedDate = Date()
-                        try? modelContext.save()
-                        showingAnswerEditor = false
-                        isEditingPrompt = false
+                        do {
+                            try modelContext.save()
+                            showingAnswerEditor = false
+                            isEditingPrompt = false
+                        } catch {
+                            print("❌ Error saving question answer: \(error.localizedDescription)")
+                            ErrorHandler.shared.handle(.saveFailed)
+                        }
                     },
                     onCancel: {
                         showingAnswerEditor = false
@@ -672,11 +702,21 @@ struct TopicDetailView: View {
                 notes = topic.notes
                 studyService.markAsViewed(topic)
                 relatedTopics = studyService.getRelatedTopics(for: topic)
-                try? modelContext.save()
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("❌ Error saving topic view on appear: \(error.localizedDescription)")
+                    ErrorHandler.shared.handle(.saveFailed)
+                }
             }
             .onChange(of: notes) { _, newValue in
                 topic.notes = newValue
-                try? modelContext.save()
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("❌ Error auto-saving notes: \(error.localizedDescription)")
+                    ErrorHandler.shared.handle(.saveFailed)
+                }
             }
         }
     }

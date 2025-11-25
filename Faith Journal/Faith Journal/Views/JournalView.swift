@@ -120,10 +120,17 @@ struct JournalView: View {
     
     private func deleteEntry(at offsets: IndexSet) {
         for index in offsets {
+            guard index < filteredEntries.count else { continue }
             let entry = filteredEntries[index]
             modelContext.delete(entry)
         }
-        try? modelContext.save()
+        
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ Error deleting journal entry: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.deleteFailed)
+        }
     }
     
     private func createSampleEntries() {
@@ -155,7 +162,12 @@ struct JournalView: View {
             modelContext.insert(entry)
         }
         
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ Error creating sample entries: \(error.localizedDescription)")
+            // Don't show error to user for sample data, just log it
+        }
     }
 }
 
@@ -243,6 +255,8 @@ struct NewJournalEntryView: View {
     @State private var audioURL: URL?
     @State private var showingDrawingSheet = false
     @State private var drawingData: Data?
+    @State private var showingErrorAlert = false
+    @State private var errorMessage = ""
     
     let moods = ["", "Happy", "Grateful", "Peaceful", "Reflective", "Challenged", "Hopeful", "Anxious", "Joyful"]
     
@@ -339,6 +353,11 @@ struct NewJournalEntryView: View {
         .sheet(isPresented: $showingDrawingSheet) {
             DrawingView(drawingData: $drawingData)
         }
+        .alert("Error", isPresented: $showingErrorAlert) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage)
+        }
         .onAppear {
             setupAudioRecorder()
         }
@@ -350,9 +369,15 @@ struct NewJournalEntryView: View {
             try audioSession.setCategory(.playAndRecord, mode: .default)
             try audioSession.setActive(true)
             
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                errorMessage = "Cannot access documents directory for audio recording."
+                showingErrorAlert = true
+                return
+            }
+            
             let audioFileName = "\(UUID().uuidString).m4a"
-            audioURL = documentsPath.appendingPathComponent(audioFileName)
+            let audioFileURL = documentsPath.appendingPathComponent(audioFileName)
+            audioURL = audioFileURL
             
             let settings = [
                 AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
@@ -361,9 +386,17 @@ struct NewJournalEntryView: View {
                 AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
             ]
             
-            audioRecorder = try AVAudioRecorder(url: audioURL!, settings: settings)
+            guard let audioURL = audioURL else {
+                errorMessage = "Failed to create audio file URL."
+                showingErrorAlert = true
+                return
+            }
+            
+            audioRecorder = try AVAudioRecorder(url: audioURL, settings: settings)
         } catch {
-            print("Audio recorder setup failed: \(error)")
+            print("❌ Audio recorder setup failed: \(error.localizedDescription)")
+            errorMessage = "Failed to setup audio recorder: \(error.localizedDescription)"
+            showingErrorAlert = true
         }
     }
     
@@ -393,8 +426,17 @@ struct NewJournalEntryView: View {
         entry.drawingData = drawingData
         
         modelContext.insert(entry)
-        try? modelContext.save()
-        dismiss()
+        
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ Error saving journal entry: \(error.localizedDescription)")
+            errorMessage = "Failed to save journal entry. Please try again.\n\n\(error.localizedDescription)"
+            showingErrorAlert = true
+            // Remove entry if save failed
+            modelContext.delete(entry)
+        }
     }
 }
 
@@ -604,14 +646,21 @@ struct JournalEntryDetailView: View {
                             AudioPlayerView(audioURL: audioURL)
                         }
                         
-                        // Drawing
-                        if let drawingData = entry.drawingData,
-                           let uiImage = UIImage(data: drawingData) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxHeight: 200)
-                                .cornerRadius(8)
+                        // Drawing - Handle both PencilKit format and legacy UIImage format
+                        if let drawingData = entry.drawingData {
+                            if let drawing = try? PKDrawing(data: drawingData) {
+                                // Render PencilKit drawing
+                                PencilKitDrawingView(drawing: drawing)
+                                    .frame(maxHeight: 200)
+                                    .cornerRadius(8)
+                            } else if let uiImage = UIImage(data: drawingData) {
+                                // Render legacy UIImage format
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxHeight: 200)
+                                    .cornerRadius(8)
+                            }
                         }
                     }
                 }
@@ -642,7 +691,12 @@ struct JournalEntryDetailView: View {
         .alert("Delete Entry", isPresented: $showingDeleteAlert) {
             Button("Delete", role: .destructive) {
                 modelContext.delete(entry)
-                try? modelContext.save()
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("❌ Error deleting entry: \(error.localizedDescription)")
+                    ErrorHandler.shared.handle(.deleteFailed)
+                }
             }
             Button("Cancel", role: .cancel) { }
         } message: {
@@ -769,8 +823,13 @@ struct EditJournalEntryView: View {
         entry.isPrivate = isPrivate
         entry.updatedAt = Date()
         
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            print("❌ Error saving journal entry changes: \(error.localizedDescription)")
+            ErrorHandler.shared.handle(.saveFailed)
+        }
     }
 }
 
@@ -832,5 +891,22 @@ struct JournalEntriesList: View {
             .onDelete(perform: deleteEntry)
         }
         .listStyle(PlainListStyle())
+    }
+}
+
+// Helper view to render PencilKit drawings in read-only mode
+struct PencilKitDrawingView: UIViewRepresentable {
+    let drawing: PKDrawing
+    
+    func makeUIView(context: Context) -> PKCanvasView {
+        let canvasView = PKCanvasView()
+        canvasView.drawing = drawing
+        canvasView.isUserInteractionEnabled = false // Read-only
+        canvasView.drawingPolicy = .anyInput
+        return canvasView
+    }
+    
+    func updateUIView(_ uiView: PKCanvasView, context: Context) {
+        uiView.drawing = drawing
     }
 } 

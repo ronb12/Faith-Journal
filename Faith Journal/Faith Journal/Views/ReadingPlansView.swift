@@ -410,7 +410,12 @@ struct ActivePlanDetailView: View {
                             // Mark complete button
                             Button(action: {
                                 plan.markReadingComplete(todayReading.day)
-                                try? modelContext.save()
+                                do {
+                                    try modelContext.save()
+                                } catch {
+                                    print("❌ Error marking reading complete: \(error.localizedDescription)")
+                                    ErrorHandler.shared.handle(.saveFailed)
+                                }
                             }) {
                                 HStack {
                                     Spacer()
@@ -592,8 +597,13 @@ struct ReadingDetailView: View {
                     if !reading.isCompleted {
                         Button(action: {
                             plan.markReadingComplete(reading.day)
-                            try? modelContext.save()
-                            dismiss()
+                            do {
+                                try modelContext.save()
+                                dismiss()
+                            } catch {
+                                print("❌ Error marking reading complete: \(error.localizedDescription)")
+                                ErrorHandler.shared.handle(.saveFailed)
+                            }
                         }) {
                             Text("Mark as Complete")
                                 .font(.headline)
