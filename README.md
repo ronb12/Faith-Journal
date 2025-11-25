@@ -42,8 +42,29 @@ For detailed setup instructions, see the [Installation Guide](wiki/Installation-
 
 ## 📚 Documentation
 
-Comprehensive documentation is available in the [Wiki](wiki/README.md):
+### Quick Links
+- **[Documentation Index](docs/README.md)** - Browse all documentation by category
+- **[Wiki](wiki/README.md)** - Comprehensive project wiki with architecture details
 
+### Documentation Categories
+
+**App Store Submission** (`docs/app-store/`)
+- App Store Connect setup guides
+- Submission checklists and review notes
+- Privacy policy and content rights
+
+**Development Guides** (`docs/development/`)
+- Build instructions and setup
+- Feature implementation guides
+- Testing and debugging guides
+- API key configuration
+
+**Fixes & Troubleshooting** (`docs/fixes/`)
+- Bug fix documentation
+- Issue resolution guides
+- Compatibility fixes
+
+**Project Wiki** (`wiki/`)
 - [Installation Guide](wiki/Installation-Guide.md)
 - [Architecture](wiki/Architecture.md)
 - [Data Models](wiki/Data-Models.md)
@@ -68,13 +89,22 @@ Faith Journal follows a **MVVM (Model-View-ViewModel)** architecture pattern wit
 
 ```
 Faith Journal/
-├── Faith Journal/
-│   ├── Models/          # SwiftData models
-│   ├── Views/           # SwiftUI views
-│   ├── Services/        # Business logic services
-│   └── Utils/           # Utility classes
-├── Faith JournalTests/   # Unit tests
-└── Faith JournalUITests/ # UI tests
+├── Faith Journal/              # Main iOS app project
+│   ├── Models/                 # SwiftData models
+│   ├── Views/                  # SwiftUI views
+│   ├── Services/               # Business logic services
+│   └── Utils/                  # Utility classes
+├── Faith JournalTests/          # Unit tests
+├── Faith JournalUITests/        # UI tests
+├── docs/                       # Project documentation
+│   ├── app-store/              # App Store submission docs
+│   ├── development/            # Development guides
+│   └── fixes/                  # Bug fixes and troubleshooting
+├── scripts/                    # Build and utility scripts
+├── assets/                     # Project assets (icons, images)
+│   └── icons/                  # App icon files
+├── wiki/                       # Comprehensive project wiki
+└── Sources/                    # Additional Swift source files
 ```
 
 ## 🤝 Contributing
