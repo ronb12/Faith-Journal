@@ -1,0 +1,37 @@
+================================================================================
+DEPLOYMENT COMMANDS - Copy and paste these in your terminal
+================================================================================
+
+STEP 1: Authorize your SSH key (one-time setup)
+------------------------------------------------
+Copy your public key to the Oracle server:
+
+ssh-copy-id -i ~/.ssh/id_ed25519.pub opc@129.213.114.10
+
+(You'll be prompted for password the first time)
+
+OR if that doesn't work, manually add the key:
+1. SSH into server: ssh opc@129.213.114.10
+2. Run: mkdir -p ~/.ssh && chmod 700 ~/.ssh
+3. Add this line to ~/.ssh/authorized_keys:
+   ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII/QN5x8Dn6hE2HvhsjGDJFJr3lRTZaauKKmZx7NQNQH tailscale-access
+
+STEP 2: Deploy the token server
+--------------------------------
+Once SSH is working, run:
+
+cd "/Users/ronellbradley/Desktop/Faith Journal/token-server"
+./deploy-interactive.sh
+
+OR manually:
+
+# Upload
+scp token-server.tar.gz opc@129.213.114.10:~/
+
+# SSH and deploy
+ssh opc@129.213.114.10
+
+# Then on the server, run:
+cd ~ && mkdir -p token-server && tar -xzf token-server.tar.gz -C token-server && cd token-server && (command -v node >/dev/null || (curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs)) && npm install --production && echo 'AGORA_APP_ID=89fdd88c9b594cf0947a48a8730e5f62' > .env && echo 'AGORA_APP_CERTIFICATE=d082915a4058446e8537acf5df266736' >> .env && echo 'PORT=3000' >> .env && sudo npm install -g pm2 && PORT=3000 pm2 start server.js --name agora-token-server && pm2 save && sudo ufw allow 3000/tcp && echo '✅ Done!'
+
+================================================================================

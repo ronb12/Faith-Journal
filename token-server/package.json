@@ -1,0 +1,27 @@
+{
+  "name": "agora-token-server",
+  "version": "1.0.0",
+  "description": "Agora RTC Token Server for Faith Journal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "vercel-build": "echo 'No build step required'"
+  },
+  "keywords": [
+    "agora",
+    "token",
+    "rtc"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "agora-token": "^2.0.5",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}

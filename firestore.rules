@@ -1,0 +1,179 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection - users can read/write their own data
+    match /users/{userId} {
+      // Allow users to read/write their own user document
+      allow read, write: if isOwner(userId);
+      
+      // User's journal entries
+      match /journalEntries/{entryId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's prayer requests
+      match /prayerRequests/{requestId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's mood entries
+      match /moodEntries/{entryId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's bookmarked verses
+      match /bookmarkedVerses/{verseId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's Bible highlights
+      match /bibleHighlights/{highlightId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's Bible notes
+      match /bibleNotes/{noteId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's reading plans
+      match /readingPlans/{planId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's session invitations (personal collection)
+      match /sessionInvitations/{invitationId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's live sessions
+      match /liveSessions/{sessionId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Test connection collection (for debugging)
+      match /testConnection/{testId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // Public session invitations collection (for joining by code)
+    // Anyone can read (to join by code), but only authenticated users can write
+    // Users can only write invitations where they are the host
+    match /sessionInvitations/{inviteCode} {
+      // Allow anyone to read (for joining by code)
+      allow read: if true;
+      
+      // Allow authenticated users to write, but only if they're the host
+      allow create: if isAuthenticated() && 
+                      request.resource.data.hostId == request.auth.uid;
+      
+      // Allow users to update their own invitations
+      allow update: if isAuthenticated() && 
+                      (resource.data.hostId == request.auth.uid ||
+                       request.resource.data.hostId == request.auth.uid);
+      
+      // Allow users to delete their own invitations
+      allow delete: if isAuthenticated() && 
+                      resource.data.hostId == request.auth.uid;
+    }
+    
+    // Public sessions collection (for cross-user session lookups)
+    match /publicSessions/{sessionId} {
+      // Allow anyone to read (for joining sessions)
+      allow read: if true;
+      
+      // Allow authenticated users to create sessions where they are the host
+      allow create: if isAuthenticated() && 
+                      request.resource.data.hostId == request.auth.uid;
+      
+      // Allow users to update their own sessions
+      allow update: if isAuthenticated() && 
+                      (resource.data.hostId == request.auth.uid ||
+                       request.resource.data.hostId == request.auth.uid);
+      
+      // Allow users to delete their own sessions
+      allow delete: if isAuthenticated() && 
+                      resource.data.hostId == request.auth.uid;
+    }
+    
+    // Sessions collection (for chat messages and participants)
+    match /sessions/{sessionId} {
+      // Allow anyone to read session metadata (for joining)
+      allow read: if true;
+      
+      // Only authenticated users can write session metadata
+      allow write: if isAuthenticated();
+      
+      // Chat messages subcollection
+      match /messages/{messageId} {
+        // Allow anyone in the session to read messages
+        allow read: if true;
+        
+        // Allow authenticated users to create messages
+        allow create: if isAuthenticated() && 
+                        request.resource.data.userId == request.auth.uid;
+        
+        // Allow users to update their own messages (for reactions, edits)
+        allow update: if isAuthenticated() && 
+                        (resource.data.userId == request.auth.uid ||
+                         request.resource.data.userId == request.auth.uid);
+        
+        // Allow users to delete their own messages
+        allow delete: if isAuthenticated() && 
+                        resource.data.userId == request.auth.uid;
+      }
+      
+      // Participants subcollection
+      match /participants/{participantId} {
+        // Allow anyone to read participants (to see who's in the session)
+        allow read: if true;
+        
+        // Allow authenticated users to create their own participant entry
+        allow create: if isAuthenticated() && 
+                        request.resource.data.userId == request.auth.uid &&
+                        participantId == request.auth.uid;
+        
+        // Allow users to update their own participant entry
+        allow update: if isAuthenticated() && 
+                        (resource.data.userId == request.auth.uid ||
+                         request.resource.data.userId == request.auth.uid) &&
+                        participantId == request.auth.uid;
+        
+        // Allow users to delete their own participant entry
+        allow delete: if isAuthenticated() && 
+                        resource.data.userId == request.auth.uid &&
+                        participantId == request.auth.uid;
+      }
+    }
+    
+    // User channels
+    match /users/{userId}/channel/info {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Public channels collection (for discovery)
+    match /channels/{channelId} {
+      // Anyone can read public channels
+      allow read: if true;
+      // Only channel owner can write
+      allow write: if isAuthenticated() && channelId == request.auth.uid;
+    }
+    
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

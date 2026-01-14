@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/agora/token",
+      "dest": "/api/agora/token.js"
+    },
+    {
+      "src": "/health",
+      "dest": "/api/health.js"
+    }
+  ]
+}
