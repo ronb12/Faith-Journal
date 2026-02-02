@@ -1,0 +1,95 @@
+name: Faith Journal
+options:
+  bundleIdPrefix: com.yourcompany
+  deploymentTarget:
+    iOS: 17.0
+    watchOS: 10.0
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: 10.0.0
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+    IPHONEOS_DEPLOYMENT_TARGET: 16.0
+    DEVELOPMENT_TEAM: YOUR_TEAM_ID
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Development"
+targets:
+  Faith Journal:
+    type: application
+    platform: iOS
+    info:
+      path: Info.plist
+    sources:
+      - path: .
+        excludes:
+          - "**/*.md"
+          - "**/*.txt"
+          - "**/*.applescript"
+          - "**/*.sh"
+          - "**/*.json"
+          - "**/*.ckdb"
+          - "**/*.plist"
+          - "**/.github/**"
+          - "**/Faith Journal/**"
+      - path: Models
+      - path: Services
+      - path: Views
+      - path: Utils
+      - path: ViewModels
+      - path: Faith_JournalApp.swift
+      - path: SceneDelegate.swift
+    resources:
+      - path: Faith Journal/Resources
+        excludes:
+          - "**/*.sh"
+          - "**/*.applescript"
+    dependencies:
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: Firebase
+        product: FirebaseStorage
+      - package: Firebase
+        product: FirebaseCore
+    # No test target dependencies for main app target to avoid dependency cycle
+    # dependencies:
+    #   - target: Faith JournalTests
+    #   - target: Faith JournalUITests
+  Faith JournalTests:
+    type: bundle.unit-test
+    platform: iOS
+    info:
+      path: Info.plist
+    sources:
+      - path: Faith JournalTests
+    dependencies:
+      - target: Faith Journal
+  Faith JournalUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    info:
+      path: Info.plist
+    sources:
+      - path: Faith JournalUITests
+    dependencies:
+      - target: Faith Journal
+  "Faith Journal Watch App":
+    type: application
+    platform: watchOS
+    deploymentTarget:
+      watchOS: 10.0
+    info:
+      path: "../Faith Journal Watch App/Info.plist"
+    sources:
+      - path: "../Faith Journal Watch App"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.yourcompany.FaithJournal.watchkitapp
+        WK_COMPANION_APP_BUNDLE_IDENTIFIER: com.yourcompany.FaithJournal
+        WK_WATCH_ONLY: true
+        TARGETED_DEVICE_FAMILY: 4
+        SDKROOT: watchos
+        SWIFT_VERSION: 5.0

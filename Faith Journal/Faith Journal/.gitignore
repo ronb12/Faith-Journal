@@ -1,0 +1,60 @@
+# Xcode
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcworkspace/xcshareddata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+build/
+DerivedData/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# Firebase
+.firebase/
+GoogleService-Info.plist
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Web app build
+web-app/dist/
+web-app/build/
+
+# VSCode and IDE files
+.vscode/
+*.code-workspace
+.idea/
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.app
+*.ipa
+*.dSYM/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+*.xctestplan
+test_output/
+
+# Logs
+*.log
+build.log
+
+# Temporary files
+*.tmp
+*.temp

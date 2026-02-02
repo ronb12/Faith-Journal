@@ -1,0 +1,39 @@
+{
+  "id": {
+    "type": "stringType",
+    "value": "CLI-TEST-ENTRY-001"
+  },
+  "title": {
+    "type": "stringType",
+    "value": "CloudKit Test Entry - Created via CLI"
+  },
+  "content": {
+    "type": "stringType",
+    "value": "This is a test journal entry created via CLI to verify CloudKit sync is working properly. If you can see this entry in the app or CloudKit Console, CloudKit is functioning correctly!\n\nCreated via CLI: 2024-12-19"
+  },
+  "date": {
+    "type": "timestampType",
+    "value": "2024-12-19T12:00:00Z"
+  },
+  "tags": {
+    "type": "stringListType",
+    "value": ["test", "cloudkit", "verification", "cli"]
+  },
+  "mood": {
+    "type": "stringType",
+    "value": "Grateful"
+  },
+  "isPrivate": {
+    "type": "int64Type",
+    "value": 0
+  },
+  "createdAt": {
+    "type": "timestampType",
+    "value": "2024-12-19T12:00:00Z"
+  },
+  "updatedAt": {
+    "type": "timestampType",
+    "value": "2024-12-19T12:00:00Z"
+  }
+}
+

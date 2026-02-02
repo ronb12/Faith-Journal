@@ -1,0 +1,28 @@
+GitHub Actions Self-Hosted Runner Setup
+
+To complete the setup, you need to:
+
+1. Get your GitHub repository URL:
+   - Go to your GitHub repository
+   - Click the green "Code" button
+   - Copy the HTTPS URL (e.g., https://github.com/username/repo.git)
+
+2. Get your registration token:
+   - Go to: https://github.com/YOUR_USERNAME/YOUR_REPO/settings/actions/runners/new
+   - Or: Repository → Settings → Actions → Runners → New self-hosted runner
+   - Select "macOS" and "x64"
+   - Copy the token (looks like: AXXXXXXXXXXXXXXXXXXXXXXXXXXXXX)
+
+3. Run this command (replace YOUR_USERNAME, YOUR_REPO, and YOUR_TOKEN):
+   cd ~/actions-runner
+   ./config.sh --url https://github.com/YOUR_USERNAME/YOUR_REPO --token YOUR_TOKEN
+
+4. Install as service:
+   ./svc.sh install
+   ./svc.sh start
+
+5. Verify it's running:
+   ./svc.sh status
+
+The runner will now automatically pick up builds from GitHub!
+

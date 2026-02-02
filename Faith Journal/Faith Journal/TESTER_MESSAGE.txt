@@ -1,0 +1,52 @@
+📱 Faith Journal - Testing Instructions
+
+Thank you for testing! Please focus on testing cross-device sync and the features below.
+
+🔐 SIGN IN
+• Use "Sign in with Apple" for best sync results
+• Or create account with Email/Password
+• Make sure you're signed in with the SAME account on all devices
+
+✅ PRIORITY TESTING - Cross-Device Sync
+
+Test that these sync across devices (create on Device 1, check Device 2):
+1. Journal Entries - Create/edit/delete entries
+2. Prayer Requests - Create, mark answered, archive, delete
+3. Mood Entries - Create mood check-ins
+4. Bookmarked Verses - Bookmark Bible verses
+5. Bible Highlights - Highlight verses
+6. Bible Notes - Add notes to verses
+7. Reading Plans - Start plan, mark readings complete
+
+⏱️ Sync Time: Changes should appear on other devices within 10-30 seconds
+
+🐛 REPORTING ISSUES
+
+Please include:
+• What you were doing
+• What happened (crash, didn't sync, etc.)
+• Device: iPhone/iPad model, iOS version
+• App version (Settings → App Information)
+
+Example:
+"I created a prayer request on my iPhone 15 Pro (iOS 17.2) but it didn't appear on my iPad after 2 minutes. Both devices are signed in with the same Apple ID."
+
+📋 QUICK CHECKLIST
+□ Signed in successfully
+□ Journal entry synced ✓
+□ Prayer request synced ✓
+□ Mood entry synced ✓
+□ Bookmark synced ✓
+□ Highlight synced ✓
+□ Bible note synced ✓
+□ Reading plan synced ✓
+□ Tested "Forgot Password" ✓
+□ Checked sync status in Settings ✓
+
+💡 TIPS
+• Check sync status: Settings → Data → Sync Status
+• If data doesn't sync: Try "Sync Now" button in Settings
+• Wait 10-30 seconds for changes to appear on other devices
+
+Thank you for your help! 🙏
+

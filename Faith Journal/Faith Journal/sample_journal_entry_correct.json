@@ -1,0 +1,39 @@
+{
+  "id": {
+    "type": "stringType",
+    "value": "TEST-ENTRY-001"
+  },
+  "title": {
+    "type": "stringType",
+    "value": "Test Journal Entry - CloudKit Verification"
+  },
+  "content": {
+    "type": "stringType",
+    "value": "This is a test journal entry created to verify CloudKit sync is working properly. If you can see this entry, CloudKit is functioning correctly!"
+  },
+  "date": {
+    "type": "timestampType",
+    "value": "2024-12-19T00:00:00Z"
+  },
+  "tags": {
+    "type": "stringListType",
+    "value": ["test", "cloudkit", "verification"]
+  },
+  "mood": {
+    "type": "stringType",
+    "value": "Grateful"
+  },
+  "isPrivate": {
+    "type": "int64Type",
+    "value": 0
+  },
+  "createdAt": {
+    "type": "timestampType",
+    "value": "2024-12-19T00:00:00Z"
+  },
+  "updatedAt": {
+    "type": "timestampType",
+    "value": "2024-12-19T00:00:00Z"
+  }
+}
+

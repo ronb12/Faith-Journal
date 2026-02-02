@@ -130,3 +130,38 @@ GoogleService-Info.plist
 
 # Local configuration files
 *.plist.local
+
+# --- Broken submodule cleanup ---
+# We keep only the real source folder that Xcode references:
+#   Faith Journal/Faith Journal/...
+# Everything else under the outer "Faith Journal/" directory is legacy/archived
+# automation scripts and duplicate projects and should not be committed.
+Faith Journal/*
+!Faith Journal/Faith Journal/
+!Faith Journal/Faith Journal/**
+
+# Inside the kept folder, ignore legacy automation/scripts/archives not needed for the iOS build
+Faith Journal/Faith Journal/**/*.applescript
+Faith Journal/Faith Journal/**/*.ckdb
+Faith Journal/Faith Journal/**/.github/
+Faith Journal/Faith Journal/**/*.xcodeproj/
+Faith Journal/Faith Journal/**/*.xcworkspace/
+Faith Journal/Faith Journal/**/project_backup/
+Faith Journal/Faith Journal/**/project_backup_*/
+Faith Journal/Faith Journal/**/backup/
+Faith Journal/Faith Journal/**/backup_*/
+Faith Journal/Faith Journal/Package.swift
+Faith Journal/Faith Journal/Package.resolved
+Faith Journal/Faith Journal/firebase.json
+Faith Journal/Faith Journal/firestore.indexes.json
+Faith Journal/Faith Journal/firestore.rules
+Faith Journal/Faith Journal/firestore_indexes_required.json
+Faith Journal/Faith Journal/Sources/
+Faith Journal/Faith Journal/Faith Journal/
+
+# Common local env / firebase artifacts (at any level)
+.env
+**/.env
+**/.firebase/
+**/.logs/
+

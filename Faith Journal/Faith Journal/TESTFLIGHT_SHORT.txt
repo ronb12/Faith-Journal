@@ -1,0 +1,21 @@
+Faith Journal - Testing Instructions
+
+SIGN IN: Use "Sign in with Apple" on all devices with the same account.
+
+PRIORITY: Test cross-device sync. Create items on Device 1, check Device 2 within 30 seconds.
+
+Test sync for:
+- Journal Entries
+- Prayer Requests  
+- Mood Entries
+- Bookmarked Verses
+- Bible Highlights
+- Bible Notes
+- Reading Plans
+
+REPORTING: Include what you did, what happened, device model, iOS version, and app version.
+
+TIPS: Check sync status in Settings -> Data. Use "Sync Now" if data doesn't appear.
+
+Thank you!
+

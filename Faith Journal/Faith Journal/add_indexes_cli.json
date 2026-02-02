@@ -1,0 +1,22 @@
+{
+  "recordType": "CD_JournalEntry",
+  "indexes": [
+    {
+      "fieldName": "recordName",
+      "indexType": "QUERYABLE"
+    },
+    {
+      "fieldName": "createdAt",
+      "indexType": "QUERYABLE_SORTABLE"
+    },
+    {
+      "fieldName": "updatedAt",
+      "indexType": "QUERYABLE_SORTABLE"
+    },
+    {
+      "fieldName": "date",
+      "indexType": "QUERYABLE_SORTABLE"
+    }
+  ]
+}
+
