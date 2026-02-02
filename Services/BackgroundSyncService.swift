@@ -6,9 +6,12 @@
 //
 
 import Foundation
-import BackgroundTasks
 import SwiftData
 import UIKit
+
+#if canImport(BackgroundTasks)
+import BackgroundTasks
+#endif
 
 @MainActor
 @available(iOS 17.0, *)
@@ -34,6 +37,7 @@ class BackgroundSyncService {
     /// Schedule a background sync task
     /// This will be called periodically by iOS to check for pending sync operations
     func scheduleBackgroundSync() {
+#if canImport(BackgroundTasks)
         let request = BGProcessingTaskRequest(identifier: syncTaskIdentifier)
         
         // Schedule to run periodically (iOS decides the best time)
@@ -48,15 +52,23 @@ class BackgroundSyncService {
         } catch {
             print("❌ [BACKGROUND SYNC] Could not schedule background sync: \(error.localizedDescription)")
         }
+#else
+        print("ℹ️ [BACKGROUND SYNC] BackgroundTasks not available on this build target")
+#endif
     }
     
     /// Cancel any pending background sync tasks
     func cancelBackgroundSync() {
+#if canImport(BackgroundTasks)
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: syncTaskIdentifier)
         print("ℹ️ [BACKGROUND SYNC] Cancelled background sync task")
+#else
+        print("ℹ️ [BACKGROUND SYNC] BackgroundTasks not available on this build target")
+#endif
     }
     
     /// Handle the background sync task when iOS executes it
+    #if canImport(BackgroundTasks)
     private func handleBackgroundSync(task: BGProcessingTask) {
         print("🔄 [BACKGROUND SYNC] Background sync task started")
         
@@ -84,6 +96,7 @@ class BackgroundSyncService {
             }
         }
     }
+    #endif
     
     /// Check if there are pending Firebase sync operations
     private func checkForPendingSync() async -> Bool {

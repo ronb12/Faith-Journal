@@ -130,6 +130,22 @@ class HLSStreamingService: NSObject, ObservableObject {
         isStreaming = true
         isConnected = true
     }
+
+    /// Stop screen broadcast
+    func stopScreenBroadcast() {
+        screenRecorder.stopCapture { [weak self] error in
+            if let error = error {
+                Task { @MainActor in
+                    self?.errorMessage = error.localizedDescription
+                }
+            }
+        }
+
+        Task { @MainActor in
+            self.isStreaming = false
+            self.isConnected = false
+        }
+    }
     
     /// Stop broadcasting
     func stopBroadcast() {

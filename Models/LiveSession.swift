@@ -16,6 +16,7 @@ final class LiveSession {
     var isActive: Bool = true
     var maxParticipants: Int = 10
     var currentParticipants: Int = 0
+    var currentBroadcasters: Int = 0 // Number of active broadcasters
     var viewerCount: Int = 0 // For broadcast mode
     var peakViewerCount: Int = 0
     var category: String = ""
@@ -35,6 +36,23 @@ final class LiveSession {
     var thumbnailURL: String? // Preview image
     var messageCount: Int = 0 // Total messages in chat
     var reactionCount: Int = 0 // Total reactions received
+    // Stream mode: "broadcast", "conference", or "multiParticipant"
+    var streamMode: String = "conference" // Default to conference (all can participate)
+
+    // Session controls / scheduling enhancements
+    var durationLimitMinutes: Int = 30
+
+    // Recurring session fields
+    var isRecurring: Bool = false
+    var recurrencePattern: String = "" // "weekly", "monthly"
+    var recurrenceEndDate: Date? // Optional end date for recurring sessions
+    var parentSessionId: UUID? // Link to parent template
+    var calendarEventId: String? // Calendar integration identifier
+
+    // Waiting room fields
+    var hasWaitingRoom: Bool = false
+    var waitingRoomEnabled: Bool = false
+    var allowParticipantsBeforeStart: Bool = true // Allow participants to join before host starts
     
     init(title: String, description: String, hostId: String, category: String, maxParticipants: Int = 10, tags: [String] = []) {
         self.id = UUID()
@@ -48,6 +66,7 @@ final class LiveSession {
         self.isActive = true
         self.maxParticipants = maxParticipants
         self.currentParticipants = 1
+        self.currentBroadcasters = 1 // Host is a broadcaster by default
         self.viewerCount = 0
         self.peakViewerCount = 0
         self.category = category
@@ -60,6 +79,16 @@ final class LiveSession {
         self.connectionQuality = "Good"
         self.isLocked = false
         self.isRecording = false
+        self.streamMode = "conference"
+        self.durationLimitMinutes = 30
+        self.isRecurring = false
+        self.recurrencePattern = ""
+        self.recurrenceEndDate = nil
+        self.parentSessionId = nil
+        self.calendarEventId = nil
+        self.hasWaitingRoom = false
+        self.waitingRoomEnabled = false
+        self.allowParticipantsBeforeStart = true
     }
     
     // Computed properties
@@ -68,6 +97,13 @@ final class LiveSession {
             return Date().timeIntervalSince(startTime)
         }
         return end.timeIntervalSince(startTime)
+    }
+
+    var durationLimitDescription: String {
+        if durationLimitMinutes > 0 {
+            return "\(durationLimitMinutes)m limit"
+        }
+        return "No limit"
     }
     
     var formattedDuration: String {

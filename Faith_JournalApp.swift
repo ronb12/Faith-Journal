@@ -13,7 +13,7 @@ import UIKit
 /// A human-readable identifier we can show in the UI to prove which binary is running.
 /// Update this whenever diagnosing “old build still showing”.
 enum BuildInfo {
-    static let stamp = "2026-01-06.1"
+    static let stamp = "2026-02-02.1"
 }
 
 @main
@@ -59,6 +59,12 @@ struct Faith_JournalApp: App {
         }
         
         print("✅ [FIX] UserDefaults corruption check complete")
+
+        // CRITICAL: Configure Firebase as early as possible (before any Auth usage).
+        // Some singletons/views may touch FirebaseAuth during initialization; if Firebase
+        // isn't configured yet, the app will crash with:
+        // “The default FirebaseApp instance must be configured…”
+        FirebaseInitializer.shared.initialize()
     }
     
     // Add defensive logging for TestFlight debugging
@@ -77,11 +83,11 @@ struct Faith_JournalApp: App {
         Subscription.self,
         ChatMessage.self,
         SessionInvitation.self,
-        SessionTemplate.self,
-        SessionRating.self,
-        SessionPlaylist.self,
-        SessionNote.self,
-        SessionClip.self,
+        //         SessionTemplate.self,
+        //         SessionRating.self,
+        //         SessionPlaylist.self,
+        //         SessionNote.self,
+        //         SessionClip.self,
         BookmarkedVerse.self,
         BibleHighlight.self,
         BibleNote.self,
@@ -417,9 +423,6 @@ struct Faith_JournalApp: App {
                     // Clear badge when app opens
                     notificationService.clearBadge()
                     print("🚀 [LAUNCH] Badge cleared")
-                    
-                    // Initialize Firebase
-                    FirebaseInitializer.shared.initialize()
                     
                     // Enable background sync (already registered in init, just schedule it)
                     // Temporarily disabled until BackgroundSyncService compilation is resolved

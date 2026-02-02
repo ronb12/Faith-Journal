@@ -9,6 +9,10 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 
+#if canImport(FirebaseFirestore)
+import FirebaseFirestore
+#endif
+
 @available(iOS 17.0, *)
 struct InvitationsView: View {
     @Query(sort: [SortDescriptor(\SessionInvitation.createdAt, order: .reverse)]) var allInvitations: [SessionInvitation]
@@ -676,16 +680,69 @@ struct JoinByCodeView: View {
         // First check local invitations
         let invitation = invitations.first(where: { $0.inviteCode.uppercased() == code && $0.isValid })
         
-        // If not found locally, try to fetch from CloudKit
+        // If not found locally, try to fetch from Firebase (cross-device).
         if invitation == nil {
             Task {
-                do {
-                    // CloudKitPublicSyncService removed - use Firebase for sync
+                #if canImport(FirebaseFirestore)
+                if let record = await FirebaseSyncService.shared.fetchInviteCodeRecord(code: code),
+                   let sessionIdString = record["sessionId"] as? String,
+                   let sessionId = UUID(uuidString: sessionIdString) {
+                    
+                    let sessionTitle = record["sessionTitle"] as? String ?? "Live Session"
+                    let hostId = record["hostId"] as? String ?? ""
+                    let hostName = record["hostName"] as? String ?? ""
+                    let expiresAt = (record["expiresAt"] as? Timestamp)?.dateValue()
+                    
+                    // Create a local invitation placeholder so the rest of the join flow works.
+                    let localInvitation = SessionInvitation(
+                        sessionId: sessionId,
+                        sessionTitle: sessionTitle,
+                        hostId: hostId,
+                        hostName: hostName,
+                        invitedUserId: LocalUserService.shared.userIdentifier,
+                        invitedUserName: nil,
+                        invitedEmail: nil,
+                        inviteCode: code,
+                        expiresAt: expiresAt
+                    )
+                    
                     await MainActor.run {
-                        errorMessage = "Invitation lookup not available (CloudKit removed - use Firebase for sync)"
-                        showingError = true
+                        modelContext.insert(localInvitation)
+                        try? modelContext.save()
                     }
+                    
+                    // Ensure the session exists locally (fetch from Firebase if needed)
+                    let sessionQueryAny = FetchDescriptor<LiveSession>(
+                        predicate: #Predicate { s in s.id == sessionId }
+                    )
+                    
+                    var existing = try? modelContext.fetch(sessionQueryAny).first
+                    if existing == nil {
+                        if let remoteSession = await FirebaseSyncService.shared.fetchLiveSessionPublic(sessionId: sessionId) {
+                            await MainActor.run {
+                                modelContext.insert(remoteSession)
+                                try? modelContext.save()
+                            }
+                            existing = remoteSession
+                        }
+                    }
+                    
+                    await MainActor.run {
+                        joinWithInvitation(localInvitation)
+                    }
+                    return
                 }
+                
+                await MainActor.run {
+                    errorMessage = "Invitation code not found (or not accessible). Ask the host to regenerate the code and try again."
+                    showingError = true
+                }
+                #else
+                await MainActor.run {
+                    errorMessage = "Invitation lookup not available on this build."
+                    showingError = true
+                }
+                #endif
             }
             return
         }

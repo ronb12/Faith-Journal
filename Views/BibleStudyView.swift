@@ -1360,3 +1360,205 @@ struct TopicRow: View {
         .buttonStyle(PlainButtonStyle())
     }
 }
+
+// MARK: - Bible Study Game
+
+@available(iOS 17.0, *)
+struct BibleStudyGameView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var questions: [GameQuestion] = []
+    @State private var currentIndex: Int = 0
+    @State private var selectedOption: String?
+    @State private var score: Int = 0
+    @State private var isComplete: Bool = false
+
+    private var currentQuestion: GameQuestion? {
+        guard questions.indices.contains(currentIndex) else { return nil }
+        return questions[currentIndex]
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                if questions.isEmpty {
+                    Text("No questions are ready yet. Please try again in a bit.")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                        .padding()
+                    Spacer()
+                } else if isComplete {
+                    Spacer()
+                    Text("Final Score")
+                        .font(.title)
+                        .fontWeight(.semibold)
+                    Text("\(score)/\(questions.count)")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundColor(.purple)
+                    Text("Great job! Keep exploring more topics.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Spacer()
+                    Button("Play Again") {
+                        resetGame()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Spacer()
+                } else if let question = currentQuestion {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Question \(currentIndex + 1) of \(questions.count)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(question.prompt)
+                            .font(.headline)
+                        if let verseText = question.verseText, !verseText.isEmpty {
+                            Text("“\(verseText)”")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .italic()
+                        }
+
+                        ForEach(question.options, id: \.self) { option in
+                            Button {
+                                selectOption(option)
+                            } label: {
+                                HStack {
+                                    Text(option)
+                                        .multilineTextAlignment(.leading)
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    if let selected = selectedOption, selected == option {
+                                        Image(systemName: option == question.correctAnswer ? "checkmark.circle.fill" : "x.circle.fill")
+                                            .foregroundColor(option == question.correctAnswer ? .green : .red)
+                                    }
+                                }
+                                .padding()
+                                .background(optionBackground(option, correct: question.correctAnswer))
+                                .cornerRadius(12)
+                            }
+                            .disabled(selectedOption != nil)
+                        }
+
+                        if let selected = selectedOption {
+                            Text(selected == question.correctAnswer ? "Correct! \(question.correctAnswer)" : "Correct Answer: \(question.correctAnswer)")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(selected == question.correctAnswer ? .green : .red)
+                            Text(question.explanation)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Button(action: goToNextQuestion) {
+                        Text(currentIndex == questions.count - 1 ? "Finish Game" : "Next Question")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .disabled(selectedOption == nil)
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding()
+            .navigationTitle("Bible Game")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear(perform: resetGame)
+    }
+
+    private func selectOption(_ option: String) {
+        guard selectedOption == nil, let question = currentQuestion else { return }
+        selectedOption = option
+        if option == question.correctAnswer {
+            score += 1
+        }
+    }
+
+    private func goToNextQuestion() {
+        guard selectedOption != nil else { return }
+        selectedOption = nil
+
+        if currentIndex < questions.count - 1 {
+            currentIndex += 1
+        } else {
+            isComplete = true
+        }
+    }
+
+    private func resetGame() {
+        let topics = BibleStudyService.shared.getAllTopics()
+        questions = Self.generateQuestions(from: topics)
+        currentIndex = 0
+        selectedOption = nil
+        score = 0
+        isComplete = questions.isEmpty
+    }
+
+    private func optionBackground(_ option: String, correct: String) -> Color {
+        guard let selected = selectedOption else {
+            return Color(.systemGray6)
+        }
+        if option == selected {
+            return option == correct ? Color.green.opacity(0.2) : Color.red.opacity(0.2)
+        }
+        if option == correct {
+            return Color.green.opacity(0.15)
+        }
+        return Color(.systemGray6)
+    }
+
+    private static func generateQuestions(from topics: [BibleStudyTopic], count: Int = 6) -> [GameQuestion] {
+        let candidates = topics.filter { !$0.keyVerses.isEmpty }
+        var questions: [GameQuestion] = []
+        let shuffledTopics = candidates.shuffled()
+
+        for topic in shuffledTopics {
+            guard questions.count < count else { break }
+            guard let correct = topic.keyVerses.randomElement()?.trimmingCharacters(in: .whitespacesAndNewlines), !correct.isEmpty else {
+                continue
+            }
+
+            var decoys = Set<String>()
+            let otherVerses = candidates.filter { $0.id != topic.id }
+                .flatMap { $0.keyVerses }
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty && $0 != correct }
+
+            for verse in otherVerses.shuffled() where decoys.count < 3 {
+                decoys.insert(verse)
+            }
+
+            guard decoys.count >= 3 else { continue }
+            let options = ([correct] + Array(decoys)).shuffled()
+            let explanation = topic.topicDescription.isEmpty ? "Category: \(topic.category.rawValue)." : topic.topicDescription
+            let verseText = topic.verseTexts.first
+            let prompt = "Which verse reference ties to “\(topic.title)”?"
+
+            questions.append(GameQuestion(
+                prompt: prompt,
+                options: options,
+                correctAnswer: correct,
+                explanation: explanation,
+                verseText: verseText
+            ))
+        }
+
+        return questions
+    }
+
+    private struct GameQuestion: Identifiable {
+        let id = UUID()
+        let prompt: String
+        let options: [String]
+        let correctAnswer: String
+        let explanation: String
+        let verseText: String?
+    }
+}

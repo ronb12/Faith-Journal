@@ -157,6 +157,47 @@ struct SettingsView: View {
         }
     }
     
+    private var themeSelectionBinding: Binding<ThemeManager.Theme> {
+        Binding(
+            get: { themeManager.currentTheme },
+            set: { themeManager.currentTheme = $0 }
+        )
+    }
+
+    @ViewBuilder
+    private func themeRow(for theme: ThemeManager.Theme) -> some View {
+        let manager = themeManager
+        let colors = manager.colorsForTheme(theme)
+        HStack(spacing: 12) {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(colors.primary)
+                    .frame(width: 16, height: 16)
+                Circle()
+                    .fill(colors.secondary)
+                    .frame(width: 16, height: 16)
+                Circle()
+                    .fill(colors.accent)
+                    .frame(width: 16, height: 16)
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    .padding(-2)
+            )
+            Text(theme.rawValue)
+                .font(.body)
+            Spacer()
+            if manager.currentTheme == theme {
+                Image(systemName: "checkmark")
+                    .foregroundColor(manager.colors.primary)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+        }
+        .padding(.vertical, 4)
+        .tag(theme)
+    }
+    
     var body: some View {
         if #available(iOS 17.0, *) {
             NavigationStack {
@@ -219,41 +260,11 @@ struct SettingsView: View {
                             Text(themeManager.currentTheme.rawValue)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         // Color Theme Picker
-                        Picker("Color Theme", selection: Binding(
-                            get: { themeManager.currentTheme },
-                            set: { themeManager.currentTheme = $0 }
-                        )) {
+                        Picker("Color Theme", selection: themeSelectionBinding) {
                             ForEach(ThemeManager.Theme.allCases, id: \.self) { theme in
-                                HStack(spacing: 12) {
-                                    // Color preview with multiple colors
-                                    HStack(spacing: 4) {
-                                        Circle()
-                                            .fill(themeManager.colorsForTheme(theme).primary)
-                                            .frame(width: 16, height: 16)
-                                        Circle()
-                                            .fill(themeManager.colorsForTheme(theme).secondary)
-                                            .frame(width: 16, height: 16)
-                                        Circle()
-                                            .fill(themeManager.colorsForTheme(theme).accent)
-                                            .frame(width: 16, height: 16)
-                                    }
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                                            .padding(-2)
-                                    )
-                                    Text(theme.rawValue)
-                                        .font(.body)
-                                    Spacer()
-                                    if themeManager.currentTheme == theme {
-                                        Image(systemName: "checkmark")
-                                            .foregroundColor(themeManager.colors.primary)
-                                            .font(.system(size: 14, weight: .semibold))
-                                    }
-                                }
-                                .tag(theme)
+                                themeRow(for: theme)
                             }
                         }
                         .pickerStyle(.menu)
@@ -403,6 +414,12 @@ struct SettingsView: View {
                             #endif
                             
                             Divider()
+                        }
+
+                        NavigationLink {
+                            BackupRestoreView()
+                        } label: {
+                            Label("Backup & Restore", systemImage: "externaldrive.fill")
                         }
                         
                         Button(action: {

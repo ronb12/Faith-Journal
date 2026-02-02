@@ -18,7 +18,15 @@ class ThemeManager: ObservableObject {
     }
     
     var colors: ThemeColors {
-        switch currentTheme {
+        colors(for: currentTheme)
+    }
+
+    func colorsForTheme(_ theme: Theme) -> ThemeColors {
+        colors(for: theme)
+    }
+
+    private func colors(for theme: Theme) -> ThemeColors {
+        switch theme {
         case .default:
             return ThemeColors(
                 primary: Color(red: 0.4, green: 0.2, blue: 0.8),

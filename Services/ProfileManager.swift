@@ -19,13 +19,25 @@ class ProfileManager: ObservableObject {
     static let shared = ProfileManager()
     
     #if canImport(FirebaseFirestore)
-    private let db = Firestore.firestore()
+    private var db: Firestore? {
+        guard FirebaseInitializer.shared.isConfigured else {
+            print("⚠️ [PROFILE] Firebase not configured yet - cannot use Firestore")
+            return nil
+        }
+        return Firestore.firestore()
+    }
     #else
     private let db: Any? = nil
     #endif
     
     #if canImport(FirebaseStorage)
-    private let storage = Storage.storage()
+    private var storage: Storage? {
+        guard FirebaseInitializer.shared.isConfigured else {
+            print("⚠️ [PROFILE] Firebase not configured yet - cannot access Storage")
+            return nil
+        }
+        return Storage.storage()
+    }
     #else
     private let storage: Any? = nil
     #endif
@@ -49,6 +61,9 @@ class ProfileManager: ObservableObject {
         guard let userId = Auth.auth().currentUser?.uid else {
             throw ProfileError.notAuthenticated
         }
+        guard let db else {
+            throw ProfileError.firebaseNotConfigured
+        }
         
         let userRef = db.collection("users").document(userId)
         try await userRef.setData([
@@ -69,13 +84,16 @@ class ProfileManager: ObservableObject {
             print("❌ [ProfileManager] User not authenticated")
             throw ProfileError.notAuthenticated
         }
+        guard let db else {
+            throw ProfileError.firebaseNotConfigured
+        }
         
         print("🔄 [ProfileManager] Starting profile picture save for user: \(userId)")
         print("📸 [ProfileManager] Image size: \(image.size.width)x\(image.size.height)")
         print("📸 [ProfileManager] Image scale: \(image.scale)")
         
         // Convert image to JPEG data - try multiple compression qualities if needed
-        let imageData: Data
+        var imageData: Data?
         var compressionQuality: CGFloat = 0.8
         var attempts = 0
         let maxAttempts = 3
@@ -92,7 +110,7 @@ class ProfileManager: ObservableObject {
             }
         }
         
-        guard attempts < maxAttempts else {
+        guard attempts < maxAttempts, let imageData else {
             print("❌ [ProfileManager] Failed to convert image to JPEG after \(maxAttempts) attempts")
             throw ProfileError.invalidImage
         }
@@ -215,6 +233,10 @@ class ProfileManager: ObservableObject {
             print("🗑️ [ProfileManager] Removed profile picture from local storage")
         }
         
+        guard let db else {
+            throw ProfileError.firebaseNotConfigured
+        }
+
         // Clear path in Firestore
         let userRef = db.collection("users").document(userId)
         let timestamp = Timestamp(date: Date())
@@ -245,11 +267,15 @@ class ProfileManager: ObservableObject {
     func saveProfile(name: String?, image: UIImage?) async throws {
         print("🔄 [ProfileManager] saveProfile called - name: \(name ?? "nil"), image: \(image != nil ? "present" : "nil")")
         
-        self.isLoading = true
-        self.errorMessage = nil
+        await MainActor.run {
+            self.isLoading = true
+            self.errorMessage = nil
+        }
         
         defer {
-            self.isLoading = false
+            Task { @MainActor in
+                self.isLoading = false
+            }
         }
         
         do {
@@ -273,7 +299,9 @@ class ProfileManager: ObservableObject {
                 print("   Error domain: \(nsError.domain)")
                 print("   Error code: \(nsError.code)")
             }
-            self.errorMessage = error.localizedDescription
+            Task { @MainActor in
+                self.errorMessage = error.localizedDescription
+            }
             throw error
         }
         
@@ -299,6 +327,11 @@ class ProfileManager: ObservableObject {
         
         defer {
             self.isLoading = false
+        }
+        
+        guard let db else {
+            print("⚠️ [ProfileManager] Firebase not configured yet - skipping profile load")
+            return
         }
         
         do {
@@ -406,6 +439,7 @@ enum ProfileError: LocalizedError {
     case invalidImage
     case networkError
     case unknown
+    case firebaseNotConfigured
     
     var errorDescription: String? {
         switch self {
@@ -415,6 +449,8 @@ enum ProfileError: LocalizedError {
             return "Invalid image data"
         case .networkError:
             return "Network error occurred"
+        case .firebaseNotConfigured:
+            return "Firebase is not configured yet"
         case .unknown:
             return "An unknown error occurred"
         }

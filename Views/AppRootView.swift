@@ -102,7 +102,7 @@ struct AppRootView: View {
                 // Load user profile from Firebase (if authenticated)
                 #if canImport(FirebaseAuth)
                 if FirebaseInitializer.shared.isConfigured {
-                    ProfileManager.shared.loadProfile()
+                    await ProfileManager.shared.loadProfile()
                     print("✅ [PROFILE] Profile loaded from Firebase on app launch")
                 }
                 #endif

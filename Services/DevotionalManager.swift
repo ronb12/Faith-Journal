@@ -90,10 +90,11 @@ class DevotionalManager: ObservableObject {
     }
     
     func generate365Devotionals() -> [Devotional] {
+        // NOTE: Kept the function name for compatibility, but this now generates 1000 devotionals.
         let calendar = Calendar.current
         let today = Date()
         var allDevotionals: [Devotional] = []
-        allDevotionals.reserveCapacity(365) // Pre-allocate for better performance
+        allDevotionals.reserveCapacity(1000) // Pre-allocate for better performance
         
         // Get sample devotionals as templates
         let sampleDevotionals = getSampleDevotionals()
@@ -101,8 +102,8 @@ class DevotionalManager: ObservableObject {
         
         let categories = ["Faith", "Hope", "Love", "Prayer", "Gratitude", "Forgiveness", "Service", "Wisdom", "Courage", "Peace", "Growth"]
         
-        // Generate 365 devotionals (one for each day of the year)
-        for dayOffset in 0..<365 {
+        // Generate 1000 devotionals (cycling through samples)
+        for dayOffset in 0..<1000 {
             guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
             let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
             let categoryIndex = (dayOfYear - 1) % categories.count
@@ -434,6 +435,13 @@ class DevotionalManager: ObservableObject {
         if let index = devotionals.firstIndex(where: { $0.id == devotional.id }) {
             // Update the existing devotional's isCompleted property
             devotionals[index].isCompleted = !devotionals[index].isCompleted
+        }
+    }
+    
+    func toggleFavorite(_ devotional: Devotional) {
+        if let index = devotionals.firstIndex(where: { $0.id == devotional.id }) {
+            // Toggle the favorite status
+            devotionals[index].isFavorite = !devotionals[index].isFavorite
         }
     }
     

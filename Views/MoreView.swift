@@ -43,6 +43,16 @@ struct MoreView: View {
                             color: .blue
                         )
                     }
+
+                    NavigationLink {
+                        BibleStudyGameView()
+                    } label: {
+                        MenuRowContent(
+                            icon: "gamecontroller.fill",
+                            title: "Bible Game",
+                            color: .purple
+                        )
+                    }
                     
                     NavigationLink {
                         LiveSessionsView()
@@ -107,6 +117,23 @@ struct MoreView: View {
                         )
                     }
                 }
+
+                // Build / Debug Section (helps confirm you’re running the latest binary)
+                Section(header: Text("Build")) {
+                    HStack {
+                        MenuRowContent(
+                            icon: "hammer.fill",
+                            title: "Stamp",
+                            color: .secondary
+                        )
+                        Spacer()
+                        Text(BuildInfo.stamp)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .monospaced()
+                    }
+                    .accessibilityLabel("Build stamp \(BuildInfo.stamp)")
+                }
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("More")
@@ -117,7 +144,6 @@ struct MoreView: View {
                 BibleView()
             }
             .onChange(of: nav.bibleTarget) { oldValue, newValue in
-                // When a bible target is set and we're on the More tab, automatically navigate to Bible view
                 if newValue != nil && selectedTab == 4 && !navigateToBible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         navigateToBible = true
@@ -125,7 +151,6 @@ struct MoreView: View {
                 }
             }
             .onChange(of: selectedTab) { oldValue, newValue in
-                // When switching to More tab, check if there's a pending bible target
                 if newValue == 4 && nav.bibleTarget != nil && !navigateToBible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         navigateToBible = true

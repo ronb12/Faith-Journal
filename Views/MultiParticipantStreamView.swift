@@ -8,6 +8,10 @@
 import SwiftUI
 import SwiftData
 import AVFoundation
+import PhotosUI
+import UniformTypeIdentifiers
+import PDFKit
+import UIKit
 
 #if canImport(WebRTC)
 import WebRTC
@@ -36,6 +40,22 @@ struct MultiParticipantStreamView: View {
     @State private var isHost = false
     @State private var showingFullScreen = false
     @State private var fullScreenParticipant: String?
+
+    // Presentation tools
+    @State private var showingPresentation = false
+    @State private var activePresentation: ActivePresentation?
+    @State private var selectedPDFURLs: [URL] = []
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedPhotoData: Data?
+    @State private var isScreenSharing = false
+    @State private var screenShareError: String?
+    @State private var showingChat = false
+
+    enum ActivePresentation: Equatable {
+        case bibleStudy
+        case pdf(URL)
+        case image(Data)
+    }
     
     struct ParticipantInfo: Identifiable {
         let id: String
@@ -91,6 +111,13 @@ struct MultiParticipantStreamView: View {
         } message: {
             Text(errorMessage)
         }
+        .alert("Screen Sharing", isPresented: Binding(get: { screenShareError != nil }, set: { if !$0 { screenShareError = nil } })) {
+            Button("OK", role: .cancel) {
+                screenShareError = nil
+            }
+        } message: {
+            Text(screenShareError ?? "Unable to share your screen.")
+        }
         .onChange(of: streamingService.errorMessage) { _, newValue in
             if let error = newValue {
                 errorMessage = error
@@ -132,6 +159,20 @@ struct MultiParticipantStreamView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingPresentation) {
+            NavigationStack {
+                InSessionPresentationSheet(
+                    selectedPDFURLs: $selectedPDFURLs,
+                    selectedPhotoItem: $selectedPhotoItem,
+                    activePresentation: $activePresentation
+                )
+                .navigationTitle("Presentation")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .sheet(isPresented: $showingChat) {
+            LiveSessionChatView(session: session, canSend: true)
+        }
     }
     
     private func muteAllParticipants() {
@@ -145,10 +186,20 @@ struct MultiParticipantStreamView: View {
     
     private var videoGridArea: some View {
         GeometryReader { geometry in
-            if layoutMode == .grid {
-                gridLayout(geometry: geometry)
-            } else {
-                speakerLayout(geometry: geometry)
+            ZStack {
+                if layoutMode == .grid {
+                    gridLayout(geometry: geometry)
+                } else {
+                    speakerLayout(geometry: geometry)
+                }
+
+                if let activePresentation {
+                    PresentedContentOverlay(
+                        activePresentation: activePresentation,
+                        stop: { self.activePresentation = nil }
+                    )
+                    .padding(12)
+                }
             }
         }
     }
@@ -166,6 +217,26 @@ struct MultiParticipantStreamView: View {
                         .foregroundColor(.white.opacity(0.7))
                 }
                 Spacer()
+
+                // Countdown (if time limit is enabled)
+                if session.durationLimitMinutes > 0 {
+                    TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                        let remaining = remainingTimeSeconds(now: timeline.date)
+                        HStack(spacing: 6) {
+                            Image(systemName: "timer")
+                                .foregroundColor(remaining <= 300 ? .orange : .white.opacity(0.8))
+                            Text(formatDuration(seconds: remaining))
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(remaining <= 60 ? .red : (remaining <= 300 ? .orange : .white.opacity(0.9)))
+                                .monospacedDigit()
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Capsule())
+                        .accessibilityLabel("Time remaining \(formatDuration(seconds: remaining))")
+                    }
+                }
                 
                 // Layout toggle
                 Button(action: {
@@ -191,67 +262,344 @@ struct MultiParticipantStreamView: View {
             )
         )
     }
+
+    // MARK: - Countdown helpers
+
+    private func remainingTimeSeconds(now: Date) -> Int {
+        let limitMinutes = session.durationLimitMinutes
+        guard limitMinutes > 0 else { return 0 }
+        let endAt = session.startTime.addingTimeInterval(TimeInterval(limitMinutes * 60))
+        return max(0, Int(endAt.timeIntervalSince(now)))
+    }
+
+    private func formatDuration(seconds: Int) -> String {
+        let s = max(0, seconds)
+        let hours = s / 3600
+        let minutes = (s % 3600) / 60
+        let secs = s % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        }
+        return String(format: "%d:%02d", minutes, secs)
+    }
     
     private var controlButtons: some View {
-        HStack(spacing: 20) {
-            // Toggle video
-            Button(action: {
-                Task { @MainActor in
-                    streamingService.toggleVideo()
-                    // Update local video view when toggling
-                    if streamingService.isVideoEnabled {
-                        await setupLocalVideoView()
-                    } else {
-                        localVideoView = nil
+        GeometryReader { geo in
+            let isCompact = geo.size.width < 380
+            let buttonSize: CGFloat = isCompact ? 48 : 56
+            let iconFont: Font = isCompact ? .title3 : .title2
+            let spacing: CGFloat = isCompact ? 14 : 20
+
+            VStack(spacing: 12) {
+                // Primary controls row (always fits)
+                HStack(spacing: spacing) {
+                    // Video
+                    Button(action: {
+                        Task { @MainActor in
+                            streamingService.toggleVideo()
+                            if streamingService.isVideoEnabled {
+                                await setupLocalVideoView()
+                            } else {
+                                localVideoView = nil
+                            }
+                            if let index = participants.firstIndex(where: { $0.id == userService.userIdentifier }) {
+                                participants[index].isVideoEnabled = streamingService.isVideoEnabled
+                            }
+                        }
+                    }) {
+                        Image(systemName: streamingService.isVideoEnabled ? "video.fill" : "video.slash.fill")
+                            .font(iconFont)
+                            .foregroundColor(.white)
+                            .frame(width: buttonSize, height: buttonSize)
+                            .background(streamingService.isVideoEnabled ? Color.blue : Color.gray)
+                            .clipShape(Circle())
                     }
-                    // Update participant info
-                    if let index = participants.firstIndex(where: { $0.id == userService.userIdentifier }) {
-                        participants[index].isVideoEnabled = streamingService.isVideoEnabled
+
+                    // Audio
+                    Button(action: {
+                        Task { @MainActor in
+                            streamingService.toggleAudio()
+                            if let index = participants.firstIndex(where: { $0.id == userService.userIdentifier }) {
+                                participants[index].isMuted = !streamingService.isAudioEnabled
+                            }
+                        }
+                    }) {
+                        Image(systemName: streamingService.isAudioEnabled ? "mic.fill" : "mic.slash.fill")
+                            .font(iconFont)
+                            .foregroundColor(.white)
+                            .frame(width: buttonSize, height: buttonSize)
+                            .background(streamingService.isAudioEnabled ? Color.blue : Color.gray)
+                            .clipShape(Circle())
+                    }
+
+                    // Chat (always available for participants; host gets it in the second row to avoid overflow)
+                    if !isHost {
+                        Button(action: { showingChat = true }) {
+                            Image(systemName: "message.fill")
+                                .font(iconFont)
+                                .foregroundColor(.white)
+                                .frame(width: buttonSize, height: buttonSize)
+                                .background(Color.white.opacity(0.25))
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 2)
+                                )
+                        }
+                    }
+
+                    // Screen share (host only)
+                    if isHost {
+                        Button(action: toggleScreenSharing) {
+                            Image(systemName: isScreenSharing ? "rectangle.slash" : "rectangle.on.rectangle")
+                                .font(iconFont)
+                                .foregroundColor(.white)
+                                .frame(width: buttonSize, height: buttonSize)
+                                .background(isScreenSharing ? Color.green : Color.purple)
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                                )
+                        }
+                    }
+
+                    // End
+                    Button(action: { leaveStream() }) {
+                        Image(systemName: "phone.down.fill")
+                            .font(iconFont)
+                            .foregroundColor(.white)
+                            .frame(width: buttonSize, height: buttonSize)
+                            .background(Color.red)
+                            .clipShape(Circle())
                     }
                 }
-            }) {
-                Image(systemName: streamingService.isVideoEnabled ? "video.fill" : "video.slash.fill")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
-                    .background(streamingService.isVideoEnabled ? Color.blue : Color.gray)
-                    .clipShape(Circle())
+                .frame(maxWidth: .infinity, alignment: .center)
+
+                // Presentation tools row (host only) — separate row to avoid overflow
+                if isHost {
+                    HStack(spacing: spacing) {
+                        Button(action: { showingChat = true }) {
+                            Image(systemName: "message.fill")
+                                .font(iconFont)
+                                .foregroundColor(.white)
+                                .frame(width: buttonSize, height: buttonSize)
+                                .background(Color.white.opacity(0.25))
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 2)
+                                )
+                        }
+
+                        Button(action: { showingPresentation = true }) {
+                            Image(systemName: "play.rectangle.on.rectangle")
+                                .font(iconFont)
+                                .foregroundColor(.white)
+                                .frame(width: buttonSize, height: buttonSize)
+                                .background(Color.white.opacity(0.25))
+                                .clipShape(Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.2), lineWidth: 2)
+                                )
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
-            
-            // Toggle audio
-            Button(action: {
-                Task { @MainActor in
-                    streamingService.toggleAudio()
-                    // Update participant info
-                    if let index = participants.firstIndex(where: { $0.id == userService.userIdentifier }) {
-                        participants[index].isMuted = !streamingService.isAudioEnabled
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+        .frame(height: isHost ? 140 : 80)
+    }
+
+    // MARK: - Presentation UI
+
+    private struct InSessionPresentationSheet: View {
+        @Binding var selectedPDFURLs: [URL]
+        @Binding var selectedPhotoItem: PhotosPickerItem?
+        @Binding var activePresentation: ActivePresentation?
+        @Environment(\.dismiss) private var dismiss
+        @State private var showingPDFPicker = false
+
+        var body: some View {
+            List {
+                Section("Present") {
+                    Button {
+                        activePresentation = .bibleStudy
+                        dismiss()
+                    } label: {
+                        Label("Bible Study", systemImage: "book.fill")
+                    }
+
+                    Button {
+                        showingPDFPicker = true
+                    } label: {
+                        Label("Pick PDF", systemImage: "doc.richtext")
+                    }
+
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        Label("Pick Image", systemImage: "photo")
                     }
                 }
-            }) {
-                Image(systemName: streamingService.isAudioEnabled ? "mic.fill" : "mic.slash.fill")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
-                    .background(streamingService.isAudioEnabled ? Color.blue : Color.gray)
-                    .clipShape(Circle())
+
+                if let activePresentation {
+                    Section("Now presenting") {
+                        Text(presentationTitle(activePresentation))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        Button(role: .destructive) {
+                            self.activePresentation = nil
+                        } label: {
+                            Label("Stop presenting", systemImage: "xmark.circle.fill")
+                        }
+                    }
+                }
             }
-            
-            Spacer()
-            
-            // End call
-            Button(action: {
-                leaveStream()
-            }) {
-                Image(systemName: "phone.down.fill")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
-                    .background(Color.red)
-                    .clipShape(Circle())
+            .onChange(of: selectedPDFURLs) { _, newValue in
+                if let url = newValue.first {
+                    activePresentation = .pdf(url)
+                    dismiss()
+                }
+            }
+            .onChange(of: selectedPhotoItem) { _, newValue in
+                guard let newValue else { return }
+                Task {
+                    if let data = try? await newValue.loadTransferable(type: Data.self) {
+                        await MainActor.run {
+                            activePresentation = .image(data)
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingPDFPicker) {
+                DocumentPickerView(
+                    selectedFileURLs: $selectedPDFURLs,
+                    allowedContentTypes: [UTType.pdf],
+                    allowsMultipleSelection: false
+                )
             }
         }
-        .padding(.horizontal)
-        .padding(.bottom)
+
+        private func presentationTitle(_ active: ActivePresentation) -> String {
+            switch active {
+            case .bibleStudy: return "Bible Study"
+            case .pdf(let url): return "PDF: \(url.lastPathComponent)"
+            case .image: return "Image"
+            }
+        }
+    }
+
+    private struct PresentedContentOverlay: View {
+        let activePresentation: ActivePresentation
+        let stop: () -> Void
+
+        var body: some View {
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer()
+                    Button(action: stop) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.white)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.65))
+                .cornerRadius(12)
+
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.75))
+                    .cornerRadius(14)
+            }
+        }
+
+        private var title: String {
+            switch activePresentation {
+            case .bibleStudy: return "Bible Study"
+            case .pdf(let url): return url.lastPathComponent
+            case .image: return "Image"
+            }
+        }
+
+        @ViewBuilder
+        private var content: some View {
+            switch activePresentation {
+            case .bibleStudy:
+                NavigationStack {
+                    BibleStudyView()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            case .pdf(let url):
+                PDFKitView(url: url)
+
+            case .image(let data):
+                if let uiImage = UIImage(data: data) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(10)
+                } else {
+                    Text("Unable to load image")
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding()
+                }
+            }
+        }
+    }
+
+    private struct PDFKitView: UIViewRepresentable {
+        let url: URL
+
+        func makeUIView(context: Context) -> PDFView {
+            let view = PDFView()
+            view.autoScales = true
+            view.displayMode = .singlePageContinuous
+            view.displayDirection = .vertical
+            view.backgroundColor = .black
+            view.document = PDFDocument(url: url)
+            return view
+        }
+
+        func updateUIView(_ uiView: PDFView, context: Context) {
+            if uiView.document?.documentURL != url {
+                uiView.document = PDFDocument(url: url)
+            }
+        }
+    }
+
+    private func toggleScreenSharing() {
+        if isScreenSharing {
+            HLSStreamingService.shared.stopScreenBroadcast()
+            isScreenSharing = false
+            return
+        }
+
+        Task {
+            do {
+                try await HLSStreamingService.shared.startScreenBroadcast()
+                await MainActor.run {
+                    isScreenSharing = true
+                }
+            } catch {
+                await MainActor.run {
+                    screenShareError = error.localizedDescription
+                    isScreenSharing = false
+                }
+            }
+        }
     }
     
     // MARK: - Layouts
@@ -476,22 +824,23 @@ struct MultiParticipantStreamView: View {
         
         // Try multiple times to get the preview layer (it may take a moment to initialize)
         for attempt in 1...3 {
+            let hlsService = HLSStreamingService.shared
+            var didSetPreview = false
             await MainActor.run {
-                let hlsService = HLSStreamingService.shared
                 if let previewLayer = hlsService.getPreviewLayer() {
-                    localVideoView = AnyView(
+                    self.localVideoView = AnyView(
                         VideoPreviewLayerView(previewLayer: previewLayer)
                             .aspectRatio(contentMode: .fill)
                             .clipped()
                     )
                     print("✅ [CAMERA] Local video view set up successfully (attempt \(attempt))")
-                    return
-                } else if attempt < 3 {
-                    print("⚠️ [CAMERA] Preview layer not ready yet, attempt \(attempt)/3")
+                    didSetPreview = true
                 }
             }
-            
-            if attempt < 3 {
+            if didSetPreview {
+                break
+            } else if attempt < 3 {
+                print("⚠️ [CAMERA] Preview layer not ready yet, attempt \(attempt)/3")
                 try? await Task.sleep(nanoseconds: 500_000_000) // Wait another 0.5 seconds
             }
         }

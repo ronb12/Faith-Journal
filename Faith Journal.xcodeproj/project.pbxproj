@@ -12,13 +12,12 @@
 		05C959CFFB6643E07B54D161 /* ProfileEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F909A333ED655DA2AF05722 /* ProfileEditView.swift */; };
 		06BF3FBF1398D3BA6FF98539 /* BroadcastStreamView_HLS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AF3E99C49F14638117F7B82 /* BroadcastStreamView_HLS.swift */; };
 		0B776504A501443E2B0318D2 /* BottomActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8258DC19C67D8495726A5526 /* BottomActionBar.swift */; };
-		0B988EEE4B89282A69322EDD /* AppNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D11667E0B677E86EBE9B4C /* AppNavigation.swift */; };
+		0B988EEE4B89282A69322EDD /* Faith Journal/Faith Journal/Utils/AppNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D11667E0B677E86EBE9B4C /* Faith Journal/Faith Journal/Utils/AppNavigation.swift */; };
 		0C8E4543FFA3C3FB4DF66C30 /* WebRTCService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66BA33738D59219C20ACA3A6 /* WebRTCService.swift */; };
 		109B409DEB5022508728FFCE /* ChatMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77241ABB6B5A982E4DC4A5AC /* ChatMessage.swift */; };
-		9B124378834E41F286F45003 /* UserChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67C2052592B4F1696C100B9 /* UserChannel.swift */; };
 		14C79D5FE4766BF213B6400E /* StreamingConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B59451B4CF4CF7402D5F26F /* StreamingConfig.swift */; };
 		1684E9CB317B5C34DC6C392A /* StatisticsView_Old.swift in Sources */ = {isa = PBXBuildFile; fileRef = F435C91C244F2CB9956D842D /* StatisticsView_Old.swift */; };
-		176ED2C841A89FCA36660477 /* ExportHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C77637ECB31225EE86F2C8B /* ExportHelper.swift */; };
+		176ED2C841A89FCA36660477 /* Faith Journal/Faith Journal/Utils/ExportHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C77637ECB31225EE86F2C8B /* Faith Journal/Faith Journal/Utils/ExportHelper.swift */; };
 		18A055E4EEE41FB7563AC3BD /* BroadcastStreamView_LiveKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 794B0A3AF0E4F7ABD35C9787 /* BroadcastStreamView_LiveKit.swift */; };
 		1918EF7287459242075AE666 /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC3E94F71A6AA665254C5D14 /* Item.swift */; };
 		1C746ABC905BC3F218F66B5D /* RtcBasic in Frameworks */ = {isa = PBXBuildFile; productRef = F6FE65D433AC935D2151131C /* RtcBasic */; };
@@ -29,50 +28,57 @@
 		257A366458F0807BCC2BFE5A /* BibleHighlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94295809F151ECDC10DC3AB0 /* BibleHighlight.swift */; };
 		268420BB1D4A98E86274891A /* StatisticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 732DF685BD6CF1DA2E6B7759 /* StatisticsService.swift */; };
 		2688A1E6CD7156CB5B45A45B /* BibleAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0029F6E58EE426FE0659B58F /* BibleAPIService.swift */; };
+		293DE9ACE2AE65A04304583E /* Faith Journal/Faith Journal/Models/SessionClip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90660CF74331BBDE9976FAF4 /* Faith Journal/Faith Journal/Models/SessionClip.swift */; };
 		29F45297394132E6EA0F8F8B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44CE5A8647CD34762AE82FDE /* SettingsView.swift */; };
-		2DB19F674BD18CF52AE06598 /* BackupRestoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DAB8D641CB8E89E55A6CE6E /* BackupRestoreView.swift */; };
 		2A2F0CDBDC5BE3B77F6C9969 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E90C128D8CE56FE3F69E79A4 /* OnboardingView.swift */; };
-		5D33ADB202D113EB963F765C /* AccessibilityHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDAF280A3DA5DBEB4290380 /* AccessibilityHelpers.swift */; };
 		2A5F6F929AE88C8E76E539D9 /* VideoViewRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17ABB613BB2CD23731451E6D /* VideoViewRepresentable.swift */; };
 		2ABE1C5F88D9369CD66AB54E /* YouTubeStyleStreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 646161915C60EBE44630F04C /* YouTubeStyleStreamView.swift */; };
+		2DB19F674BD18CF52AE06598 /* Faith Journal/Faith Journal/Views/BackupRestoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DAB8D641CB8E89E55A6CE6E /* Faith Journal/Faith Journal/Views/BackupRestoreView.swift */; };
 		2DBE17981777202DBBE4D14A /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDCE707BDDE000C541F10113 /* HomeView.swift */; };
 		2E5D246DE35537BEF1731AFC /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AC65BF2FA58E2257A9F2EBC /* PrivacyPolicyView.swift */; };
 		2FEC5FCBE46897CD6FA358CC /* LiveSessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A7C458690928AB05BBFCE87 /* LiveSessionsView.swift */; };
 		2FFF4C42C3637FC50B6A650F /* BibleNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E9813A163ED6E3E64FB6CB /* BibleNote.swift */; };
 		311CA35834186E5C2CDC25C9 /* DocumentPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A474FB4A82FCD0C304CF2D73 /* DocumentPickerView.swift */; };
 		3176F4E62630BB3448D58ACE /* BibleChapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C6FB28B49BAAEE927646197 /* BibleChapter.swift */; };
-		33E6A5ACDAECAA3A9D82843E /* StreamAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22306A16B1C3A2333D3CB66F /* StreamAnalyticsService.swift */; };
+		33E6A5ACDAECAA3A9D82843E /* Faith Journal/Faith Journal/Services/StreamAnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22306A16B1C3A2333D3CB66F /* Faith Journal/Faith Journal/Services/StreamAnalyticsService.swift */; };
+		37A976B752D4924ADB284CC6 /* Faith Journal/Faith Journal/Services/BackupRestoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8F9262008FC985C657F058C /* Faith Journal/Faith Journal/Services/BackupRestoreService.swift */; };
 		3B58481603188824621B7B4D /* GlobalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D5DE5DFCE5B314F8157F6C /* GlobalSearchView.swift */; };
 		3C4E7CD24DACD74FB62D0311 /* MoodHeatmapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C80499282964FADCAD43F74D /* MoodHeatmapView.swift */; };
+		3D205A2A14B68768C08BA1DA /* Faith Journal/Faith Journal/Services/AgoraTokenService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2029D3B407AB8326ED497C8 /* Faith Journal/Faith Journal/Services/AgoraTokenService.swift */; };
 		3EA322A678B9CFD8AA52FD64 /* BroadcastStreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD93A719C84A27F719F59321 /* BroadcastStreamView.swift */; };
 		3FFEBA78AC357F62C487B2FF /* InviteCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EE7415E2DA6F13844D41530 /* InviteCodeView.swift */; };
 		442211D573C279E415B059DB /* WatchConnectivityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD1697F5A3CD534B099B26BF /* WatchConnectivityService.swift */; };
 		455203242460B8AE456BFAC6 /* SharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51E3FE0ECC705080AFAF7FAF /* SharedComponents.swift */; };
+		479865372F21C22600AFE22F /* Faith Journal/Faith Journal/DevotionalCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479865362F21C22600AFE22F /* Faith Journal/Faith Journal/DevotionalCompletion.swift */; };
 		481506644DF74BBBE298EE13 /* JitsiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6E6CF9FCBBA78F5CD6A40E /* JitsiService.swift */; };
+		4B9586561B27DF7C55C84A76 /* Faith Journal/Faith Journal/Services/SessionRecommendationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED6180D8AE480AE265FE28A /* Faith Journal/Faith Journal/Services/SessionRecommendationService.swift */; };
 		4D267098F58C713D377181D7 /* Subscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004866F3B0FA3F5C8BBC11B0 /* Subscription.swift */; };
 		4F74AB4231061545F41EAE70 /* AchievementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CB14EFEC77C1A182190C18B /* AchievementService.swift */; };
 		5053706BA188E1CFF01FED96 /* StatisticAchievement.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE5823500F472492E277C41F /* StatisticAchievement.swift */; };
+		51185B6C3D50D36C010DD340 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74ACDA599C4EE65FC1EE44A4 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift */; };
 		51D3F828E570BC235A28EAAA /* BibleVerseOfTheDayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27E690FAE4D439DB5D357FCC /* BibleVerseOfTheDayManager.swift */; };
 		549264D4E8FE690D3BE5839E /* Faith_JournalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E98D132390BD4690EB7FE3B6 /* Faith_JournalApp.swift */; };
 		56D2B56FD4E2CE54CAB8D525 /* BibleVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8382F0FB32FE7E0B6AECED99 /* BibleVersion.swift */; };
 		583A473672C06E1823020B7A /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D213A1C588B1D051C1DAE6DB /* AppRootView.swift */; };
 		59FA941D335F9E285999D977 /* BibleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8FF5CA810DAA7C11109229C /* BibleViewModel.swift */; };
+		5B6B6A28AFDB24E5B679E582 /* Faith Journal/Faith Journal/Models/SessionRating.swift in Sources */ = {isa = PBXBuildFile; fileRef = E030442D534B6B898DBE2042 /* Faith Journal/Faith Journal/Models/SessionRating.swift */; };
+		5D33ADB202D113EB963F765C /* Faith Journal/Faith Journal/Utils/AccessibilityHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDAF280A3DA5DBEB4290380 /* Faith Journal/Faith Journal/Utils/AccessibilityHelpers.swift */; };
 		5F08F4294F5CD7E8832AFED0 /* SessionInvitation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3211149439A1E664B283FD74 /* SessionInvitation.swift */; };
 		5F4B1B6E3E7DE07DEE9DCA81 /* UnifiedStreamingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F906360CFF437C58DFFDB57 /* UnifiedStreamingService.swift */; };
 		607BB6D6CB2A1235C72ECA70 /* LiveSessionParticipant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25FFA403D0B9D6A3FEC0659F /* LiveSessionParticipant.swift */; };
 		6112B5B0C230D47941332844 /* ReadingPlanReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 359FCE3C7A1E60C25032F15B /* ReadingPlanReminderService.swift */; };
 		66477959B0EA8320C2B32440 /* MoodInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5ED39497061C338BE3C70BD /* MoodInsightsView.swift */; };
+		66ACB1F8B4ADCE75B182015E /* Faith Journal/Faith Journal/Services/TranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3350892E6FA32EF9F47A9C29 /* Faith Journal/Faith Journal/Services/TranslationService.swift */; };
 		678AE4902EEE5B4C5D187E0B /* StreamingHelperViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B3AA48FE8928493A270BAB0 /* StreamingHelperViews.swift */; };
 		6832188C5DD145BA283A99E0 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = C5E284E4EC2F3E403008F105 /* FirebaseStorage */; };
 		69609D8B7A92C7FE2A249C84 /* MoodGoal.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE108C2D0962818131D2B221 /* MoodGoal.swift */; };
-		6D944D10F995815A2FD5211B /* AppearanceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B381A94BEBAB9642A000825A /* AppearanceMode.swift */; };
+		6D944D10F995815A2FD5211B /* Faith Journal/Faith Journal/Utils/AppearanceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B381A94BEBAB9642A000825A /* Faith Journal/Faith Journal/Utils/AppearanceMode.swift */; };
 		6FAAA9F843A2E5094329158E /* StreamFeatureOverlays.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39EA09D2A8B6E21CB23614E4 /* StreamFeatureOverlays.swift */; };
 		7004B54A7514F4943D5FDC7D /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97873647EA6F7904BF48F6E4 /* LoginView.swift */; };
 		71E93708A359AAAE8D3EBE0A /* LandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26BF002ACF682F623EA7BDD2 /* LandingView.swift */; };
 		73F361624C821A3C94B6A621 /* PromptPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C58E4AF0E9CB9C01C773502B /* PromptPickerView.swift */; };
 		780B680EDA62A0CDC0BC31E1 /* MoodReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD244AC4CA73726509FDB7C /* MoodReminderService.swift */; };
 		7A310EFE99B2C8E6BDB54635 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80EFFE2C3DC6DAD57BA28A43 /* NotificationService.swift */; };
-			37A976B752D4924ADB284CC6 /* BackupRestoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8F9262008FC985C657F058C /* BackupRestoreService.swift */; };
 		7C979B92CD33F83EF48BCF09 /* BibleStudyTopic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491396DC4872AB7CCE7B682D /* BibleStudyTopic.swift */; };
 		7DE3D2E2AFAF2880699FF1ED /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADAB7FD4DD6098986947D56 /* SearchView.swift */; };
 		7F127B975D356A5C9F735A7E /* BibleStudyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E496E94EBCD8F251F55E54 /* BibleStudyView.swift */; };
@@ -94,6 +100,7 @@
 		92B36303096732E7E1AE43FE /* ProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A81C7F4F3778C29EE2325210 /* ProfileManager.swift */; };
 		984ED8678FA84647327498A8 /* LiveKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 523005301B9D34AF3A8C0FBA /* LiveKitService.swift */; };
 		988998C5934FB86EEEE2243F /* CloudKitUserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB1AC16F4ACEF96B905A5FB /* CloudKitUserService.swift */; };
+		9B124378834E41F286F45003 /* Faith Journal/Faith Journal/Models/UserChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C67C2052592B4F1696C100B9 /* Faith Journal/Faith Journal/Models/UserChannel.swift */; };
 		9F7184EF52B91D6F89F8BC02 /* StatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B981BA66FC01F2CD3AA741 /* StatisticsView.swift */; };
 		A0AC9834C3B8178A46190B10 /* BackgroundSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37266D49065F24A006B66B3C /* BackgroundSyncService.swift */; };
 		A5245D15FB110DFCA9A445B4 /* MoodExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBDEB426DC4DE5A7A6BCF06F /* MoodExportView.swift */; };
@@ -106,7 +113,7 @@
 		AE6D357F074D494AA2503C39 /* JournalEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 618C1108E4DC6F2EA20F24C4 /* JournalEntry.swift */; };
 		AFE76FC067551F64223EF29D /* ContactSupportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06AF8F4CC0849B0D0C5F8C97 /* ContactSupportView.swift */; };
 		B082A4C0FBA249008597EF5F /* ActivityHeatmapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0AD9DA20ACB0A80202E156 /* ActivityHeatmapView.swift */; };
-		B50EB3F12852B5646C7807BF /* BibleBooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DB8DAAE69AE35C697A8B52A /* BibleBooks.swift */; };
+		B50EB3F12852B5646C7807BF /* Faith Journal/Faith Journal/Utils/BibleBooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DB8DAAE69AE35C697A8B52A /* Faith Journal/Faith Journal/Utils/BibleBooks.swift */; };
 		B86A736F0E0171BA43F7F541 /* MultiParticipantStreamView_Jitsi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ABE3BEFEC6ED5ED3BC14373 /* MultiParticipantStreamView_Jitsi.swift */; };
 		B8B126C64735A5FAB88BF8AF /* BroadcastSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF40C7771944950F0A37690 /* BroadcastSettingsView.swift */; };
 		BA80BA69D97533E9A8C8ABE0 /* TermsOfServiceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59063047854396C1A20B810D /* TermsOfServiceView.swift */; };
@@ -114,12 +121,11 @@
 		BDC065BE39C799E8C6867192 /* BibleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0D47B32F1BA492353C4CF6E /* BibleView.swift */; };
 		BDF77695021DBB1F41160A2A /* DevotionalManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A4CAFDA4AFBF0FCDDBD4FDE /* DevotionalManager.swift */; };
 		BEAD7A4C2AAFEE61CCC38A29 /* QuickSettingsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D9D2DB49ADCD97CC784135D /* QuickSettingsPanel.swift */; };
-		BF78CFC806C4DD9CB1516EFA /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 30D40949C3B3DFDCD6169386 /* Preview Assets.xcassets */; };
 		C0D6E0BBD3407A12D86842A1 /* AchievementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2623B8EF0044708853AF329 /* AchievementsView.swift */; };
 		C20E18B41C4477CA28959CFC /* StreamSchedulingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1506E8C674F2B1407D090A0 /* StreamSchedulingService.swift */; };
 		C2AAAB246848398C5E701335 /* ReadingPlansView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD17D23F9FE249658E28F4B2 /* ReadingPlansView.swift */; };
 		C2DFB2159D0753EC93D6DA4F /* LocalUserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC750204C0F8477DF32C95E /* LocalUserService.swift */; };
-		C4373BFB5AA4F8BFDB5B03AE /* ErrorHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F94ACF1747ABF7A7BEDAB9A7 /* ErrorHandler.swift */; };
+		C4373BFB5AA4F8BFDB5B03AE /* Faith Journal/Faith Journal/Utils/ErrorHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F94ACF1747ABF7A7BEDAB9A7 /* Faith Journal/Faith Journal/Utils/ErrorHandler.swift */; };
 		C566DCE7F2B68D07B21B8E78 /* BibleStudyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1740951ABBBA97FC045612A4 /* BibleStudyService.swift */; };
 		C60D0AFA1414A3AD3213E356 /* StatisticsExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21190362E59EF02DC1803E9 /* StatisticsExportView.swift */; };
 		C79B527CAD7E4E6E8B9F36F9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D3CBB44A7DC0A47A4E33C3A5 /* Assets.xcassets */; };
@@ -144,34 +150,27 @@
 		E3B55FAB2E85F8DD175B2FE7 /* MoodSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422F94095D028BCEACE40101 /* MoodSettingsView.swift */; };
 		E4F239F32D301F0429ED4AD0 /* InviteUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54930461BCFE5AC38544443 /* InviteUsersView.swift */; };
 		E5DBAD13258EFEB0A702222F /* StatisticsInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37ABBCA50341AE78CF1542D7 /* StatisticsInsightsView.swift */; };
-		E916AD71B271BD28DE11B3EE /* AgoraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71F539BB10273A75ECD504E /* AgoraService.swift */; };
-		3D205A2A14B68768C08BA1DA /* AgoraTokenService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2029D3B407AB8326ED497C8 /* AgoraTokenService.swift */; };
+		E916AD71B271BD28DE11B3EE /* Faith Journal/Faith Journal/Services/AgoraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C71F539BB10273A75ECD504E /* Faith Journal/Faith Journal/Services/AgoraService.swift */; };
+		EB076A3BA39B99C4CEAA581B /* Faith Journal/Faith Journal/Views/TranslationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F754A20131D82D75448DD6D7 /* Faith Journal/Faith Journal/Views/TranslationSettingsView.swift */; };
 		EC450763EE8B5C6FB66B2BAC /* FirebaseInitializer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3864DE0832611CB3B08BF3EC /* FirebaseInitializer.swift */; };
 		ECBDCE3C5855BA3370F2DE4A /* QRCodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD81B918E8F6E6CC3570889 /* QRCodeScannerView.swift */; };
 		ED1ED22CB27F239B6EEC5EBC /* ReadingPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31F2A56D2F490EB7B911E9B /* ReadingPlan.swift */; };
-		EE164B54E2D47E63D5AD698F /* AppStoreHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72F6F852E29DDB0C2FD1083 /* AppStoreHelper.swift */; };
+		EE164B54E2D47E63D5AD698F /* Faith Journal/Faith Journal/Utils/AppStoreHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72F6F852E29DDB0C2FD1083 /* Faith Journal/Faith Journal/Utils/AppStoreHelper.swift */; };
 		F2F5B68A5A78B6D96382143A /* InvitationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0FCB98537F4343E93590956 /* InvitationsView.swift */; };
 		F35072122AF33C7506D59949 /* MoodGoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6A76A294068A9744832C99 /* MoodGoalsView.swift */; };
 		F35A763681152FD5EC236BD0 /* FirebaseSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FEE59F4458177ADE2585EB /* FirebaseSyncService.swift */; };
 		F3BFBB2F11A46D9FAFA111CC /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80160AB29EF495BA8DADA593 /* ThemeManager.swift */; };
 		F3C86D840C231C17DDBFAFF4 /* StreamHighlightsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDBCCD17840DF2D8B4B8E62 /* StreamHighlightsService.swift */; };
+		F3EB1A67E11AFF8532C7E084 /* Faith Journal/Faith Journal/Views/WaitingRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27187DE146BD87E8036417E /* Faith Journal/Faith Journal/Views/WaitingRoomView.swift */; };
 		F5AD03C2B45EAD2CBBF2CD35 /* JournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA315374E590ADE3CE32DAF8 /* JournalView.swift */; };
 		F64C30A798DC0809653FD487 /* JournalPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7D040269085A86E2F6ABBAE /* JournalPrompt.swift */; };
 		F9760F217F7C45CAB02510E9 /* WeatherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B168EA608ABBA725F56231B /* WeatherService.swift */; };
-
-		5B6B6A28AFDB24E5B679E582 /* SessionRating.swift in Sources */ = {isa = PBXBuildFile; fileRef = E030442D534B6B898DBE2042 /* SessionRating.swift */; };
-		293DE9ACE2AE65A04304583E /* SessionClip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90660CF74331BBDE9976FAF4 /* SessionClip.swift */; };
-		66ACB1F8B4ADCE75B182015E /* TranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3350892E6FA32EF9F47A9C29 /* TranslationService.swift */; };
-		4B9586561B27DF7C55C84A76 /* SessionRecommendationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED6180D8AE480AE265FE28A /* SessionRecommendationService.swift */; };
-		F3EB1A67E11AFF8532C7E084 /* WaitingRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27187DE146BD87E8036417E /* WaitingRoomView.swift */; };
-		51185B6C3D50D36C010DD340 /* SessionClipsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74ACDA599C4EE65FC1EE44A4 /* SessionClipsView.swift */; };
-		EB076A3BA39B99C4CEAA581B /* TranslationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F754A20131D82D75448DD6D7 /* TranslationSettingsView.swift */; };
-		/* End PBXBuildFile section */
+		FAD0EA6A5E329B0A0A3D455C /* Faith Journal/Faith Journal/Services/PresentationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD0EA6A5E329B0A0A3D455B /* Faith Journal/Faith Journal/Services/PresentationService.swift */; };
+/* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0029F6E58EE426FE0659B58F /* BibleAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleAPIService.swift; sourceTree = "<group>"; };
 		004866F3B0FA3F5C8BBC11B0 /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
-		021C8EAF069258AFD409961D /* Info.plist.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Info.plist.xml; sourceTree = "<group>"; };
 		06AF8F4CC0849B0D0C5F8C97 /* ContactSupportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactSupportView.swift; sourceTree = "<group>"; };
 		0906EAC7305F16678C32663E /* BibleVerseOfTheDay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleVerseOfTheDay.swift; sourceTree = "<group>"; };
 		0B3AA48FE8928493A270BAB0 /* StreamingHelperViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingHelperViews.swift; sourceTree = "<group>"; };
@@ -184,22 +183,22 @@
 		17ABB613BB2CD23731451E6D /* VideoViewRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoViewRepresentable.swift; sourceTree = "<group>"; };
 		1ADAB7FD4DD6098986947D56 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		1B59451B4CF4CF7402D5F26F /* StreamingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingConfig.swift; sourceTree = "<group>"; };
-		1C58B5910B7880D3AC08E6A2 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		1CC74FA360CAD116395D920D /* HLSStreamingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSStreamingService.swift; sourceTree = "<group>"; };
-		22306A16B1C3A2333D3CB66F /* StreamAnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamAnalyticsService.swift; sourceTree = "<group>"; };
+		1ED6180D8AE480AE265FE28A /* Faith Journal/Faith Journal/Services/SessionRecommendationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/SessionRecommendationService.swift"; sourceTree = SOURCE_ROOT; };
+		22306A16B1C3A2333D3CB66F /* Faith Journal/Faith Journal/Services/StreamAnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/StreamAnalyticsService.swift"; sourceTree = SOURCE_ROOT; };
 		25FFA403D0B9D6A3FEC0659F /* LiveSessionParticipant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSessionParticipant.swift; sourceTree = "<group>"; };
 		26BF002ACF682F623EA7BDD2 /* LandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandingView.swift; sourceTree = "<group>"; };
 		27E690FAE4D439DB5D357FCC /* BibleVerseOfTheDayManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleVerseOfTheDayManager.swift; sourceTree = "<group>"; };
 		2ABE3BEFEC6ED5ED3BC14373 /* MultiParticipantStreamView_Jitsi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiParticipantStreamView_Jitsi.swift; sourceTree = "<group>"; };
+		2DAB8D641CB8E89E55A6CE6E /* Faith Journal/Faith Journal/Views/BackupRestoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Views/BackupRestoreView.swift"; sourceTree = SOURCE_ROOT; };
 		2E0216C9C509E9911665E99E /* BibleVerse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleVerse.swift; sourceTree = "<group>"; };
 		2E38553C8FE57FDC4AD3ED61 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2EE7415E2DA6F13844D41530 /* InviteCodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteCodeView.swift; sourceTree = "<group>"; };
 		2FF7F14E12F73BC7114C77DE /* BookmarkedVerse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkedVerse.swift; sourceTree = "<group>"; };
-		30D40949C3B3DFDCD6169386 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		310C890383CF86C99B2E0484 /* StreamCaptionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamCaptionsService.swift; sourceTree = "<group>"; };
 		31198B1C06EE173CF15F66F7 /* conversion_progress.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = conversion_progress.json; sourceTree = "<group>"; };
 		3211149439A1E664B283FD74 /* SessionInvitation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionInvitation.swift; sourceTree = "<group>"; };
-		C67C2052592B4F1696C100B9 /* UserChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserChannel.swift; sourceTree = "<group>"; };
+		3350892E6FA32EF9F47A9C29 /* Faith Journal/Faith Journal/Services/TranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/TranslationService.swift"; sourceTree = SOURCE_ROOT; };
 		351013AA13F4286FF3DD7287 /* TopicPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopicPickerView.swift; sourceTree = "<group>"; };
 		359FCE3C7A1E60C25032F15B /* ReadingPlanReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPlanReminderService.swift; sourceTree = "<group>"; };
 		35C9274A6D8400DB75FA09DE /* MoodAnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodAnalyticsView.swift; sourceTree = "<group>"; };
@@ -213,16 +212,16 @@
 		3AEAC3E43747ED646869C717 /* Devotional.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Devotional.swift; sourceTree = "<group>"; };
 		3AF3E99C49F14638117F7B82 /* BroadcastStreamView_HLS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastStreamView_HLS.swift; sourceTree = "<group>"; };
 		3B8F4B3B33B60EEC4F57EF46 /* StreamPollsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamPollsService.swift; sourceTree = "<group>"; };
-		3C77637ECB31225EE86F2C8B /* ExportHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportHelper.swift; sourceTree = "<group>"; };
+		3C77637ECB31225EE86F2C8B /* Faith Journal/Faith Journal/Utils/ExportHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/ExportHelper.swift"; sourceTree = SOURCE_ROOT; };
 		3D9D2DB49ADCD97CC784135D /* QuickSettingsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickSettingsPanel.swift; sourceTree = "<group>"; };
-		3DB8DAAE69AE35C697A8B52A /* BibleBooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleBooks.swift; sourceTree = "<group>"; };
+		3DB8DAAE69AE35C697A8B52A /* Faith Journal/Faith Journal/Utils/BibleBooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/BibleBooks.swift"; sourceTree = SOURCE_ROOT; };
 		3F134623DA8BF9B931072221 /* MultiParticipantStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiParticipantStreamView.swift; sourceTree = "<group>"; };
 		3F909A333ED655DA2AF05722 /* ProfileEditView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileEditView.swift; sourceTree = "<group>"; };
 		422F94095D028BCEACE40101 /* MoodSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodSettingsView.swift; sourceTree = "<group>"; };
 		4252209CE1A02631FCDE0310 /* BibleBook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleBook.swift; sourceTree = "<group>"; };
 		44CE5A8647CD34762AE82FDE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		2DAB8D641CB8E89E55A6CE6E /* BackupRestoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreView.swift; sourceTree = "<group>"; };
 		46D5DE5DFCE5B314F8157F6C /* GlobalSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSearchView.swift; sourceTree = "<group>"; };
+		479865362F21C22600AFE22F /* Faith Journal/Faith Journal/DevotionalCompletion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/DevotionalCompletion.swift"; sourceTree = SOURCE_ROOT; };
 		48F34481CE2224C9CAF5DC9D /* SessionNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionNotificationService.swift; sourceTree = "<group>"; };
 		491396DC4872AB7CCE7B682D /* BibleStudyTopic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleStudyTopic.swift; sourceTree = "<group>"; };
 		49FEE59F4458177ADE2585EB /* FirebaseSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseSyncService.swift; sourceTree = "<group>"; };
@@ -233,7 +232,7 @@
 		59DD88F1D3051B1A4DA86120 /* Faith Journal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Faith Journal.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		5C37CC34FD18A852F55EA19A /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		5CDCFBB643230B35F53D3424 /* PromptManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptManager.swift; sourceTree = "<group>"; };
-		5EE5186C55B2E59FE2C07E0A /* Faith Journal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Faith Journal.entitlements"; sourceTree = "<group>"; };
+		5EE5186C55B2E59FE2C07E0A /* Faith Journal/Faith Journal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Faith Journal/Faith Journal.entitlements"; sourceTree = SOURCE_ROOT; };
 		60994891BA4072AF3BCBE732 /* conversion_progress.json.backup */ = {isa = PBXFileReference; lastKnownFileType = text; path = conversion_progress.json.backup; sourceTree = "<group>"; };
 		618C1108E4DC6F2EA20F24C4 /* JournalEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalEntry.swift; sourceTree = "<group>"; };
 		63AA1E38DB3165FBA593E534 /* DrawingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingView.swift; sourceTree = "<group>"; };
@@ -244,6 +243,7 @@
 		6A8557075EE0588D6EC271A9 /* StatisticsView_Enhanced.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView_Enhanced.swift; sourceTree = "<group>"; };
 		6F906360CFF437C58DFFDB57 /* UnifiedStreamingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedStreamingService.swift; sourceTree = "<group>"; };
 		732DF685BD6CF1DA2E6B7759 /* StatisticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsService.swift; sourceTree = "<group>"; };
+		74ACDA599C4EE65FC1EE44A4 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Views/SessionClipsView.swift"; sourceTree = SOURCE_ROOT; };
 		77241ABB6B5A982E4DC4A5AC /* ChatMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMessage.swift; sourceTree = "<group>"; };
 		79018FDF6F98FDD783982A34 /* PrayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerView.swift; sourceTree = "<group>"; };
 		794B0A3AF0E4F7ABD35C9787 /* BroadcastStreamView_LiveKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastStreamView_LiveKit.swift; sourceTree = "<group>"; };
@@ -253,41 +253,43 @@
 		7FC7BD9A9A7C28612987AC7E /* StreamReactionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamReactionsService.swift; sourceTree = "<group>"; };
 		80160AB29EF495BA8DADA593 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		80EFFE2C3DC6DAD57BA28A43 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
-		D8F9262008FC985C657F058C /* BackupRestoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupRestoreService.swift; sourceTree = "<group>"; };
 		8258DC19C67D8495726A5526 /* BottomActionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomActionBar.swift; sourceTree = "<group>"; };
 		8382F0FB32FE7E0B6AECED99 /* BibleVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleVersion.swift; sourceTree = "<group>"; };
 		8390C9F1D1CE52FFFBD24254 /* BibleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleService.swift; sourceTree = "<group>"; };
 		87E9813A163ED6E3E64FB6CB /* BibleNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleNote.swift; sourceTree = "<group>"; };
 		8A7C458690928AB05BBFCE87 /* LiveSessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSessionsView.swift; sourceTree = "<group>"; };
 		8C6FB28B49BAAEE927646197 /* BibleChapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleChapter.swift; sourceTree = "<group>"; };
+		90660CF74331BBDE9976FAF4 /* Faith Journal/Faith Journal/Models/SessionClip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Models/SessionClip.swift"; sourceTree = SOURCE_ROOT; };
 		937A69B41E6703838564008F /* Fastfile */ = {isa = PBXFileReference; lastKnownFileType = text; path = Fastfile; sourceTree = "<group>"; };
-		ADDAF280A3DA5DBEB4290380 /* AccessibilityHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityHelpers.swift; sourceTree = "<group>"; };
 		94295809F151ECDC10DC3AB0 /* BibleHighlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleHighlight.swift; sourceTree = "<group>"; };
 		94CF367E9B327A15B1B0AB46 /* BibleVerseDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleVerseDisplay.swift; sourceTree = "<group>"; };
 		97873647EA6F7904BF48F6E4 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		9B0AD9DA20ACB0A80202E156 /* ActivityHeatmapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHeatmapView.swift; sourceTree = "<group>"; };
 		9BD81B918E8F6E6CC3570889 /* QRCodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCodeScannerView.swift; sourceTree = "<group>"; };
 		9F9726524F77A08E7400CD10 /* ProfileEditView.swift.backup */ = {isa = PBXFileReference; lastKnownFileType = text; path = ProfileEditView.swift.backup; sourceTree = "<group>"; };
-		A2D11667E0B677E86EBE9B4C /* AppNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigation.swift; sourceTree = "<group>"; };
+		A27187DE146BD87E8036417E /* Faith Journal/Faith Journal/Views/WaitingRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Views/WaitingRoomView.swift"; sourceTree = SOURCE_ROOT; };
+		A2D11667E0B677E86EBE9B4C /* Faith Journal/Faith Journal/Utils/AppNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/AppNavigation.swift"; sourceTree = SOURCE_ROOT; };
 		A474FB4A82FCD0C304CF2D73 /* DocumentPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPickerView.swift; sourceTree = "<group>"; };
 		A81C7F4F3778C29EE2325210 /* ProfileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManager.swift; sourceTree = "<group>"; };
+		ADDAF280A3DA5DBEB4290380 /* Faith Journal/Faith Journal/Utils/AccessibilityHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/AccessibilityHelpers.swift"; sourceTree = SOURCE_ROOT; };
 		ADDBCCD17840DF2D8B4B8E62 /* StreamHighlightsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamHighlightsService.swift; sourceTree = "<group>"; };
 		B0D47B32F1BA492353C4CF6E /* BibleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleView.swift; sourceTree = "<group>"; };
 		B21FE46CF25E61EB9F1380AF /* StreamRecordingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamRecordingService.swift; sourceTree = "<group>"; };
 		B33069E8E48C91F19D894E59 /* FilterChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChip.swift; sourceTree = "<group>"; };
-		B381A94BEBAB9642A000825A /* AppearanceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceMode.swift; sourceTree = "<group>"; };
+		B381A94BEBAB9642A000825A /* Faith Journal/Faith Journal/Utils/AppearanceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/AppearanceMode.swift"; sourceTree = SOURCE_ROOT; };
 		BA315374E590ADE3CE32DAF8 /* JournalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalView.swift; sourceTree = "<group>"; };
 		BAF40C7771944950F0A37690 /* BroadcastSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastSettingsView.swift; sourceTree = "<group>"; };
 		BD1697F5A3CD534B099B26BF /* WatchConnectivityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityService.swift; sourceTree = "<group>"; };
 		BED6B290C34BC04564E433C9 /* MoodGoalsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodGoalsService.swift; sourceTree = "<group>"; };
 		C1506E8C674F2B1407D090A0 /* StreamSchedulingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamSchedulingService.swift; sourceTree = "<group>"; };
+		C2029D3B407AB8326ED497C8 /* Faith Journal/Faith Journal/Services/AgoraTokenService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/AgoraTokenService.swift"; sourceTree = SOURCE_ROOT; };
 		C2623B8EF0044708853AF329 /* AchievementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AchievementsView.swift; sourceTree = "<group>"; };
 		C58E4AF0E9CB9C01C773502B /* PromptPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptPickerView.swift; sourceTree = "<group>"; };
 		C6468201BABC215111936F44 /* MoodExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodExportService.swift; sourceTree = "<group>"; };
+		C67C2052592B4F1696C100B9 /* Faith Journal/Faith Journal/Models/UserChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Models/UserChannel.swift"; sourceTree = SOURCE_ROOT; };
 		C69531CD236A36230575CFFC /* PrayerRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrayerRequest.swift; sourceTree = "<group>"; };
-		C71F539BB10273A75ECD504E /* AgoraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraService.swift; sourceTree = "<group>"; };
-		C2029D3B407AB8326ED497C8 /* AgoraTokenService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraTokenService.swift; sourceTree = "<group>"; };
-		C72F6F852E29DDB0C2FD1083 /* AppStoreHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreHelper.swift; sourceTree = "<group>"; };
+		C71F539BB10273A75ECD504E /* Faith Journal/Faith Journal/Services/AgoraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/AgoraService.swift"; sourceTree = SOURCE_ROOT; };
+		C72F6F852E29DDB0C2FD1083 /* Faith Journal/Faith Journal/Utils/AppStoreHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/AppStoreHelper.swift"; sourceTree = SOURCE_ROOT; };
 		C80499282964FADCAD43F74D /* MoodHeatmapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodHeatmapView.swift; sourceTree = "<group>"; };
 		C8FF5CA810DAA7C11109229C /* BibleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleViewModel.swift; sourceTree = "<group>"; };
 		CBDEB426DC4DE5A7A6BCF06F /* MoodExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodExportView.swift; sourceTree = "<group>"; };
@@ -295,18 +297,19 @@
 		CDCE707BDDE000C541F10113 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		CE5823500F472492E277C41F /* StatisticAchievement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticAchievement.swift; sourceTree = "<group>"; };
 		CE6E6CF9FCBBA78F5CD6A40E /* JitsiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JitsiService.swift; sourceTree = "<group>"; };
-		D196179D52134137CB3A46B5 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		D21190362E59EF02DC1803E9 /* StatisticsExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsExportView.swift; sourceTree = "<group>"; };
 		D213A1C588B1D051C1DAE6DB /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		D2147F566944567A45E1AE2B /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
-		D3CBB44A7DC0A47A4E33C3A5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D3CBB44A7DC0A47A4E33C3A5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Faith Journal/Faith Journal/Resources/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
 		D6B981BA66FC01F2CD3AA741 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		D7D040269085A86E2F6ABBAE /* JournalPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalPrompt.swift; sourceTree = "<group>"; };
+		D8F9262008FC985C657F058C /* Faith Journal/Faith Journal/Services/BackupRestoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/BackupRestoreService.swift"; sourceTree = SOURCE_ROOT; };
 		D9E5AEEC51ADE06701CB5A91 /* LiveSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSession.swift; sourceTree = "<group>"; };
 		DABAA217A436A0873524B06B /* LiveStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamView.swift; sourceTree = "<group>"; };
 		DB10659643D6EFB0F953F03A /* WebRTCSignalingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCSignalingService.swift; sourceTree = "<group>"; };
 		DC294AD9641F2553CF66C640 /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
 		DD93A719C84A27F719F59321 /* BroadcastStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastStreamView.swift; sourceTree = "<group>"; };
+		E030442D534B6B898DBE2042 /* Faith Journal/Faith Journal/Models/SessionRating.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Models/SessionRating.swift"; sourceTree = SOURCE_ROOT; };
 		E46F4B6AA049DD0353F7CEA6 /* StreamModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamModerationService.swift; sourceTree = "<group>"; };
 		E54930461BCFE5AC38544443 /* InviteUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteUsersView.swift; sourceTree = "<group>"; };
 		E7B3F7351D1E12696124E417 /* AgoraVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraVideoView.swift; sourceTree = "<group>"; };
@@ -317,26 +320,21 @@
 		EF6A76A294068A9744832C99 /* MoodGoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodGoalsView.swift; sourceTree = "<group>"; };
 		F0FCB98537F4343E93590956 /* InvitationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvitationsView.swift; sourceTree = "<group>"; };
 		F172D8247D6B5811ADC5C874 /* HLSStreamingService.swift.backup */ = {isa = PBXFileReference; lastKnownFileType = text; path = HLSStreamingService.swift.backup; sourceTree = "<group>"; };
+		F1B1040C11D5AF9A43E07005 /* Faith Journal/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Faith Journal/Info.plist"; sourceTree = SOURCE_ROOT; };
 		F2907E882F0F8796787622F4 /* BroadcastStreamView_LiveKit_Stub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastStreamView_LiveKit_Stub.swift; sourceTree = "<group>"; };
 		F31F2A56D2F490EB7B911E9B /* ReadingPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPlan.swift; sourceTree = "<group>"; };
 		F435C91C244F2CB9956D842D /* StatisticsView_Old.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView_Old.swift; sourceTree = "<group>"; };
 		F5ED39497061C338BE3C70BD /* MoodInsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodInsightsView.swift; sourceTree = "<group>"; };
-		F94ACF1747ABF7A7BEDAB9A7 /* ErrorHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorHandler.swift; sourceTree = "<group>"; };
+		F754A20131D82D75448DD6D7 /* Faith Journal/Faith Journal/Views/TranslationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Views/TranslationSettingsView.swift"; sourceTree = SOURCE_ROOT; };
+		F94ACF1747ABF7A7BEDAB9A7 /* Faith Journal/Faith Journal/Utils/ErrorHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/ErrorHandler.swift"; sourceTree = SOURCE_ROOT; };
 		F94ECF686028C7E99BFC11FA /* SpeechSynthesizerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechSynthesizerService.swift; sourceTree = "<group>"; };
+		FAD0EA6A5E329B0A0A3D455B /* Faith Journal/Faith Journal/Services/PresentationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/PresentationService.swift"; sourceTree = SOURCE_ROOT; };
 		FC32F330CE7FBCD7FE75045E /* SectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionView.swift; sourceTree = "<group>"; };
 		FC3E94F71A6AA665254C5D14 /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
 		FD17D23F9FE249658E28F4B2 /* ReadingPlansView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPlansView.swift; sourceTree = "<group>"; };
 		FE06ECF01EB73908C0BE2BF1 /* Appfile */ = {isa = PBXFileReference; lastKnownFileType = text; path = Appfile; sourceTree = "<group>"; };
 		FFD244AC4CA73726509FDB7C /* MoodReminderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodReminderService.swift; sourceTree = "<group>"; };
-
-		E030442D534B6B898DBE2042 /* SessionRating.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Models/SessionRating.swift"; sourceTree = "<group>"; };
-		90660CF74331BBDE9976FAF4 /* SessionClip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Models/SessionClip.swift"; sourceTree = "<group>"; };
-		3350892E6FA32EF9F47A9C29 /* TranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/TranslationService.swift"; sourceTree = "<group>"; };
-		1ED6180D8AE480AE265FE28A /* SessionRecommendationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/SessionRecommendationService.swift"; sourceTree = "<group>"; };
-		A27187DE146BD87E8036417E /* WaitingRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Views/WaitingRoomView.swift"; sourceTree = "<group>"; };
-		74ACDA599C4EE65FC1EE44A4 /* SessionClipsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Views/SessionClipsView.swift"; sourceTree = "<group>"; };
-		F754A20131D82D75448DD6D7 /* TranslationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Views/TranslationSettingsView.swift"; sourceTree = "<group>"; };
-		/* End PBXFileReference section */
+/* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		EB1A775A26EE35F356C2BDBB /* Frameworks */ = {
@@ -356,13 +354,13 @@
 		029A46FEB10A1C4077E20724 /* Utils */ = {
 			isa = PBXGroup;
 			children = (
-				ADDAF280A3DA5DBEB4290380 /* AccessibilityHelpers.swift */,
-				B381A94BEBAB9642A000825A /* AppearanceMode.swift */,
-				A2D11667E0B677E86EBE9B4C /* AppNavigation.swift */,
-				C72F6F852E29DDB0C2FD1083 /* AppStoreHelper.swift */,
-				3DB8DAAE69AE35C697A8B52A /* BibleBooks.swift */,
-				F94ACF1747ABF7A7BEDAB9A7 /* ErrorHandler.swift */,
-				3C77637ECB31225EE86F2C8B /* ExportHelper.swift */,
+				ADDAF280A3DA5DBEB4290380 /* Faith Journal/Faith Journal/Utils/AccessibilityHelpers.swift */,
+				B381A94BEBAB9642A000825A /* Faith Journal/Faith Journal/Utils/AppearanceMode.swift */,
+				A2D11667E0B677E86EBE9B4C /* Faith Journal/Faith Journal/Utils/AppNavigation.swift */,
+				C72F6F852E29DDB0C2FD1083 /* Faith Journal/Faith Journal/Utils/AppStoreHelper.swift */,
+				3DB8DAAE69AE35C697A8B52A /* Faith Journal/Faith Journal/Utils/BibleBooks.swift */,
+				F94ACF1747ABF7A7BEDAB9A7 /* Faith Journal/Faith Journal/Utils/ErrorHandler.swift */,
+				3C77637ECB31225EE86F2C8B /* Faith Journal/Faith Journal/Utils/ExportHelper.swift */,
 				80160AB29EF495BA8DADA593 /* ThemeManager.swift */,
 			);
 			path = Utils;
@@ -397,7 +395,8 @@
 				CE5823500F472492E277C41F /* StatisticAchievement.swift */,
 				004866F3B0FA3F5C8BBC11B0 /* Subscription.swift */,
 				5C37CC34FD18A852F55EA19A /* UserProfile.swift */,
-				C67C2052592B4F1696C100B9 /* UserChannel.swift */,
+				C67C2052592B4F1696C100B9 /* Faith Journal/Faith Journal/Models/UserChannel.swift */,
+				479865362F21C22600AFE22F /* Faith Journal/Faith Journal/DevotionalCompletion.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -455,7 +454,7 @@
 				1ADAB7FD4DD6098986947D56 /* SearchView.swift */,
 				FC32F330CE7FBCD7FE75045E /* SectionView.swift */,
 				44CE5A8647CD34762AE82FDE /* SettingsView.swift */,
-				2DAB8D641CB8E89E55A6CE6E /* BackupRestoreView.swift */,
+				2DAB8D641CB8E89E55A6CE6E /* Faith Journal/Faith Journal/Views/BackupRestoreView.swift */,
 				51E3FE0ECC705080AFAF7FAF /* SharedComponents.swift */,
 				D21190362E59EF02DC1803E9 /* StatisticsExportView.swift */,
 				37ABBCA50341AE78CF1542D7 /* StatisticsInsightsView.swift */,
@@ -473,14 +472,6 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
-		22D9255C2971AA36B5BCE06F /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				30D40949C3B3DFDCD6169386 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
 		2D1AFF951093641DFF9695E2 /* fastlane */ = {
 			isa = PBXGroup;
 			children = (
@@ -490,15 +481,15 @@
 			path = fastlane;
 			sourceTree = "<group>";
 		};
-		320B5BAD0673C1A3549F33DB /* Faith Journal/Faith Journal */ = {
+		320B5BAD0673C1A3549F33DB = {
 			isa = PBXGroup;
 			children = (
-				5EE5186C55B2E59FE2C07E0A /* Faith Journal.entitlements */,
+				5EE5186C55B2E59FE2C07E0A /* Faith Journal/Faith Journal.entitlements */,
 				E98D132390BD4690EB7FE3B6 /* Faith_JournalApp.swift */,
 				10F787660F9D1E1C38B5D452 /* GoogleService-Info.plist */,
-				021C8EAF069258AFD409961D /* Info.plist.xml */,
+				F1B1040C11D5AF9A43E07005 /* Faith Journal/Info.plist */,
 				6AE50D1AE244C8D17D247AE4 /* build_logs */,
-				A7F5E067684261D5F8D919B5 /* Faith Journal/Faith Journal */,
+				A7F5E067684261D5F8D919B5 /* Faith Journal */,
 				2D1AFF951093641DFF9695E2 /* fastlane */,
 				16328512D39CF10D1EDE3A34 /* Models */,
 				B01F613F9F0ADBB12A6E8B89 /* Resources */,
@@ -507,15 +498,20 @@
 				84833A530112ABA1CEE23C0A /* ViewModels */,
 				168933EA88707F12B19767CC /* Views */,
 			);
-			path = "Faith Journal/Faith Journal";
 			sourceTree = "<group>";
 		};
-		4B9835A35DEB7F287927312E /* Resources */ = {
+		47F719A22F1960580092CD94 /* Recovered References */ = {
 			isa = PBXGroup;
 			children = (
-				9E6CC922496B44D2F160F2BA /* Preview Content */,
+				E030442D534B6B898DBE2042 /* Faith Journal/Faith Journal/Models/SessionRating.swift */,
+				90660CF74331BBDE9976FAF4 /* Faith Journal/Faith Journal/Models/SessionClip.swift */,
+				3350892E6FA32EF9F47A9C29 /* Faith Journal/Faith Journal/Services/TranslationService.swift */,
+				1ED6180D8AE480AE265FE28A /* Faith Journal/Faith Journal/Services/SessionRecommendationService.swift */,
+				A27187DE146BD87E8036417E /* Faith Journal/Faith Journal/Views/WaitingRoomView.swift */,
+				74ACDA599C4EE65FC1EE44A4 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift */,
+				F754A20131D82D75448DD6D7 /* Faith Journal/Faith Journal/Views/TranslationSettingsView.swift */,
 			);
-			path = Resources;
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		6AE50D1AE244C8D17D247AE4 /* build_logs */ = {
@@ -524,14 +520,6 @@
 				120B56D5E1C2FF69B70FE6F0 /* latest_build.txt */,
 			);
 			path = build_logs;
-			sourceTree = "<group>";
-		};
-		79F7D9AE13098EF8E6E0B16B /* Faith Journal/Faith Journal */ = {
-			isa = PBXGroup;
-			children = (
-				4B9835A35DEB7F287927312E /* Resources */,
-			);
-			path = "Faith Journal/Faith Journal";
 			sourceTree = "<group>";
 		};
 		84833A530112ABA1CEE23C0A /* ViewModels */ = {
@@ -546,8 +534,8 @@
 			isa = PBXGroup;
 			children = (
 				0CB14EFEC77C1A182190C18B /* AchievementService.swift */,
-				C71F539BB10273A75ECD504E /* AgoraService.swift */,
-				C2029D3B407AB8326ED497C8 /* AgoraTokenService.swift */,
+				C71F539BB10273A75ECD504E /* Faith Journal/Faith Journal/Services/AgoraService.swift */,
+				C2029D3B407AB8326ED497C8 /* Faith Journal/Faith Journal/Services/AgoraTokenService.swift */,
 				37266D49065F24A006B66B3C /* BackgroundSyncService.swift */,
 				0029F6E58EE426FE0659B58F /* BibleAPIService.swift */,
 				8390C9F1D1CE52FFFBD24254 /* BibleService.swift */,
@@ -570,15 +558,16 @@
 				BED6B290C34BC04564E433C9 /* MoodGoalsService.swift */,
 				FFD244AC4CA73726509FDB7C /* MoodReminderService.swift */,
 				80EFFE2C3DC6DAD57BA28A43 /* NotificationService.swift */,
-				D8F9262008FC985C657F058C /* BackupRestoreService.swift */,
+				D8F9262008FC985C657F058C /* Faith Journal/Faith Journal/Services/BackupRestoreService.swift */,
 				A81C7F4F3778C29EE2325210 /* ProfileManager.swift */,
 				5CDCFBB643230B35F53D3424 /* PromptManager.swift */,
+				FAD0EA6A5E329B0A0A3D455B /* Faith Journal/Faith Journal/Services/PresentationService.swift */,
 				359FCE3C7A1E60C25032F15B /* ReadingPlanReminderService.swift */,
 				163C0DD80465390AABF4FD63 /* ReadingPlanStatisticsService.swift */,
 				48F34481CE2224C9CAF5DC9D /* SessionNotificationService.swift */,
 				F94ECF686028C7E99BFC11FA /* SpeechSynthesizerService.swift */,
 				732DF685BD6CF1DA2E6B7759 /* StatisticsService.swift */,
-				22306A16B1C3A2333D3CB66F /* StreamAnalyticsService.swift */,
+				22306A16B1C3A2333D3CB66F /* Faith Journal/Faith Journal/Services/StreamAnalyticsService.swift */,
 				310C890383CF86C99B2E0484 /* StreamCaptionsService.swift */,
 				ADDBCCD17840DF2D8B4B8E62 /* StreamHighlightsService.swift */,
 				1B59451B4CF4CF7402D5F26F /* StreamingConfig.swift */,
@@ -596,39 +585,20 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
-		9E6CC922496B44D2F160F2BA /* Preview Content */ = {
+		A7F5E067684261D5F8D919B5 /* Faith Journal */ = {
 			isa = PBXGroup;
 			children = (
-				1C58B5910B7880D3AC08E6A2 /* Preview Assets.xcassets */,
 			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		A7F5E067684261D5F8D919B5 /* Faith Journal/Faith Journal */ = {
-			isa = PBXGroup;
-			children = (
-				79F7D9AE13098EF8E6E0B16B /* Faith Journal/Faith Journal */,
-				D2E18A4B211833A96FCAC8F2 /* Resources */,
-			);
-			path = "Faith Journal/Faith Journal";
+			path = "Faith Journal";
 			sourceTree = "<group>";
 		};
 		B01F613F9F0ADBB12A6E8B89 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
 				D3CBB44A7DC0A47A4E33C3A5 /* Assets.xcassets */,
-				22D9255C2971AA36B5BCE06F /* Preview Content */,
 			);
 			path = Resources;
-			sourceTree = "<group>";
-		};
-		B9E28F7B302AC30FF20923A6 /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				D196179D52134137CB3A46B5 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
+			sourceTree = SOURCE_ROOT;
 		};
 		C43888A113700C13C5CD75A4 /* Products */ = {
 			isa = PBXGroup;
@@ -638,19 +608,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		D2E18A4B211833A96FCAC8F2 /* Resources */ = {
-			isa = PBXGroup;
-			children = (
-				B9E28F7B302AC30FF20923A6 /* Preview Content */,
-			);
-			path = Resources;
-			sourceTree = "<group>";
-		};
 		FD027129038EAC01ED551760 = {
 			isa = PBXGroup;
 			children = (
-				320B5BAD0673C1A3549F33DB /* Faith Journal/Faith Journal */,
+				320B5BAD0673C1A3549F33DB,
 				C43888A113700C13C5CD75A4 /* Products */,
+				47F719A22F1960580092CD94 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -689,12 +652,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 2620;
-				TargetAttributes = {
-					0667FA2AE1ED61C1EDAFC816 = {
-						DevelopmentTeam = 4SQJ3AH62S;
-						ProvisioningStyle = Automatic;
-					};
-				};
 			};
 			buildConfigurationList = AA14FD9E01402DF233A5F1F2 /* Build configuration list for PBXProject "Faith Journal" */;
 			compatibilityVersion = "Xcode 14.0";
@@ -725,7 +682,6 @@
 			files = (
 				C79B527CAD7E4E6E8B9F36F9 /* Assets.xcassets in Resources */,
 				D589C26CABC3A37A156347BC /* GoogleService-Info.plist in Resources */,
-				BF78CFC806C4DD9CB1516EFA /* Preview Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -771,17 +727,17 @@
 				4F74AB4231061545F41EAE70 /* AchievementService.swift in Sources */,
 				C0D6E0BBD3407A12D86842A1 /* AchievementsView.swift in Sources */,
 				B082A4C0FBA249008597EF5F /* ActivityHeatmapView.swift in Sources */,
-				E916AD71B271BD28DE11B3EE /* AgoraService.swift in Sources */,
-				3D205A2A14B68768C08BA1DA /* AgoraTokenService.swift in Sources */,
+				E916AD71B271BD28DE11B3EE /* Faith Journal/Faith Journal/Services/AgoraService.swift in Sources */,
+				3D205A2A14B68768C08BA1DA /* Faith Journal/Faith Journal/Services/AgoraTokenService.swift in Sources */,
 				8CAEDB060D33D78299B2D7C5 /* AgoraVideoView.swift in Sources */,
-				0B988EEE4B89282A69322EDD /* AppNavigation.swift in Sources */,
+				0B988EEE4B89282A69322EDD /* Faith Journal/Faith Journal/Utils/AppNavigation.swift in Sources */,
 				583A473672C06E1823020B7A /* AppRootView.swift in Sources */,
-				EE164B54E2D47E63D5AD698F /* AppStoreHelper.swift in Sources */,
-				6D944D10F995815A2FD5211B /* AppearanceMode.swift in Sources */,
+				EE164B54E2D47E63D5AD698F /* Faith Journal/Faith Journal/Utils/AppStoreHelper.swift in Sources */,
+				6D944D10F995815A2FD5211B /* Faith Journal/Faith Journal/Utils/AppearanceMode.swift in Sources */,
 				A0AC9834C3B8178A46190B10 /* BackgroundSyncService.swift in Sources */,
 				2688A1E6CD7156CB5B45A45B /* BibleAPIService.swift in Sources */,
 				8C58CBDBF2E06A65FEC096F8 /* BibleBook.swift in Sources */,
-				B50EB3F12852B5646C7807BF /* BibleBooks.swift in Sources */,
+				B50EB3F12852B5646C7807BF /* Faith Journal/Faith Journal/Utils/BibleBooks.swift in Sources */,
 				3176F4E62630BB3448D58ACE /* BibleChapter.swift in Sources */,
 				257A366458F0807BCC2BFE5A /* BibleHighlight.swift in Sources */,
 				2FFF4C42C3637FC50B6A650F /* BibleNote.swift in Sources */,
@@ -814,8 +770,8 @@
 				86FD239D1842E107757847F4 /* DevotionalsView.swift in Sources */,
 				311CA35834186E5C2CDC25C9 /* DocumentPickerView.swift in Sources */,
 				AE29FE00F70BC6E02FF93A24 /* DrawingView.swift in Sources */,
-				C4373BFB5AA4F8BFDB5B03AE /* ErrorHandler.swift in Sources */,
-				176ED2C841A89FCA36660477 /* ExportHelper.swift in Sources */,
+				C4373BFB5AA4F8BFDB5B03AE /* Faith Journal/Faith Journal/Utils/ErrorHandler.swift in Sources */,
+				176ED2C841A89FCA36660477 /* Faith Journal/Faith Journal/Utils/ExportHelper.swift in Sources */,
 				549264D4E8FE690D3BE5839E /* Faith_JournalApp.swift in Sources */,
 				1F27C94A6A700DA9402245F8 /* FilterChip.swift in Sources */,
 				EC450763EE8B5C6FB66B2BAC /* FirebaseInitializer.swift in Sources */,
@@ -856,6 +812,7 @@
 				E1759D86F5D5CEF6F2953E06 /* MultiParticipantStreamView.swift in Sources */,
 				B86A736F0E0171BA43F7F541 /* MultiParticipantStreamView_Jitsi.swift in Sources */,
 				7A310EFE99B2C8E6BDB54635 /* NotificationService.swift in Sources */,
+				FAD0EA6A5E329B0A0A3D455C /* Faith Journal/Faith Journal/Services/PresentationService.swift in Sources */,
 				2A2F0CDBDC5BE3B77F6C9969 /* OnboardingView.swift in Sources */,
 				9019FABFCEFCDAC58C246F4C /* PrayerRequest.swift in Sources */,
 				81A05A3AD57ACAD39BC29A44 /* PrayerView.swift in Sources */,
@@ -873,22 +830,23 @@
 				7DE3D2E2AFAF2880699FF1ED /* SearchView.swift in Sources */,
 				8FE7177E6B9573B4E99AD3D7 /* SectionView.swift in Sources */,
 				5F08F4294F5CD7E8832AFED0 /* SessionInvitation.swift in Sources */,
-				9B124378834E41F286F45003 /* UserChannel.swift in Sources */,
+				9B124378834E41F286F45003 /* Faith Journal/Faith Journal/Models/UserChannel.swift in Sources */,
 				84BAA2B436852206722C587C /* SessionNotificationService.swift in Sources */,
-				37A976B752D4924ADB284CC6 /* BackupRestoreService.swift in Sources */,
-				5D33ADB202D113EB963F765C /* AccessibilityHelpers.swift in Sources */,
+				37A976B752D4924ADB284CC6 /* Faith Journal/Faith Journal/Services/BackupRestoreService.swift in Sources */,
+				5D33ADB202D113EB963F765C /* Faith Journal/Faith Journal/Utils/AccessibilityHelpers.swift in Sources */,
 				29F45297394132E6EA0F8F8B /* SettingsView.swift in Sources */,
-				2DB19F674BD18CF52AE06598 /* BackupRestoreView.swift in Sources */,
+				2DB19F674BD18CF52AE06598 /* Faith Journal/Faith Journal/Views/BackupRestoreView.swift in Sources */,
 				455203242460B8AE456BFAC6 /* SharedComponents.swift in Sources */,
 				20AF1B21C3FB34065CCF4596 /* SpeechSynthesizerService.swift in Sources */,
 				5053706BA188E1CFF01FED96 /* StatisticAchievement.swift in Sources */,
 				C60D0AFA1414A3AD3213E356 /* StatisticsExportView.swift in Sources */,
 				E5DBAD13258EFEB0A702222F /* StatisticsInsightsView.swift in Sources */,
+				479865372F21C22600AFE22F /* Faith Journal/Faith Journal/DevotionalCompletion.swift in Sources */,
 				268420BB1D4A98E86274891A /* StatisticsService.swift in Sources */,
 				9F7184EF52B91D6F89F8BC02 /* StatisticsView.swift in Sources */,
 				DF6B58B967B247CB8C426409 /* StatisticsView_Enhanced.swift in Sources */,
 				1684E9CB317B5C34DC6C392A /* StatisticsView_Old.swift in Sources */,
-				33E6A5ACDAECAA3A9D82843E /* StreamAnalyticsService.swift in Sources */,
+				33E6A5ACDAECAA3A9D82843E /* Faith Journal/Faith Journal/Services/StreamAnalyticsService.swift in Sources */,
 				0158F9AFC49014DDA84B606B /* StreamCaptionsService.swift in Sources */,
 				6FAAA9F843A2E5094329158E /* StreamFeatureOverlays.swift in Sources */,
 				F3C86D840C231C17DDBFAFF4 /* StreamHighlightsService.swift in Sources */,
@@ -912,13 +870,13 @@
 				D07A683943F1CA2DB1860CAE /* WebRTCSignalingService.swift in Sources */,
 				850C405799D5B99AC2B19E5A /* WelcomeView.swift in Sources */,
 				2ABE1C5F88D9369CD66AB54E /* YouTubeStyleStreamView.swift in Sources */,
-				5B6B6A28AFDB24E5B679E582 /* SessionRating.swift in Sources */,
-				293DE9ACE2AE65A04304583E /* SessionClip.swift in Sources */,
-				66ACB1F8B4ADCE75B182015E /* TranslationService.swift in Sources */,
-				4B9586561B27DF7C55C84A76 /* SessionRecommendationService.swift in Sources */,
-				F3EB1A67E11AFF8532C7E084 /* WaitingRoomView.swift in Sources */,
-				51185B6C3D50D36C010DD340 /* SessionClipsView.swift in Sources */,
-				EB076A3BA39B99C4CEAA581B /* TranslationSettingsView.swift in Sources */,
+				5B6B6A28AFDB24E5B679E582 /* Faith Journal/Faith Journal/Models/SessionRating.swift in Sources */,
+				293DE9ACE2AE65A04304583E /* Faith Journal/Faith Journal/Models/SessionClip.swift in Sources */,
+				66ACB1F8B4ADCE75B182015E /* Faith Journal/Faith Journal/Services/TranslationService.swift in Sources */,
+				4B9586561B27DF7C55C84A76 /* Faith Journal/Faith Journal/Services/SessionRecommendationService.swift in Sources */,
+				F3EB1A67E11AFF8532C7E084 /* Faith Journal/Faith Journal/Views/WaitingRoomView.swift in Sources */,
+				51185B6C3D50D36C010DD340 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift in Sources */,
+				EB076A3BA39B99C4CEAA581B /* Faith Journal/Faith Journal/Views/TranslationSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -929,28 +887,30 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "Faith Journal/Faith Journal.entitlements";
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 4SQJ3AH62S;
 				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Faith Journal needs access to your microphone to record audio for journal entries.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Faith Journal needs access to speech recognition to convert your voice to text in journal entries.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Faith Journal needs access to save photos to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Faith Journal needs access to your photo library to set your profile picture.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Faith Journal needs access to speech recognition to convert your voice to text in journal entries.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.0;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
-				STRIP_INSTALLED_PRODUCT = NO;
-				STRIP_STYLE = "non-global";
+				SUPPORTS_MACCATALYST = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
-};
+			};
 			name = Release;
 		};
 		6DD0EC9D08C4B6C7BD311B79 /* Release */ = {
@@ -1088,24 +1048,28 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "Faith Journal/Faith Journal.entitlements";
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 1;
+				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 4SQJ3AH62S;
 				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Faith Journal needs access to your microphone to record audio for journal entries.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Faith Journal needs access to speech recognition to convert your voice to text in journal entries.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Faith Journal needs access to save photos to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Faith Journal needs access to your photo library to set your profile picture.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Faith Journal needs access to speech recognition to convert your voice to text in journal entries.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.0;
+				MARKETING_VERSION = 4.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;

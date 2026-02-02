@@ -32,10 +32,11 @@ struct LiveStreamView: View {
     @State private var participants: [ParticipantInfo] = []
     @State private var spotlightedParticipant: String?
     @State private var showingParticipantGrid = false
-    @State private var showingWhiteboard = false
-    @State private var showingBreakoutRooms = false
     @State private var showingWaitingRoom = false
     @State private var isHost = false
+    @State private var isScreenSharing = false
+    @State private var screenShareError: String?
+    @State private var showingPresentation = false
     
     struct ParticipantInfo: Identifiable {
         let id: String
@@ -70,6 +71,10 @@ struct LiveStreamView: View {
                 startStreaming()
             }
             .onDisappear {
+                if isScreenSharing {
+                    HLSStreamingService.shared.stopScreenBroadcast()
+                    isScreenSharing = false
+                }
                 leaveStream()
             }
             .onChange(of: streamingService.isVideoEnabled) { _, newValue in
@@ -102,6 +107,13 @@ struct LiveStreamView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage)
+            }
+            .alert("Screen Sharing", isPresented: Binding(get: { screenShareError != nil }, set: { if !$0 { screenShareError = nil } })) {
+                Button("OK", role: .cancel) {
+                    screenShareError = nil
+                }
+            } message: {
+                Text(screenShareError ?? "Unable to share your screen.")
             }
             .onChange(of: streamingService.errorMessage) { _, newValue in
                 if let error = newValue {
@@ -295,17 +307,9 @@ struct LiveStreamView: View {
                             .background(Color.white.opacity(0.2))
                             .clipShape(Circle())
                     }
-                    
-                    Button(action: { showingWhiteboard = true }) {
-                        Image(systemName: "pencil.and.outline")
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Color.white.opacity(0.2))
-                            .clipShape(Circle())
-                    }
-                    
-                    Button(action: { showingBreakoutRooms = true }) {
-                        Image(systemName: "rectangle.split.2x1")
+
+                    Button(action: { showingPresentation = true }) {
+                        Image(systemName: "play.rectangle.on.rectangle")
                             .foregroundColor(.white)
                             .padding(8)
                             .background(Color.white.opacity(0.2))
@@ -317,62 +321,71 @@ struct LiveStreamView: View {
                 .padding(.horizontal)
             }
             
-            // Control buttons
-            HStack(spacing: 20) {
-                // Toggle video
-                Button(action: {
-                    Task { @MainActor in
-                        streamingService.toggleVideo()
+            // Control buttons (responsive; no Spacer-based clipping)
+            GeometryReader { geo in
+                let isCompact = geo.size.width < 380
+                let buttonSize: CGFloat = isCompact ? 48 : 56
+                let iconFont: Font = isCompact ? .title3 : .title2
+                let spacing: CGFloat = isCompact ? 14 : 20
+                
+                HStack(spacing: spacing) {
+                    // Toggle video
+                    Button(action: {
+                        Task { @MainActor in
+                            streamingService.toggleVideo()
+                        }
+                    }) {
+                        Image(systemName: streamingService.isVideoEnabled ? "video.fill" : "video.slash.fill")
+                            .font(iconFont)
+                            .foregroundColor(.white)
+                            .frame(width: buttonSize, height: buttonSize)
+                            .background(streamingService.isVideoEnabled ? Color.blue : Color.gray)
+                            .clipShape(Circle())
                     }
-                }) {
-                    Image(systemName: streamingService.isVideoEnabled ? "video.fill" : "video.slash.fill")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .frame(width: 56, height: 56)
-                        .background(streamingService.isVideoEnabled ? Color.blue : Color.gray)
-                        .clipShape(Circle())
-                }
-                
-                // Toggle audio
-                Button(action: {
-                    Task { @MainActor in
-                        streamingService.toggleAudio()
+                    
+                    // Toggle audio
+                    Button(action: {
+                        Task { @MainActor in
+                            streamingService.toggleAudio()
+                        }
+                    }) {
+                        Image(systemName: streamingService.isAudioEnabled ? "mic.fill" : "mic.slash.fill")
+                            .font(iconFont)
+                            .foregroundColor(.white)
+                            .frame(width: buttonSize, height: buttonSize)
+                            .background(streamingService.isAudioEnabled ? Color.blue : Color.gray)
+                            .clipShape(Circle())
                     }
-                }) {
-                    Image(systemName: streamingService.isAudioEnabled ? "mic.fill" : "mic.slash.fill")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .frame(width: 56, height: 56)
-                        .background(streamingService.isAudioEnabled ? Color.blue : Color.gray)
-                        .clipShape(Circle())
+                    
+                    // Screen sharing
+                    Button(action: toggleScreenSharing) {
+                        Image(systemName: isScreenSharing ? "rectangle.slash" : "rectangle.on.rectangle")
+                            .font(iconFont)
+                            .foregroundColor(.white)
+                            .frame(width: buttonSize, height: buttonSize)
+                            .background(isScreenSharing ? Color.green : Color.purple)
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                            )
+                    }
+                    
+                    // End call
+                    Button(action: { leaveStream() }) {
+                        Image(systemName: "phone.down.fill")
+                            .font(iconFont)
+                            .foregroundColor(.white)
+                            .frame(width: buttonSize, height: buttonSize)
+                            .background(Color.red)
+                            .clipShape(Circle())
+                    }
                 }
-                
-                // Screen sharing
-                Button(action: startScreenSharing) {
-                    Image(systemName: "rectangle.on.rectangle")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .frame(width: 56, height: 56)
-                        .background(Color.purple)
-                        .clipShape(Circle())
-                }
-                
-                Spacer()
-                
-                // End call
-                Button(action: {
-                    leaveStream()
-                }) {
-                    Image(systemName: "phone.down.fill")
-                        .font(.title2)
-                        .foregroundColor(.white)
-                        .frame(width: 56, height: 56)
-                        .background(Color.red)
-                        .clipShape(Circle())
-                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal)
-            .padding(.bottom)
+            .frame(height: 80)
         }
         .background(
             LinearGradient(
@@ -452,38 +465,20 @@ struct LiveStreamView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingWhiteboard) {
+        .sheet(isPresented: $showingPresentation) {
             NavigationStack {
-                ZStack {
-                    Color.white
-                    Text("Whiteboard - Drawing functionality coming soon")
-                        .foregroundColor(.gray)
-                }
-                .navigationTitle("Whiteboard")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") { showingWhiteboard = false }
+                Text("Presentation is available in Multi‑Participant sessions (Bible Study / PDF / Images).")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding()
+                    .navigationTitle("Presentation")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Done") { showingPresentation = false }
+                        }
                     }
-                }
-            }
-        }
-        .sheet(isPresented: $showingBreakoutRooms) {
-            NavigationStack {
-                List {
-                    Section(header: Text("Breakout Rooms")) {
-                        Text("Breakout rooms feature coming soon")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .navigationTitle("Breakout Rooms")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") { showingBreakoutRooms = false }
-                    }
-                }
             }
         }
     }
@@ -503,8 +498,21 @@ struct LiveStreamView: View {
         // Implement mute participant functionality
     }
     
-    private func startScreenSharing() {
-        // Implement screen sharing
+    private func toggleScreenSharing() {
+        Task {
+            if isScreenSharing {
+                HLSStreamingService.shared.stopScreenBroadcast()
+                isScreenSharing = false
+            } else {
+                do {
+                    screenShareError = nil
+                    try await HLSStreamingService.shared.startScreenBroadcast()
+                    isScreenSharing = true
+                } catch {
+                    screenShareError = error.localizedDescription
+                }
+            }
+        }
     }
     
     private func getUserName(for userId: String) -> String {

@@ -117,7 +117,6 @@ struct MoreView: View {
                 BibleView()
             }
             .onChange(of: nav.bibleTarget) { oldValue, newValue in
-                // When a bible target is set and we're on the More tab, automatically navigate to Bible view
                 if newValue != nil && selectedTab == 4 && !navigateToBible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         navigateToBible = true
@@ -125,7 +124,6 @@ struct MoreView: View {
                 }
             }
             .onChange(of: selectedTab) { oldValue, newValue in
-                // When switching to More tab, check if there's a pending bible target
                 if newValue == 4 && nav.bibleTarget != nil && !navigateToBible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         navigateToBible = true

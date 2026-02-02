@@ -12,59 +12,81 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    // Helper function to check if this is the test user ID (for simulator testing)
+    function isTestUser(userId) {
+      return userId == 'simulator-test-user-shared';
+    }
+    
+    // Allow test collection for testing/debugging (top-level)
+    // This allows creating test documents without authentication for development
+    match /testConnection/{document=**} {
+      allow read, write: if true; // Allow all access for testing
+    }
+    
     // Users collection - users can read/write their own data
     match /users/{userId} {
-      // Allow users to read/write their own user document
-      allow read, write: if isOwner(userId);
+      // Allow users to read/write their own user document OR if it's the test user (for simulator testing)
+      allow read, write: if isOwner(userId) || isTestUser(userId);
       
       // User's journal entries
       match /journalEntries/{entryId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's prayer requests
       match /prayerRequests/{requestId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's mood entries
       match /moodEntries/{entryId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's bookmarked verses
       match /bookmarkedVerses/{verseId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's Bible highlights
       match /bibleHighlights/{highlightId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's Bible notes
       match /bibleNotes/{noteId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's reading plans
       match /readingPlans/{planId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's session invitations (personal collection)
       match /sessionInvitations/{invitationId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's live sessions
       match /liveSessions/{sessionId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
+      }
+      
+      // User's devotional completions
+      match /devotionalCompletions/{completionId} {
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
       // Test connection collection (for debugging)
       match /testConnection/{testId} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isOwner(userId) || isTestUser(userId);
+      }
+      
+      // Catch-all for any other subcollections - SECURE BY DEFAULT
+      match /{document=**} {
+        // Only allow if user owns the parent user document OR if it's the test user
+        allow read, write: if isOwner(userId) || isTestUser(userId);
       }
     }
     
@@ -141,20 +163,19 @@ service cloud.firestore {
         allow read: if true;
         
         // Allow authenticated users to create their own participant entry
+        // participantId can be userId or Firebase Auth UID
         allow create: if isAuthenticated() && 
-                        request.resource.data.userId == request.auth.uid &&
-                        participantId == request.auth.uid;
+                        request.resource.data.userId == request.auth.uid;
         
         // Allow users to update their own participant entry
+        // Check userId field matches auth.uid (document ID can be different)
         allow update: if isAuthenticated() && 
                         (resource.data.userId == request.auth.uid ||
-                         request.resource.data.userId == request.auth.uid) &&
-                        participantId == request.auth.uid;
+                         request.resource.data.userId == request.auth.uid);
         
         // Allow users to delete their own participant entry
         allow delete: if isAuthenticated() && 
-                        resource.data.userId == request.auth.uid &&
-                        participantId == request.auth.uid;
+                        resource.data.userId == request.auth.uid;
       }
     }
     

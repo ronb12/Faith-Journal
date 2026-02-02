@@ -1,6 +1,7 @@
 import SwiftUI
 import LocalAuthentication
 import AuthenticationServices
+import CryptoKit
 
 // Try to import Firebase - if it fails, we'll handle it at runtime
 #if canImport(FirebaseAuth)
@@ -30,6 +31,9 @@ struct LoginView: View {
     @State private var username = ""
     @State private var showPasswordResetSent = false
     @State private var showPasswordResetAlert = false
+
+    // Apple Sign-In nonce (required for Firebase Auth with Apple)
+    @State private var currentNonce: String?
     
     init(hasLoggedIn: Binding<Bool> = .constant(false)) {
         _hasLoggedIn = hasLoggedIn
@@ -118,6 +122,10 @@ struct LoginView: View {
                                 // Sign in with Apple Button (primary authentication method)
                                 SignInWithAppleButton(
                                     onRequest: { request in
+                                        // Firebase requires a nonce to prevent replay attacks.
+                                        let nonce = randomNonceString()
+                                        currentNonce = nonce
+                                        request.nonce = sha256(nonce)
                                         request.requestedScopes = [.fullName, .email]
                                         print("🔍 [APPLE SIGN IN] Button tapped, requesting authorization...")
                                     },
@@ -248,6 +256,9 @@ struct LoginView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.all, edges: .all)
         .onAppear {
+            // Ensure Firebase is initialized before any Auth call paths.
+            // This prevents “Failed to get FirebaseApp instance” style errors.
+            ensureFirebaseInitialized()
             checkBiometricType()
             
             // Check Firebase availability and log status
@@ -263,6 +274,13 @@ struct LoginView: View {
             print("❌ [LOGIN] Packages are linked but not being imported")
             print("❌ [LOGIN] Solution: Clean build (⇧⌘K) and rebuild (⌘B)")
             #endif
+        }
+    }
+
+    private func ensureFirebaseInitialized() {
+        // FirebaseInitializer itself uses compile-time guards; calling it is safe even if packages aren't linked.
+        if !FirebaseInitializer.shared.isConfigured {
+            FirebaseInitializer.shared.initialize()
         }
     }
     
@@ -483,6 +501,15 @@ struct LoginView: View {
             }
             return
         }
+
+        guard let nonce = currentNonce else {
+            print("❌ [FIREBASE AUTH] Missing nonce. Apple request did not include nonce.")
+            await MainActor.run {
+                errorMessage = "Sign in failed. Please try again."
+                isAuthenticating = false
+            }
+            return
+        }
         
         guard let identityToken = appleIDCredential.identityToken,
               let idTokenString = String(data: identityToken, encoding: .utf8) else {
@@ -517,7 +544,7 @@ struct LoginView: View {
             let credential = OAuthProvider.credential(
                 withProviderID: "apple",
                 idToken: idTokenString,
-                rawNonce: "",
+                rawNonce: nonce,
                 accessToken: nil
             )
             
@@ -580,10 +607,9 @@ struct LoginView: View {
             print("❌ [FIREBASE AUTH] Error localizedFailureReason: \(nsError.localizedFailureReason ?? "none")")
                 
             // Check for common Firebase Auth errors
-            if let authErrorCode = AuthErrorCode.Code(rawValue: nsError.code),
-               let authError = AuthErrorCode(authErrorCode) {
-                print("❌ [FIREBASE AUTH] AuthErrorCode: \(authError)")
-                switch authError {
+            if let authErrorCode = AuthErrorCode.Code(rawValue: nsError.code) {
+                print("❌ [FIREBASE AUTH] AuthErrorCode: \(authErrorCode)")
+                switch authErrorCode {
                 case .networkError:
                     errorMessage = "Network error. Please check your internet connection and try again."
                 case .invalidCredential:
@@ -630,6 +656,42 @@ struct LoginView: View {
             }
         }
         #endif
+    }
+
+    // MARK: - Nonce helpers (Firebase Auth + Apple)
+
+    private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        let charset: [Character] =
+        Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+
+        var result = ""
+        var remainingLength = length
+
+        while remainingLength > 0 {
+            var randomBytes = [UInt8](repeating: 0, count: 16)
+            let status = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+            if status != errSecSuccess {
+                // Extremely unlikely; fall back to UUID-based entropy.
+                return UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            }
+
+            randomBytes.forEach { byte in
+                if remainingLength == 0 { return }
+                if byte < charset.count {
+                    result.append(charset[Int(byte)])
+                    remainingLength -= 1
+                }
+            }
+        }
+
+        return result
+    }
+
+    private func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashed = SHA256.hash(data: inputData)
+        return hashed.map { String(format: "%02x", $0) }.joined()
     }
     
     
@@ -998,6 +1060,8 @@ struct LoginView: View {
         print("🔍 [FIREBASE AUTH] Starting email/password sign-in...")
         
         #if canImport(FirebaseAuth)
+        // Defensive: initialize Firebase if needed (LoginView can appear before app init completes).
+        ensureFirebaseInitialized()
         guard FirebaseInitializer.shared.isConfigured else {
             print("❌ [FIREBASE AUTH] Firebase is not configured")
             await MainActor.run {
@@ -1046,16 +1110,29 @@ struct LoginView: View {
         } catch {
             print("❌ [FIREBASE AUTH] Email sign-in failed: \(error.localizedDescription)")
             await MainActor.run {
-                let authError = error as NSError
-                switch authError.code {
-                case 17008: // Invalid email
-                    errorMessage = "Invalid email address"
-                case 17009: // Wrong password
-                    errorMessage = "Incorrect password"
-                case 17011: // User not found
-                    errorMessage = "No account found with this email"
-                case 17020: // Network error
-                    errorMessage = "Network error. Please check your connection"
+                let nsError = error as NSError
+                let code = AuthErrorCode(_nsError: nsError)
+                print("❌ [FIREBASE AUTH] Sign-in error code: \(code.code.rawValue) (\(code.code))")
+                
+                switch code.code {
+                case .invalidEmail:
+                    errorMessage = "Invalid email address."
+                case .wrongPassword:
+                    errorMessage = "Incorrect password."
+                case .userNotFound:
+                    errorMessage = "No account found with this email."
+                case .userDisabled:
+                    errorMessage = "This account has been disabled."
+                case .networkError:
+                    errorMessage = "Network error. Please check your connection."
+                case .tooManyRequests:
+                    errorMessage = "Too many attempts. Try again in a few minutes."
+                case .operationNotAllowed:
+                    errorMessage = "Email/password sign-in is not enabled for this app. Enable it in Firebase Console → Authentication → Sign-in method."
+                case .invalidCredential:
+                    errorMessage = "This email can’t be used with a password on this app. Try Sign in with Apple, or create an email/password account."
+                case .accountExistsWithDifferentCredential:
+                    errorMessage = "This email is already linked to a different sign-in method. Try Sign in with Apple."
                 default:
                     errorMessage = "Sign in failed: \(error.localizedDescription)"
                 }
@@ -1076,6 +1153,8 @@ struct LoginView: View {
         print("🔍 [FIREBASE AUTH] Starting email/password sign-up...")
         
         #if canImport(FirebaseAuth)
+        // Defensive: initialize Firebase if needed.
+        ensureFirebaseInitialized()
         guard FirebaseInitializer.shared.isConfigured else {
             print("❌ [FIREBASE AUTH] Firebase is not configured")
             await MainActor.run {
@@ -1129,16 +1208,21 @@ struct LoginView: View {
         } catch {
             print("❌ [FIREBASE AUTH] Sign-up failed: \(error.localizedDescription)")
             await MainActor.run {
-                let authError = error as NSError
-                switch authError.code {
-                case 17007: // Email already in use
+                let nsError = error as NSError
+                let code = AuthErrorCode(_nsError: nsError)
+                print("❌ [FIREBASE AUTH] Sign-up error code: \(code.code.rawValue) (\(code.code))")
+                
+                switch code.code {
+                case .emailAlreadyInUse:
                     errorMessage = "An account with this email already exists. Please sign in instead."
-                case 17008: // Invalid email
-                    errorMessage = "Invalid email address"
-                case 17026: // Weak password
+                case .invalidEmail:
+                    errorMessage = "Invalid email address."
+                case .weakPassword:
                     errorMessage = "Password is too weak. Please use a stronger password."
-                case 17020: // Network error
-                    errorMessage = "Network error. Please check your connection"
+                case .networkError:
+                    errorMessage = "Network error. Please check your connection."
+                case .operationNotAllowed:
+                    errorMessage = "Email/password sign-up is not enabled for this app. Enable it in Firebase Console → Authentication → Sign-in method."
                 default:
                     errorMessage = "Sign up failed: \(error.localizedDescription)"
                 }

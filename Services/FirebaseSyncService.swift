@@ -25,6 +25,10 @@ class FirebaseSyncService: ObservableObject {
     private var listener: ListenerRegistration?
     private var prayerRequestListener: ListenerRegistration?
     private var invitationListener: ListenerRegistration?
+
+    #if canImport(FirebaseAuth)
+    private var authStateListenerHandle: AuthStateDidChangeListenerHandle?
+    #endif
     
     /// Lazy Firestore database access - only initializes after Firebase is configured
     private var db: Firestore? {
@@ -37,10 +41,10 @@ class FirebaseSyncService: ObservableObject {
             
             // Initialize Firestore only after Firebase is configured
             _db = Firestore.firestore()
-            // Enable offline persistence using new cacheSettings API
-            let settings = FirestoreSettings()
-            settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: FirestoreCacheSizeUnlimited))
-            _db?.settings = settings
+            // IMPORTANT:
+            // Do NOT set Firestore settings here. Firestore only allows settings to be set
+            // before any other Firestore usage; doing it here can crash if Firestore was
+            // touched elsewhere already (e.g., during app init / other services).
             print("✅ [FIREBASE SYNC] Firestore initialized")
         }
         return _db
@@ -71,6 +75,11 @@ class FirebaseSyncService: ObservableObject {
     /// Configure the sync service with a ModelContext
     func configure(modelContext: ModelContext) {
         self.modelContext = modelContext
+
+        // Ensure sync starts immediately after sign-in (if configure() ran before login).
+        #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
+        installAuthStateListenerIfNeeded()
+        #endif
         
         // For simulator testing, use shared test user ID for cross-device sync
         // Note: This requires Firestore security rules to allow unauthenticated access
@@ -100,6 +109,49 @@ class FirebaseSyncService: ObservableObject {
         } else {
             print("⚠️ [FIREBASE] User not authenticated yet, listener will start after sign-in")
         }
+    }
+
+    #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
+    private func installAuthStateListenerIfNeeded() {
+        guard authStateListenerHandle == nil else { return }
+        
+        authStateListenerHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            guard let self else { return }
+            Task { @MainActor in
+                if let user {
+                    print("✅ [FIREBASE] Auth state changed: signed in (\(user.uid))")
+                    
+                    guard self.modelContext != nil else {
+                        print("⚠️ [FIREBASE] ModelContext not set yet; will start listening after configure(modelContext:)")
+                        return
+                    }
+                    
+                    // Start listeners + run an initial sync right away.
+                    self.restartListening()
+                    await self.syncAllData()
+                    
+                    // Refresh profile after sign-in.
+                    await ProfileManager.shared.loadProfile()
+                } else {
+                    print("⚠️ [FIREBASE] Auth state changed: signed out")
+                    self.stopListeningInternal()
+                }
+            }
+        }
+        
+        print("✅ [FIREBASE] Installed Auth state listener")
+    }
+    #endif
+
+    private func stopListeningInternal() {
+        #if canImport(FirebaseFirestore)
+        listener?.remove()
+        listener = nil
+        prayerRequestListener?.remove()
+        prayerRequestListener = nil
+        invitationListener?.remove()
+        invitationListener = nil
+        #endif
     }
     
     /// Test Firebase connection by writing a test document
@@ -291,10 +343,7 @@ class FirebaseSyncService: ObservableObject {
     func restartListening() {
         #if canImport(FirebaseFirestore)
         // Remove existing listeners if any
-        listener?.remove()
-        listener = nil
-        invitationListener?.remove()
-        invitationListener = nil
+        stopListeningInternal()
         
         // Ensure modelContext is set (might not be if called before configure)
         guard modelContext != nil else {
@@ -438,10 +487,7 @@ class FirebaseSyncService: ObservableObject {
         }
         
         // Remove existing listeners if any
-        listener?.remove()
-        listener = nil
-        prayerRequestListener?.remove()
-        prayerRequestListener = nil
+        stopListeningInternal()
         
         print("👂 [FIREBASE] Starting Firebase listener for user: \(userId)")
         print("👂 [FIREBASE] Listening to path: users/\(userId)/journalEntries")
@@ -818,11 +864,131 @@ class FirebaseSyncService: ObservableObject {
             
             try await invitationRef.setData(data, merge: true)
             print("✅ [FIREBASE] Synced session invitation: \(invitation.id.uuidString) (code: \(invitation.inviteCode))")
+
+            // Also publish by invite code so other users can resolve codes cross-device.
+            await publishInviteCode(invitation, db: db)
         } catch {
             print("❌ [FIREBASE] Failed to sync session invitation: \(error.localizedDescription)")
         }
         #endif
     }
+
+    #if canImport(FirebaseFirestore)
+    private func publishInviteCode(_ invitation: SessionInvitation, db: Firestore) async {
+        let code = invitation.inviteCode.uppercased()
+        guard !code.isEmpty else { return }
+
+        // A public-ish index for join-by-code. The Firestore rules should restrict what fields are readable.
+        // Document id is the invite code for quick lookup.
+        let ref = db.collection("sessionInviteCodes").document(code)
+        let data: [String: Any] = [
+            "inviteCode": code,
+            "invitationId": invitation.id.uuidString,
+            "sessionId": invitation.sessionId.uuidString,
+            "sessionTitle": invitation.sessionTitle,
+            "hostId": invitation.hostId,
+            "hostName": invitation.hostName,
+            "createdAt": Timestamp(date: invitation.createdAt),
+            "expiresAt": invitation.expiresAt.map { Timestamp(date: $0) } ?? NSNull(),
+            "lastSyncedAt": Timestamp(date: Date())
+        ]
+
+        do {
+            try await ref.setData(data, merge: true)
+            print("✅ [INVITE CODE] Published invite code index: \(code)")
+        } catch {
+            print("⚠️ [INVITE CODE] Failed to publish invite code index: \(error.localizedDescription)")
+        }
+    }
+
+    /// Resolve an invite code via Firestore (cross-device join by code).
+    func fetchInviteCodeRecord(code: String) async -> [String: Any]? {
+        guard let db = db else { return nil }
+        let normalized = code.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+
+        do {
+            let snap = try await db.collection("sessionInviteCodes").document(normalized).getDocument()
+            guard snap.exists else { return nil }
+            return snap.data()
+        } catch {
+            print("⚠️ [INVITE CODE] Failed to fetch invite code record: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Publish a live session for discovery/join-by-code.
+    func syncLiveSessionPublic(_ session: LiveSession) async {
+        guard let db = db else { return }
+
+        let ref = db.collection("liveSessions").document(session.id.uuidString)
+        let data: [String: Any] = [
+            "id": session.id.uuidString,
+            "title": session.title,
+            "details": session.details,
+            "hostId": session.hostId,
+            "hostName": session.hostName,
+            "hostBio": session.hostBio,
+            "category": session.category,
+            "tags": session.tags,
+            "isPrivate": session.isPrivate,
+            "isActive": session.isActive,
+            "maxParticipants": session.maxParticipants,
+            "currentParticipants": session.currentParticipants,
+            "streamMode": session.streamMode,
+            "durationLimitMinutes": session.durationLimitMinutes,
+            "startTime": Timestamp(date: session.startTime),
+            "scheduledStartTime": session.scheduledStartTime.map { Timestamp(date: $0) } ?? NSNull(),
+            "endTime": session.endTime.map { Timestamp(date: $0) } ?? NSNull(),
+            "createdAt": Timestamp(date: session.createdAt),
+            "lastSyncedAt": Timestamp(date: Date())
+        ]
+
+        do {
+            try await ref.setData(data, merge: true)
+            print("✅ [LIVE SESSION] Synced public live session: \(session.id.uuidString)")
+        } catch {
+            print("⚠️ [LIVE SESSION] Failed to sync public live session: \(error.localizedDescription)")
+        }
+    }
+
+    /// Fetch a live session from the public collection.
+    func fetchLiveSessionPublic(sessionId: UUID) async -> LiveSession? {
+        guard let db = db else { return nil }
+
+        do {
+            let snap = try await db.collection("liveSessions").document(sessionId.uuidString).getDocument()
+            guard let data = snap.data(), snap.exists else { return nil }
+
+            let title = data["title"] as? String ?? ""
+            let details = data["details"] as? String ?? ""
+            let hostId = data["hostId"] as? String ?? ""
+            let category = data["category"] as? String ?? ""
+            let maxParticipants = data["maxParticipants"] as? Int ?? 10
+            let tags = data["tags"] as? [String] ?? []
+
+            let session = LiveSession(title: title, description: details, hostId: hostId, category: category, maxParticipants: maxParticipants, tags: tags)
+            session.id = sessionId
+            session.hostName = data["hostName"] as? String ?? session.hostName
+            session.hostBio = data["hostBio"] as? String ?? session.hostBio
+            session.isPrivate = data["isPrivate"] as? Bool ?? session.isPrivate
+            session.isActive = data["isActive"] as? Bool ?? session.isActive
+            session.currentParticipants = data["currentParticipants"] as? Int ?? session.currentParticipants
+            session.streamMode = data["streamMode"] as? String ?? session.streamMode
+            session.durationLimitMinutes = data["durationLimitMinutes"] as? Int ?? session.durationLimitMinutes
+
+            if let ts = data["startTime"] as? Timestamp { session.startTime = ts.dateValue() }
+            if let ts = data["scheduledStartTime"] as? Timestamp { session.scheduledStartTime = ts.dateValue() }
+            if let ts = data["endTime"] as? Timestamp { session.endTime = ts.dateValue() }
+            if let ts = data["createdAt"] as? Timestamp { session.createdAt = ts.dateValue() }
+
+            return session
+        } catch {
+            print("⚠️ [LIVE SESSION] Failed to fetch public live session: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    #endif
     
     /// Delete a session invitation from Firebase
     func deleteSessionInvitation(_ invitation: SessionInvitation) async {
@@ -1683,6 +1849,12 @@ class FirebaseSyncService: ObservableObject {
         #if canImport(FirebaseFirestore)
         listener?.remove()
         invitationListener?.remove()
+        #endif
+        
+        #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
+        if let handle = authStateListenerHandle {
+            Auth.auth().removeStateDidChangeListener(handle)
+        }
         #endif
     }
 }

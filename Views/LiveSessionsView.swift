@@ -756,6 +756,22 @@ struct LiveSessionCard: View {
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)
+
+                        if session.durationLimitMinutes > 0 {
+                            Text("Time limit: \(session.durationLimitMinutes)m")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        if session.hasWaitingRoom || session.waitingRoomEnabled {
+                            Text("Waiting room")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                        if session.isRecurring {
+                            Text("Recurring")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
                         
                         if session.isActive {
                             HStack(spacing: 4) {
@@ -789,7 +805,7 @@ struct LiveSessionCard: View {
                     
                     Spacer()
                     
-                    Text(session.startTime, style: .relative)
+                    Text((session.scheduledStartTime ?? session.startTime), style: .relative)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -854,9 +870,14 @@ struct CreateLiveSessionView: View {
     @State private var enableReminders = true
     @State private var reminderMinutes: Int = 5
     @State private var addToCalendar = false
+    @State private var durationLimitMinutes: Int = 30
+    @State private var enableWaitingRoom: Bool = false
+    @State private var isRecurring: Bool = false
+    @State private var recurrencePattern: String = "weekly"
     
     let categories = ["Prayer", "Bible Study", "Devotional", "Testimony", "Fellowship", "Other"]
     let predefinedTags = ["Prayer", "Bible Study", "Fellowship", "Worship", "Testimony", "Encouragement", "Healing", "Praise", "Intercession", "Community"]
+    let durationOptions: [Int] = [15, 30, 45, 60, 90, 0]
     
     var body: some View {
         NavigationStack {
@@ -877,9 +898,15 @@ struct CreateLiveSessionView: View {
                         
                         // Settings Cards
                         participantsCard
+
+                        timeLimitCard
                         
                         if scheduledDate != nil || enableReminders {
                             scheduleCard
+                        }
+
+                        if scheduledDate != nil {
+                            recurringSessionCard
                         }
                         
                         if enableReminders {
@@ -1090,6 +1117,92 @@ struct CreateLiveSessionView: View {
             .padding()
             .background(Color(.tertiarySystemBackground))
             .cornerRadius(12)
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    private var timeLimitCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "hourglass")
+                    .foregroundColor(themeManager.colors.primary)
+                    .font(.title3)
+                Text("Session Controls")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            
+            VStack(spacing: 12) {
+                Picker("Time Limit", selection: $durationLimitMinutes) {
+                    ForEach(durationOptions, id: \.self) { option in
+                        Text(option == 0 ? "No limit" : "\(option)m").tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding()
+                .background(Color(.tertiarySystemBackground))
+                .cornerRadius(12)
+                
+                Toggle(isOn: $enableWaitingRoom) {
+                    HStack {
+                        Image(systemName: enableWaitingRoom ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.questionmark")
+                            .foregroundColor(themeManager.colors.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Enable Waiting Room")
+                                .foregroundColor(.primary)
+                            Text("Approve participants before they join")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .tint(themeManager.colors.primary)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    private var recurringSessionCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "repeat")
+                    .foregroundColor(themeManager.colors.primary)
+                    .font(.title3)
+                Text("Recurring")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            
+            VStack(spacing: 12) {
+                Toggle(isOn: $isRecurring) {
+                    HStack {
+                        Image(systemName: isRecurring ? "repeat.circle.fill" : "repeat.circle")
+                            .foregroundColor(themeManager.colors.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Make This Recurring")
+                                .foregroundColor(.primary)
+                            Text(isRecurring ? "Session will repeat automatically" : "Create a one-time session")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .tint(themeManager.colors.primary)
+                
+                if isRecurring {
+                    Picker("Repeat Frequency", selection: $recurrencePattern) {
+                        Text("Weekly").tag("weekly")
+                        Text("Monthly").tag("monthly")
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
         }
         .padding()
         .background(Color(.secondarySystemBackground))
@@ -1352,6 +1465,11 @@ struct CreateLiveSessionView: View {
         )
         session.isPrivate = isPrivate
         session.hostName = userName
+        session.durationLimitMinutes = durationLimitMinutes
+        session.waitingRoomEnabled = enableWaitingRoom
+        session.hasWaitingRoom = enableWaitingRoom
+        session.isRecurring = isRecurring
+        session.recurrencePattern = isRecurring ? recurrencePattern : ""
         if let scheduled = scheduledDate {
             session.scheduledStartTime = scheduled
             session.isActive = false // Scheduled sessions are not active until start time
@@ -1370,6 +1488,13 @@ struct CreateLiveSessionView: View {
         
         do {
             try modelContext.save()
+
+            // Publish to Firebase so invite codes can resolve cross-device.
+            if !session.isPrivate {
+                Task {
+                    await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+                }
+            }
             
             // CloudKitPublicSyncService removed - use Firebase for sync
             if !isPrivate && userService.isAuthenticated {
@@ -1415,6 +1540,7 @@ struct LiveSessionDetailView: View {
     @Query var participants: [LiveSessionParticipant]
     @Query var invitations: [SessionInvitation]
     @Query var userProfiles: [UserProfile]
+    @ObservedObject private var themeManager = ThemeManager.shared
     // Use regular property for singleton, not @StateObject
     private let userService = LocalUserService.shared
     private var userProfile: UserProfile? { userProfiles.first }
@@ -1767,51 +1893,34 @@ struct LiveSessionDetailView: View {
                     }
                     
                     // Action Buttons
-                    VStack(spacing: 12) {
+                    VStack(spacing: 10) {
                         // Host Actions
                         if isHost {
                             // Host Controls Section
                             if hasJoined && session.isActive {
                                 VStack(spacing: 8) {
-                                    HStack(spacing: 12) {
-                                        Button(action: lockSession) {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: session.isLocked ? "lock.fill" : "lock.open.fill")
-                                                Text(session.isLocked ? "Unlock" : "Lock")
-                                            }
-                                            .font(.caption)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(session.isLocked ? Color.red : Color.orange)
-                                            .cornerRadius(8)
-                                        }
+                                    let columns = [GridItem(.flexible()), GridItem(.flexible())]
+                                    LazyVGrid(columns: columns, spacing: 12) {
+                                        hostControlButton(
+                                            title: session.isLocked ? "Unlock" : "Lock",
+                                            systemImage: session.isLocked ? "lock.fill" : "lock.open.fill",
+                                            background: session.isLocked ? Color.red : Color.orange,
+                                            action: lockSession
+                                        )
                                         
-                                        Button(action: { showingAnalytics = true }) {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "chart.bar.fill")
-                                                Text("Analytics")
-                                            }
-                                            .font(.caption)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color.purple)
-                                            .cornerRadius(8)
-                                        }
+                                        hostControlButton(
+                                            title: "Analytics",
+                                            systemImage: "chart.bar.fill",
+                                            background: Color.purple,
+                                            action: { showingAnalytics = true }
+                                        )
                                         
-                                        Button(action: endSessionForAll) {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "stop.circle.fill")
-                                                Text("End All")
-                                            }
-                                            .font(.caption)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(Color.red)
-                                            .cornerRadius(8)
-                                        }
+                                        hostControlButton(
+                                            title: "End All",
+                                            systemImage: "stop.circle.fill",
+                                            background: Color.red,
+                                            action: endSessionForAll
+                                        )
                                     }
                                 }
                             }
@@ -1824,10 +1933,13 @@ struct LiveSessionDetailView: View {
                                             Image(systemName: "video.fill")
                                             Text("Start Live Stream")
                                         }
-                                        .font(.headline)
+                                        .font(.subheadline.weight(.semibold))
                                         .foregroundColor(.white)
                                         .frame(maxWidth: .infinity)
-                                        .padding()
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
+                                        .padding(.vertical, 12)
+                                        .padding(.horizontal, 14)
                                         .background(
                                             LinearGradient(
                                                 gradient: Gradient(colors: [Color.red, Color.orange]),
@@ -1835,7 +1947,7 @@ struct LiveSessionDetailView: View {
                                                 endPoint: .trailing
                                             )
                                         )
-                                        .cornerRadius(12)
+                                        .cornerRadius(10)
                                     }
                                     
                                     // Stream Mode Picker
@@ -1856,24 +1968,28 @@ struct LiveSessionDetailView: View {
                                 .font(.headline)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
-                                .padding()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 14)
                                 .background(Color.blue)
-                                .cornerRadius(12)
+                                .cornerRadius(10)
                             }
                             
-                            if hasJoined {
-                                Button(action: { showingChat = true }) {
-                                    HStack {
-                                        Image(systemName: "message.fill")
-                                        Text("Open Chat")
-                                    }
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.purple)
-                                    .cornerRadius(12)
+                            Button(action: { showingChat = true }) {
+                                HStack {
+                                    Image(systemName: "message.fill")
+                                    Text(hasJoined || isHost ? "Open Chat" : "View Chat")
                                 }
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 14)
+                                .background(Color.purple)
+                                .cornerRadius(10)
                             }
                         } else {
                             // Non-host Actions
@@ -1886,9 +2002,12 @@ struct LiveSessionDetailView: View {
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding()
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 14)
                                     .background(Color.green)
-                                    .cornerRadius(12)
+                                    .cornerRadius(10)
                                 }
                             } else if hasJoined {
                                 // Join Live Stream Button
@@ -1900,7 +2019,10 @@ struct LiveSessionDetailView: View {
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding()
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 14)
                                     .background(
                                         LinearGradient(
                                             gradient: Gradient(colors: [Color.blue, Color.purple]),
@@ -1908,7 +2030,7 @@ struct LiveSessionDetailView: View {
                                             endPoint: .trailing
                                         )
                                     )
-                                    .cornerRadius(12)
+                                    .cornerRadius(10)
                                 }
                                 
                                 Button(action: { showingChat = true }) {
@@ -1919,9 +2041,12 @@ struct LiveSessionDetailView: View {
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding()
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 14)
                                     .background(Color.purple)
-                                    .cornerRadius(12)
+                                    .cornerRadius(10)
                                 }
                             }
                         }
@@ -1936,9 +2061,12 @@ struct LiveSessionDetailView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.purple)
                                 .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.purple.opacity(0.1))
-                                .cornerRadius(12)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                                .padding(.vertical, 10)
+                                .padding(.horizontal, 14)
+                                .background(themeManager.colors.primary.opacity(0.1))
+                                .cornerRadius(10)
                             }
                             
                             HStack(spacing: 12) {
@@ -2168,7 +2296,7 @@ struct LiveSessionDetailView: View {
                 Text("Archive this session? Archived sessions will be moved to the Archived section and hidden from your main session list. You can unarchive it later if needed.")
             }
             .sheet(isPresented: $showingChat) {
-                LiveSessionChatView(session: session)
+                LiveSessionChatView(session: session, canSend: hasJoined || isHost)
             }
             .sheet(isPresented: $showingShareSheet) {
                 ActivityView(activityItems: [shareText])
@@ -2216,6 +2344,10 @@ struct LiveSessionDetailView: View {
                 if isHost && primaryInviteCode == nil {
                     generateInviteCodeIfNeeded()
                 }
+            }
+            .onChange(of: participants.count) { _, _ in
+                // Keep join state in sync once SwiftData @Query loads/updates
+                checkJoinStatus()
             }
         }
     }
@@ -2266,6 +2398,26 @@ struct LiveSessionDetailView: View {
             participant.leftAt = Date()
         }
         try? modelContext.save()
+    }
+
+    private func hostControlButton(
+        title: String,
+        systemImage: String,
+        background: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                Text(title)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(background)
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
     }
     
     private func archiveSession() {
@@ -2342,24 +2494,51 @@ struct LiveSessionDetailView: View {
     }
     
     private func startLiveStream() {
+        // Ensure the session is marked live, and start time is anchored for countdowns/time limits.
+        // Without this, scheduled sessions (isActive=false) never show a running countdown.
+        if !session.isActive {
+            session.isActive = true
+            session.startTime = Date()
+            session.endTime = nil
+        }
+
+        // Persist the selected mode on the session so non-hosts can join consistently.
         switch streamMode {
         case .broadcast:
-            showingBroadcastStream = true
+            session.streamMode = "broadcast"
         case .conference:
-            showingLiveStream = true
+            session.streamMode = "conference"
         case .multiParticipant:
-            showingMultiParticipantStream = true
+            session.streamMode = "multiParticipant"
         }
+        try? modelContext.save()
+
+        // Publish updated session state to Firebase (start time + active flag).
+        if !session.isPrivate {
+            Task {
+                await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+            }
+        }
+
+        // Use the multi-participant stream view as the unified experience.
+        showingMultiParticipantStream = true
     }
     
     private func joinLiveStream() {
-        // For non-hosts, join as viewer/participant
-        // Try to determine stream mode from session or default to conference
-        if session.currentParticipants > 1 {
-            showingMultiParticipantStream = true
-        } else {
-            showingLiveStream = true
+        // For non-hosts, join using the stream mode stored by the host.
+        switch session.streamMode {
+        case "broadcast":
+            streamMode = .broadcast
+        case "conference":
+            streamMode = .conference
+        case "multiParticipant":
+            streamMode = .multiParticipant
+        default:
+            // Backward compatibility for older sessions
+            streamMode = .conference
         }
+
+        showingMultiParticipantStream = true
     }
     
     private func checkJoinStatus() {
@@ -2993,6 +3172,7 @@ struct RecordingPlayerView: View {
 @available(iOS 17.0, *)
 struct LiveSessionChatView: View {
     let session: LiveSession
+    let canSend: Bool
     @Query var messages: [ChatMessage]
     @Query var userProfiles: [UserProfile]
     @Environment(\.dismiss) private var dismiss
@@ -3034,6 +3214,14 @@ struct LiveSessionChatView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
+                if !canSend {
+                    Text("Join the session to send messages.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color(.systemGray6))
+                }
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
                         ForEach(sessionMessages) { message in
@@ -3094,6 +3282,7 @@ struct LiveSessionChatView: View {
                     HStack(spacing: 12) {
                         TextField("Type a message...", text: $messageText)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .disabled(!canSend)
                             .onSubmit {
                                 if !messageText.isEmpty {
                                     sendMessage()
@@ -3111,7 +3300,7 @@ struct LiveSessionChatView: View {
                                 .font(.title2)
                                 .foregroundColor(.purple)
                         }
-                        .disabled(messageText.isEmpty)
+                        .disabled(!canSend || messageText.isEmpty)
                     }
                     .padding()
                 }
@@ -3455,9 +3644,47 @@ struct BibleVerseChatPicker: View {
     let onSelect: (String, String) -> Void
     
     let popularVerses = [
-        ("John 3:16", "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life."),
-        ("Philippians 4:13", "I can do all this through him who gives me strength."),
-        ("Jeremiah 29:11", "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.")
+        // Salvation / Gospel
+        ("John 3:16", "For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life."),
+        ("Romans 10:9", "That if thou shalt confess with thy mouth the Lord Jesus, and shalt believe in thine heart that God hath raised him from the dead, thou shalt be saved."),
+        ("Ephesians 2:8-9", "For by grace are ye saved through faith; and that not of yourselves: it is the gift of God: Not of works, lest any man should boast."),
+        ("Acts 16:31", "Believe on the Lord Jesus Christ, and thou shalt be saved, and thy house."),
+        
+        // Strength / Courage
+        ("Philippians 4:13", "I can do all things through Christ which strengtheneth me."),
+        ("Isaiah 41:10", "Fear thou not; for I am with thee: be not dismayed; for I am thy God: I will strengthen thee; yea, I will help thee; yea, I will uphold thee with the right hand of my righteousness."),
+        ("Joshua 1:9", "Have not I commanded thee? Be strong and of a good courage; be not afraid, neither be thou dismayed: for the Lord thy God is with thee whithersoever thou goest."),
+        ("2 Timothy 1:7", "For God hath not given us the spirit of fear; but of power, and of love, and of a sound mind."),
+        
+        // Peace / Anxiety
+        ("John 14:27", "Peace I leave with you, my peace I give unto you: not as the world giveth, give I unto you. Let not your heart be troubled, neither let it be afraid."),
+        ("Philippians 4:6-7", "Be careful for nothing; but in every thing by prayer and supplication with thanksgiving let your requests be made known unto God. And the peace of God, which passeth all understanding, shall keep your hearts and minds through Christ Jesus."),
+        ("Psalm 46:1", "God is our refuge and strength, a very present help in trouble."),
+        
+        // Guidance / Hope
+        ("Jeremiah 29:11", "For I know the thoughts that I think toward you, saith the Lord, thoughts of peace, and not of evil, to give you an expected end."),
+        ("Proverbs 3:5-6", "Trust in the Lord with all thine heart; and lean not unto thine own understanding. In all thy ways acknowledge him, and he shall direct thy paths."),
+        ("Romans 8:28", "And we know that all things work together for good to them that love God, to them who are the called according to his purpose."),
+        ("Psalm 23:1", "The Lord is my shepherd; I shall not want."),
+        
+        // Love / Character
+        ("1 Corinthians 13:4", "Charity suffereth long, and is kind; charity envieth not; charity vaunteth not itself, is not puffed up."),
+        ("John 13:34", "A new commandment I give unto you, That ye love one another; as I have loved you, that ye also love one another."),
+        ("Micah 6:8", "He hath shewed thee, O man, what is good; and what doth the Lord require of thee, but to do justly, and to love mercy, and to walk humbly with thy God?"),
+        
+        // Prayer / Faith
+        ("Psalm 34:17", "The righteous cry, and the Lord heareth, and delivereth them out of all their troubles."),
+        ("Mark 11:24", "Therefore I say unto you, What things soever ye desire, when ye pray, believe that ye receive them, and ye shall have them."),
+        ("Hebrews 11:1", "Now faith is the substance of things hoped for, the evidence of things not seen."),
+        
+        // Comfort / Hard times
+        ("Matthew 11:28", "Come unto me, all ye that labour and are heavy laden, and I will give you rest."),
+        ("Psalm 34:18", "The Lord is nigh unto them that are of a broken heart; and saveth such as be of a contrite spirit."),
+        ("2 Corinthians 5:7", "For we walk by faith, not by sight."),
+        
+        // Worship / Gratitude
+        ("Psalm 100:4", "Enter into his gates with thanksgiving, and into his courts with praise: be thankful unto him, and bless his name."),
+        ("1 Thessalonians 5:16-18", "Rejoice evermore. Pray without ceasing. In every thing give thanks: for this is the will of God in Christ Jesus concerning you.")
     ]
     
     var body: some View {

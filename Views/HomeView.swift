@@ -200,7 +200,9 @@ struct HomeView: View {
                     devotionalManager.loadDevotionals()
                 }
                 // Load profile from Firebase (if not already loaded)
-                profileManager.loadProfile()
+                Task {
+                    await profileManager.loadProfile()
+                }
                 // Load avatar image
                 loadAvatarImage()
             }

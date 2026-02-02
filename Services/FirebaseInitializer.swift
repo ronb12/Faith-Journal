@@ -24,6 +24,7 @@ class FirebaseInitializer {
     static let shared = FirebaseInitializer()
     
     private var isInitialized = false
+    private var didConfigureFirestoreSettings = false
     
     private init() {}
     
@@ -34,7 +35,8 @@ class FirebaseInitializer {
         
         #if canImport(FirebaseCore)
         print("✅ [FIREBASE] FirebaseCore can be imported")
-        initializeFirebaseIfAvailable()
+        configureFirebaseCoreIfNeeded()
+        configureFirestoreIfAvailable()
         #else
         print("❌ [FIREBASE] FirebaseCore CANNOT be imported")
         print("❌ [FIREBASE] Firebase packages are not properly linked in Xcode")
@@ -51,26 +53,14 @@ class FirebaseInitializer {
         #endif
     }
     
-    /// Initialize Firebase if Firestore is available, otherwise handle unavailability
-    private func initializeFirebaseIfAvailable() {
-        #if canImport(FirebaseFirestore)
-        initializeFirebaseWithFirestore()
-        #else
-        handleFirestoreUnavailable()
-        #endif
-    }
-    
-    #if canImport(FirebaseFirestore)
-    /// Initialize Firebase when Firestore is available
-    private func initializeFirebaseWithFirestore() {
-        // FirebaseFirestore is available - proceed with initialization
-        print("✅ [FIREBASE] FirebaseFirestore can be imported")
-        
-        #if canImport(FirebaseAuth)
-        print("✅ [FIREBASE] FirebaseAuth can be imported")
-        #else
-        print("⚠️ [FIREBASE] FirebaseAuth cannot be imported (Sign in with Apple may not work)")
-        #endif
+    #if canImport(FirebaseCore)
+    /// Configure FirebaseCore early (no Firestore/Auth required for configure()).
+    private func configureFirebaseCoreIfNeeded() {
+        if FirebaseApp.app() != nil {
+            isInitialized = true
+            print("ℹ️ [FIREBASE] FirebaseApp already configured")
+            return
+        }
         
         guard !isInitialized else {
             print("ℹ️ [FIREBASE] Already initialized")
@@ -81,25 +71,15 @@ class FirebaseInitializer {
         guard let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
               FileManager.default.fileExists(atPath: path) else {
             print("❌ [FIREBASE] GoogleService-Info.plist not found in app bundle")
-            print("❌ [FIREBASE] This is REQUIRED for Firebase Auth (Sign in with Apple)")
-            print("❌ [FIREBASE] Please download from Firebase Console:")
-            print("   1. Go to https://console.firebase.google.com/")
-            print("   2. Select project: faith-journal-d2a32")
-            print("   3. Click ⚙️ → Project settings")
-            print("   4. Scroll to 'Your apps' → iOS app")
-            print("   5. Download GoogleService-Info.plist")
-            print("   6. Add to Xcode project (ensure target membership is checked)")
-            print("❌ [FIREBASE] Firebase sync and Sign in with Apple will not work without this file")
+            print("❌ [FIREBASE] Firebase must be configured before any Auth usage")
             return
         }
         
         print("✅ [FIREBASE] GoogleService-Info.plist found at: \(path)")
         
-        // Configure Firebase App (FirebaseCore already checked at line 35)
         FirebaseApp.configure()
         isInitialized = true
         
-        // Log Firebase App configuration details
         if let app = FirebaseApp.app() {
             print("✅ [FIREBASE] Firebase App configured")
             print("✅ [FIREBASE] App name: \(app.name)")
@@ -107,36 +87,43 @@ class FirebaseInitializer {
         } else {
             print("❌ [FIREBASE] Firebase App configuration failed")
         }
+    }
+    #endif
+
+    /// Configure Firestore settings if available (after FirebaseApp.configure()).
+    private func configureFirestoreIfAvailable() {
+        #if canImport(FirebaseFirestore)
+        guard FirebaseApp.app() != nil else {
+            print("⚠️ [FIREBASE] Skipping Firestore setup — FirebaseApp not configured yet")
+            return
+        }
+
+        // Firestore settings can only be set once, before Firestore is used.
+        // This initializer can be called multiple times (e.g., app init + login screen),
+        // so make it idempotent to avoid a fatal Firestore illegal state crash.
+        guard !didConfigureFirestoreSettings else {
+            return
+        }
         
-        // Configure Firestore settings
         let db = Firestore.firestore()
         let settings = FirestoreSettings()
         // Use new cacheSettings API (replaces deprecated isPersistenceEnabled and cacheSizeBytes)
         settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: FirestoreCacheSizeUnlimited))
         db.settings = settings
         print("✅ [FIREBASE] Firestore persistence enabled")
+        didConfigureFirestoreSettings = true
         
-        // Verify Firebase Auth is available
         #if canImport(FirebaseAuth)
-        let auth = Auth.auth()
+        _ = Auth.auth()
         print("✅ [FIREBASE] Firebase Auth available")
-        if let currentUser = auth.currentUser {
-            print("ℹ️ [FIREBASE] Current user: \(currentUser.uid)")
-        } else {
-            print("ℹ️ [FIREBASE] No current user signed in")
-        }
         #endif
-        
-        print("✅ [FIREBASE] Firebase initialized successfully")
+        #else
+        print("⚠️ [FIREBASE] FirebaseFirestore cannot be imported (sync will be disabled)")
+        #endif
     }
-    #endif
     
-    /// Handle case when FirebaseFirestore is not available
-    private func handleFirestoreUnavailable() {
-        // FirebaseFirestore is NOT available
-        print("❌ [FIREBASE] FirebaseFirestore CANNOT be imported")
-        print("❌ [FIREBASE] Add FirebaseFirestore package to Xcode project")
-    }
+    // NOTE: Previous Firestore-gated initialization was removed.
+    // FirebaseCore must be configured regardless of Firestore availability, otherwise Auth can crash.
     
     /// Check if Firebase is properly configured
     var isConfigured: Bool {

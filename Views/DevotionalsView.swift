@@ -208,8 +208,12 @@ private struct DevotionalsContentView: View {
                     .font(.body.weight(.bold))
                     .foregroundColor(.primary)
                 Spacer()
-                if !manager.isLoading {
-                    Text("\(manager.filteredDevotionals().count) devotionals")
+                if manager.isLoading {
+                    Text("Loading...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("\(manager.devotionals.count) devotionals")
                         .font(.caption)
                         .foregroundColor(.primary)
                 }
@@ -418,7 +422,17 @@ struct DevotionalDetailView: View {
                         .foregroundColor((currentDevotional?.isCompleted ?? devotional.isCompleted) ? .green : .blue)
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    // Show save button when devotional is marked as read
+                    if (currentDevotional?.isCompleted ?? devotional.isCompleted) {
+                        Button(action: {
+                            manager.toggleFavorite(devotional)
+                        }) {
+                            let isFavorite = currentDevotional?.isFavorite ?? devotional.isFavorite
+                            Image(systemName: isFavorite ? "bookmark.fill" : "bookmark")
+                                .foregroundColor(isFavorite ? .purple : .blue)
+                        }
+                    }
                     Button("Done") {
                         dismiss()
                     }

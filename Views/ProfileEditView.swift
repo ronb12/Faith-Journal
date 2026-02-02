@@ -141,14 +141,15 @@ struct ProfileEditView: View {
     // MARK: - Functions
     
     private func loadProfile() {
-        profileManager.loadProfile()
-        
-        // Update local state from ProfileManager
-        userName = profileManager.userName
-        
-        // Load profile image if URL exists
-        if let urlString = profileManager.profileImageURL {
-            Task {
+        Task {
+            await profileManager.loadProfile()
+
+            await MainActor.run {
+                userName = profileManager.userName
+            }
+
+            let urlString = await MainActor.run { profileManager.profileImageURL }
+            if let urlString {
                 do {
                     if let image = try await profileManager.loadProfileImage(from: urlString) {
                         await MainActor.run {
