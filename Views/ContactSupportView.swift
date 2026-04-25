@@ -6,9 +6,13 @@
 //
 
 import SwiftUI
+#if os(iOS)
 import MessageUI
+#elseif os(macOS)
+import AppKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct ContactSupportView: View {
     @Environment(\.dismiss) var dismiss
     @State private var issueTitle: String = ""
@@ -24,7 +28,9 @@ struct ContactSupportView: View {
             Form {
                 Section(header: Text("Issue Details")) {
                     TextField("Issue Title", text: $issueTitle)
+                        #if os(iOS)
                         .textInputAutocapitalization(.words)
+                        #endif
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Description")
@@ -66,6 +72,7 @@ struct ContactSupportView: View {
                 }
             }
             .navigationTitle("Contact Support")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -74,6 +81,15 @@ struct ContactSupportView: View {
                     }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            #endif
             .onAppear {
                 loadDeviceInfo()
             }
@@ -84,6 +100,7 @@ struct ContactSupportView: View {
             } message: {
                 Text("Your email has been sent successfully. We'll get back to you as soon as possible!")
             }
+            #if os(iOS)
             .sheet(isPresented: $showingEmailComposer) {
                 if MFMailComposeViewController.canSendMail() {
                     SupportEmailComposerView(
@@ -95,7 +112,6 @@ struct ContactSupportView: View {
                         }
                     )
                 } else {
-                    // Fallback to mailto: link if Mail app is not configured
                     VStack(spacing: 20) {
                         Text("Mail Not Configured")
                             .font(.headline)
@@ -111,6 +127,7 @@ struct ContactSupportView: View {
                     .padding()
                 }
             }
+            #endif
             .alert("Error", isPresented: $showingError) {
                 Button("OK") { }
             } message: {
@@ -120,41 +137,54 @@ struct ContactSupportView: View {
     }
     
     private func loadDeviceInfo() {
-        let device = UIDevice.current
-        let systemVersion = device.systemVersion
-        let model = device.model
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
         let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
-        
+        #if os(iOS)
+        let device = UIDevice.current
         deviceInfo = """
-        Device: \(model)
-        iOS Version: \(systemVersion)
+        Device: \(device.model)
+        iOS Version: \(device.systemVersion)
         App Version: \(appVersion) (\(buildNumber))
         """
+        #elseif os(macOS)
+        let systemVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        deviceInfo = """
+        Device: Mac
+        macOS Version: \(systemVersion)
+        App Version: \(appVersion) (\(buildNumber))
+        """
+        #endif
     }
     
     private func sendEmail() {
+        #if os(iOS)
         if MFMailComposeViewController.canSendMail() {
             showingEmailComposer = true
-        } else {
-            // Fallback to mailto: link
-            let subject = issueTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            let body = createEmailBody().addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            let mailtoURL = "mailto:ronellbradley@gmail.com?subject=\(subject)&body=\(body)"
-            
-            if let url = URL(string: mailtoURL) {
-                UIApplication.shared.open(url) { success in
-                    if success {
-                        showingSuccess = true
-                    } else {
-                        errorMessage = "Could not open Mail app. Please configure Mail in Settings."
-                        showingError = true
-                    }
+            return
+        }
+        #endif
+        // Use mailto: link (works on both iOS and macOS)
+        let subject = issueTitle.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let body = createEmailBody().addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let mailtoURL = "mailto:ronellbradley@gmail.com?subject=\(subject)&body=\(body)"
+        
+        if let url = URL(string: mailtoURL) {
+            #if os(iOS)
+            UIApplication.shared.open(url) { success in
+                if success {
+                    showingSuccess = true
+                } else {
+                    errorMessage = "Could not open Mail app. Please configure Mail in Settings."
+                    showingError = true
                 }
-            } else {
-                errorMessage = "Could not create email. Please try again."
-                showingError = true
             }
+            #elseif os(macOS)
+            NSWorkspace.shared.open(url)
+            showingSuccess = true
+            #endif
+        } else {
+            errorMessage = "Could not create email. Please try again."
+            showingError = true
         }
     }
     
@@ -175,7 +205,8 @@ struct ContactSupportView: View {
     }
 }
 
-// Email Composer for Contact Support
+// Email Composer for Contact Support (iOS only)
+#if os(iOS)
 struct SupportEmailComposerView: UIViewControllerRepresentable {
     let recipient: String
     let subject: String
@@ -222,8 +253,9 @@ struct SupportEmailComposerView: UIViewControllerRepresentable {
         }
     }
 }
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 #Preview {
     ContactSupportView()
 }

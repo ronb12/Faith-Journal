@@ -121,6 +121,8 @@ struct StatisticsView_Enhanced: View {
                             case .mood:
                                 MoodTab(
                                     moods: filteredMoods,
+                                    allMoods: allMoods,
+                                    statsTimeframe: convertTimeframe(selectedTimeframe),
                                     statsService: statsService,
                                     themeManager: themeManager
                                 )
@@ -146,7 +148,7 @@ struct StatisticsView_Enhanced: View {
                 }
                 .navigationTitle("Statistics")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         Menu {
                             Button(action: { showingInsights = true }) {
                                 Label("Insights", systemImage: "lightbulb.fill")
@@ -162,6 +164,9 @@ struct StatisticsView_Enhanced: View {
                             }
                             Button(action: { showingExport = true }) {
                                 Label("Export Report", systemImage: "square.and.arrow.up")
+                            }
+                            Button(action: { showingMoodAnalytics = true }) {
+                                Label("Full Mood Report", systemImage: "chart.bar.fill")
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -540,7 +545,7 @@ struct PrayerTab: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(.systemGray6))
+                                .fill(Color.platformSystemGray6)
                         )
                         .padding(.horizontal)
                     }
@@ -554,20 +559,51 @@ struct PrayerTab: View {
 
 struct MoodTab: View {
     let moods: [MoodEntry]
+    let allMoods: [MoodEntry]
+    /// Must match the Statistics screen’s timeframe so charts and the consistency card match the range picker.
+    let statsTimeframe: StatisticsService.Timeframe
     let statsService: StatisticsService
     let themeManager: ThemeManager
+
+    /// Lowercase, for use inside sentences (empty states).
+    private var statsTimeframeSubtitle: String {
+        switch statsTimeframe {
+        case .week: return "this week"
+        case .month: return "this month"
+        case .year: return "this year"
+        case .all: return "all time"
+        case .custom: return "this range"
+        }
+    }
+
+    /// Aligned with the Statistics range picker: “This Week”, “This Month”, etc.
+    private var statsTimeframeForCard: String {
+        switch statsTimeframe {
+        case .week: return "This week"
+        case .month: return "This month"
+        case .year: return "This year"
+        case .all: return "All time"
+        case .custom: return "Selected range"
+        }
+    }
     
     var body: some View {
         VStack(spacing: 24) {
-            if moods.isEmpty {
+            if allMoods.isEmpty {
                 EmptyStateView(
                     icon: "face.smiling",
-                    title: "No Mood Data",
-                    message: "Start tracking your mood to see statistics"
+                    title: "No mood data yet",
+                    message: "Log a mood check-in from Home or the Mood check-in to see statistics here"
+                )
+            } else if moods.isEmpty {
+                EmptyStateView(
+                    icon: "calendar.badge.clock",
+                    title: "No check-ins in this period",
+                    message: "You have mood history, but nothing logged for \(statsTimeframeSubtitle). Try “All Time” in the range picker above, or add new check-ins."
                 )
             } else {
                 let avgMood = Double(moods.reduce(0) { $0 + $1.intensity }) / Double(moods.count)
-                let consistency = statsService.getMoodConsistency(entries: moods, timeframe: .month)
+                let consistency = statsService.getMoodConsistency(entries: moods, timeframe: statsTimeframe)
                 
                 HStack(spacing: 16) {
                     StatCard(
@@ -582,13 +618,13 @@ struct MoodTab: View {
                         value: "\(Int(consistency))%",
                         icon: "chart.line.uptrend.xyaxis",
                         color: .cyan,
-                        subtitle: "This month"
+                        subtitle: statsTimeframeForCard
                     )
                 }
                 .padding(.horizontal)
                 
                 // Mood Trend Chart
-                let moodTrend = statsService.getMoodTrend(entries: moods, timeframe: .month)
+                let moodTrend = statsService.getMoodTrend(entries: moods, timeframe: statsTimeframe)
                 if !moodTrend.isEmpty {
                     MoodTrendChart(moodTrend: moodTrend, themeManager: themeManager)
                 }
@@ -719,7 +755,7 @@ struct BibleTab: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(.systemGray6))
+                                .fill(Color.platformSystemGray6)
                         )
                         .padding(.horizontal)
                     }
@@ -761,7 +797,7 @@ struct EngagementScoreCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
         )
     }
@@ -819,7 +855,7 @@ struct EnhancedStatCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         )
     }
@@ -857,7 +893,7 @@ struct StatCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
         )
     }
@@ -887,7 +923,7 @@ struct PatternInfoCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         )
     }
@@ -917,7 +953,7 @@ struct InsightCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         )
     }
@@ -1003,7 +1039,7 @@ struct EntriesOverTimeChart: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
             .padding(.horizontal)
@@ -1040,7 +1076,7 @@ struct DayOfWeekChart: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
             .padding(.horizontal)
@@ -1100,7 +1136,7 @@ struct EntryLengthChart: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
             .padding(.horizontal)
@@ -1145,7 +1181,7 @@ struct PrayerStatusChart: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
             .padding(.horizontal)
@@ -1201,7 +1237,7 @@ struct MoodTrendChart: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
             .padding(.horizontal)

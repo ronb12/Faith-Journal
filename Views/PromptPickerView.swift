@@ -38,7 +38,7 @@ struct PromptPickerView: View {
                     TextField("Search prompts...", text: $searchText)
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(10)
                 .padding()
                 
@@ -63,9 +63,11 @@ struct PromptPickerView: View {
                 }
             }
             .navigationTitle("Journal Prompts")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -120,7 +122,9 @@ struct PromptsListView: View {
             }
         }
         .navigationTitle(category.rawValue)
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
     }
 }
 

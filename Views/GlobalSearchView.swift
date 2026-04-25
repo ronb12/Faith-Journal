@@ -7,6 +7,39 @@
 
 import SwiftUI
 import SwiftData
+#if canImport(UIKit) && !os(visionOS)
+import UIKit
+#endif
+
+// MARK: - Bible reference (opens Bible tab with `AppNavigation.bibleTarget`)
+enum BibleReferenceNavigationParser {
+    /// Minimal parse for search rows (aligned with `ReadingPlansView.parseReference`–style strings).
+    static func parse(_ reference: String) -> (String, Int, Int?, Int?)? {
+        let parts = reference.split(separator: " ")
+        guard parts.count >= 2, let lastPart = parts.last else { return nil }
+        let book = parts.dropLast().joined(separator: " ")
+        let chapVerse = String(lastPart).trimmingCharacters(in: .whitespacesAndNewlines)
+        if chapVerse.contains(":") {
+            let cv = chapVerse.split(separator: ":")
+            guard cv.count >= 2,
+                  let chapter = Int(cv[0].trimmingCharacters(in: .whitespaces)),
+                  let verse = Int(cv[1].trimmingCharacters(in: .whitespaces)) else { return nil }
+            return (book, chapter, nil, verse)
+        }
+        if chapVerse.contains("-") || chapVerse.contains("–") {
+            let separator: Character = chapVerse.contains("-") ? "-" : "–"
+            let rangeParts = chapVerse.split(separator: separator)
+            guard rangeParts.count == 2,
+                  let startChapter = Int(rangeParts[0].trimmingCharacters(in: .whitespaces)),
+                  let endChapter = Int(rangeParts[1].trimmingCharacters(in: .whitespaces)) else { return nil }
+            return (book, startChapter, endChapter, nil)
+        }
+        if let chapter = Int(chapVerse.trimmingCharacters(in: .whitespaces)) {
+            return (book, chapter, nil, nil)
+        }
+        return nil
+    }
+}
 
 struct GlobalSearchView: View {
     @Environment(\.dismiss) private var dismiss
@@ -17,7 +50,8 @@ struct GlobalSearchView: View {
         case all = "All"
         case journal = "Journal"
         case prayers = "Prayers"
-        case verses = "Verses"
+        case verses = "Bookmarked"
+        case mood = "Mood"
     }
 
     var body: some View {
@@ -32,26 +66,29 @@ struct GlobalSearchView: View {
 @available(iOS 17.0, *)
 struct GlobalSearchView17: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var nav: AppNavigation
     @Environment(\.modelContext) private var modelContext
     @Query(sort: [SortDescriptor(\JournalEntry.createdAt, order: .reverse)]) private var allJournalEntries: [JournalEntry]
     @Query(sort: [SortDescriptor(\PrayerRequest.createdAt, order: .reverse)]) private var allPrayerRequests: [PrayerRequest]
     @Query(sort: [SortDescriptor(\BookmarkedVerse.createdAt, order: .reverse)]) private var allBookmarkedVerses: [BookmarkedVerse]
+    @Query(sort: [SortDescriptor(\MoodEntry.date, order: .reverse)]) private var allMoodEntries: [MoodEntry]
     @ObservedObject var bibleService: BibleService
     @State private var searchText = ""
     @State private var selectedCategory: GlobalSearchView.SearchCategory = .all
     
     // Detect if running on iPad
     private var isIPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
+        PlatformDevice.isPadOrMac
     }
 
     struct SearchResults {
         let journalEntries: [JournalEntry]
         let prayerRequests: [PrayerRequest]
         let verses: [BookmarkedVerse]
+        let moodEntries: [MoodEntry]
 
         var isEmpty: Bool {
-            journalEntries.isEmpty && prayerRequests.isEmpty && verses.isEmpty
+            journalEntries.isEmpty && prayerRequests.isEmpty && verses.isEmpty && moodEntries.isEmpty
         }
     }
 
@@ -87,7 +124,7 @@ struct GlobalSearchView17: View {
                    prayer.tags.contains { $0.localizedCaseInsensitiveContains(trimmedSearchText) }
         }
         
-        // Filter verses
+        // Filter verses (bookmarked)
         let verses = allBookmarkedVerses.filter { verse in
             // Check if category matches
             guard selectedCategory == .all || selectedCategory == .verses else { return false }
@@ -100,7 +137,19 @@ struct GlobalSearchView17: View {
                    verse.verseText.localizedCaseInsensitiveContains(trimmedSearchText)
         }
         
-        return SearchResults(journalEntries: journalEntries, prayerRequests: prayerRequests, verses: verses)
+        let moodEntries = allMoodEntries.filter { entry in
+            guard selectedCategory == .all || selectedCategory == .mood else { return false }
+            guard !isSearchEmpty else { return false }
+            let inNotes = (entry.notes ?? "").localizedCaseInsensitiveContains(trimmedSearchText)
+            let inMood = entry.mood.localizedCaseInsensitiveContains(trimmedSearchText)
+            let inEmoji = entry.emoji.localizedCaseInsensitiveContains(trimmedSearchText)
+            let inCategory = entry.moodCategory.localizedCaseInsensitiveContains(trimmedSearchText)
+            let inTags = entry.tags.contains { $0.localizedCaseInsensitiveContains(trimmedSearchText) }
+            let inActivities = entry.activities.contains { $0.localizedCaseInsensitiveContains(trimmedSearchText) }
+            return inMood || inNotes || inEmoji || inCategory || inTags || inActivities
+        }
+        
+        return SearchResults(journalEntries: journalEntries, prayerRequests: prayerRequests, verses: verses, moodEntries: moodEntries)
     }
 
     var body: some View {
@@ -117,10 +166,12 @@ struct GlobalSearchView17: View {
                 }
             }
             .navigationTitle("Search")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(isIPad ? .large : .inline)
-            .searchable(text: $searchText, prompt: "Search journal, prayers, verses...")
+            #endif
+            .searchable(text: $searchText, prompt: "Search journal, prayers, bookmarked verses, mood…")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }
@@ -130,7 +181,7 @@ struct GlobalSearchView17: View {
     }
 
     var categoryFilter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 ForEach(GlobalSearchView.SearchCategory.allCases, id: \.self) { category in
                     Button(action: {
@@ -144,7 +195,7 @@ struct GlobalSearchView17: View {
                             .padding(.vertical, 8)
                             .background(
                                 RoundedRectangle(cornerRadius: 20)
-                                    .fill(selectedCategory == category ? Color.purple : Color(.systemGray5))
+                                    .fill(selectedCategory == category ? Color.purple : Color.platformSystemGray5)
                             )
                     }
                 }
@@ -152,7 +203,7 @@ struct GlobalSearchView17: View {
             .padding(.horizontal, isIPad ? 40 : 16)
         }
         .padding(.vertical, 8)
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
     }
 
     var emptyStateView: some View {
@@ -160,10 +211,10 @@ struct GlobalSearchView17: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 60))
                 .foregroundColor(.primary)
-            Text("Search across all your content")
+            Text("Search across your content")
                 .font(.headline)
                 .foregroundColor(.primary)
-            Text("Journal entries, prayers, verses, and more")
+            Text("Journal, prayers, bookmarked Bible verses, mood check-ins, and more")
                 .font(.subheadline)
                 .foregroundColor(.primary)
         }
@@ -188,10 +239,12 @@ struct GlobalSearchView17: View {
     var resultsContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if !searchResults.journalEntries.isEmpty || !searchResults.prayerRequests.isEmpty || !searchResults.verses.isEmpty {
+                if !searchResults.journalEntries.isEmpty || !searchResults.prayerRequests.isEmpty || !searchResults.verses.isEmpty
+                    || !searchResults.moodEntries.isEmpty {
                     journalEntriesSection
                     prayerRequestsSection
                     versesSection
+                    moodEntriesSection
                 } else {
                     noResultsView
                 }
@@ -263,7 +316,7 @@ struct GlobalSearchView17: View {
     var versesSection: some View {
         if !searchResults.verses.isEmpty {
             SearchSection(
-                title: "Verses (\(searchResults.verses.count))",
+                title: "Bookmarked Verses (\(searchResults.verses.count))",
                 icon: "book.closed.fill",
                 color: .purple
             ) {
@@ -276,22 +329,71 @@ struct GlobalSearchView17: View {
 
     @ViewBuilder
     func verseRow(verse: BookmarkedVerse) -> some View {
-        SearchResultRow(
-            title: verse.verseReference,
-            subtitle: verse.verseText,
-            date: verse.createdAt
-        )
+        Button {
+            if let p = BibleReferenceNavigationParser.parse(verse.verseReference) {
+                let (book, ch, endCh, v) = p
+                #if canImport(UIKit) && !os(visionOS)
+                let haptic = UIImpactFeedbackGenerator(style: .light)
+                haptic.prepare()
+                haptic.impactOccurred()
+                #endif
+                nav.bibleTarget = BibleTarget(book: book, chapter: ch, verse: v, endChapter: endCh)
+                nav.selectedTab = 4
+                FaithJournalLog.search.info("Open Bible from search: \(verse.verseReference)")
+                dismiss()
+            }
+        } label: {
+            SearchResultRow(
+                title: verse.verseReference,
+                subtitle: verse.verseText,
+                date: verse.createdAt
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    var moodEntriesSection: some View {
+        if !searchResults.moodEntries.isEmpty {
+            SearchSection(
+                title: "Mood (\(searchResults.moodEntries.count))",
+                icon: "face.smiling",
+                color: .pink
+            ) {
+                ForEach(searchResults.moodEntries, id: \.id) { entry in
+                    NavigationLink {
+                        MoodEntrySearchDetailView(entry: entry)
+                    } label: {
+                        SearchResultRow(
+                            title: "\(entry.emoji) \(entry.mood)",
+                            subtitle: moodSearchSubtitle(entry),
+                            date: entry.date
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func moodSearchSubtitle(_ entry: MoodEntry) -> String {
+        if let n = entry.notes, !n.isEmpty { return truncateText(n, maxLength: 100) }
+        return "Intensity \(entry.intensity)/10"
     }
 }
 
 @available(iOS 17.0, *)
-struct SearchResults {
-    let journalEntries: [JournalEntry]
-    let prayerRequests: [PrayerRequest]
-    let verses: [BookmarkedVerse]
-    
-    var isEmpty: Bool {
-        journalEntries.isEmpty && prayerRequests.isEmpty && verses.isEmpty
+struct MoodEntrySearchDetailView: View {
+    let entry: MoodEntry
+
+    var body: some View {
+        ScrollView {
+            MoodEntryRow(entry: entry)
+                .padding()
+        }
+        .navigationTitle("Mood check-in")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 
@@ -348,7 +450,7 @@ struct SearchResultRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.systemGray6))
+                .fill(Color.platformSystemGray6)
         )
     }
 }

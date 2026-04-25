@@ -7,9 +7,11 @@
 
 import Foundation
 import SwiftData
+#if os(iOS)
 import UIKit
+#endif
 
-#if canImport(BackgroundTasks)
+#if canImport(BackgroundTasks) && os(iOS)
 import BackgroundTasks
 #endif
 
@@ -37,7 +39,7 @@ class BackgroundSyncService {
     /// Schedule a background sync task
     /// This will be called periodically by iOS to check for pending sync operations
     func scheduleBackgroundSync() {
-#if canImport(BackgroundTasks)
+#if canImport(BackgroundTasks) && os(iOS)
         let request = BGProcessingTaskRequest(identifier: syncTaskIdentifier)
         
         // Schedule to run periodically (iOS decides the best time)
@@ -59,7 +61,7 @@ class BackgroundSyncService {
     
     /// Cancel any pending background sync tasks
     func cancelBackgroundSync() {
-#if canImport(BackgroundTasks)
+#if canImport(BackgroundTasks) && os(iOS)
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: syncTaskIdentifier)
         print("ℹ️ [BACKGROUND SYNC] Cancelled background sync task")
 #else
@@ -68,7 +70,7 @@ class BackgroundSyncService {
     }
     
     /// Handle the background sync task when iOS executes it
-    #if canImport(BackgroundTasks)
+    #if canImport(BackgroundTasks) && os(iOS)
     private func handleBackgroundSync(task: BGProcessingTask) {
         print("🔄 [BACKGROUND SYNC] Background sync task started")
         

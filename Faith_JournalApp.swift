@@ -8,17 +8,17 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+#if os(iOS)
 import UIKit
-
-/// A human-readable identifier we can show in the UI to prove which binary is running.
-/// Update this whenever diagnosing “old build still showing”.
-enum BuildInfo {
-    static let stamp = "2026-02-02.1"
-}
+import GoogleMobileAds
+#endif
 
 @main
 @available(iOS 17.0, *)
 struct Faith_JournalApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(PushNotificationAppDelegate.self) private var appDelegate
+    #endif
     // CRITICAL: Use lazy initialization for singletons to avoid crashes during app startup
     // Accessing .shared during app initialization can cause crashes if services aren't ready
     private var notificationService: NotificationService {
@@ -65,6 +65,12 @@ struct Faith_JournalApp: App {
         // isn't configured yet, the app will crash with:
         // “The default FirebaseApp instance must be configured…”
         FirebaseInitializer.shared.initialize()
+
+        #if os(iOS)
+        // CRITICAL: Initialize Google Mobile Ads before any ad views load.
+        // Required to prevent GADApplicationVerifyPublisherInitializedCorrectly crash.
+        MobileAds.shared.start(completionHandler: nil)
+        #endif
     }
     
     // Add defensive logging for TestFlight debugging
@@ -83,6 +89,7 @@ struct Faith_JournalApp: App {
         Subscription.self,
         ChatMessage.self,
         SessionInvitation.self,
+        FaithFriend.self,
         //         SessionTemplate.self,
         //         SessionRating.self,
         //         SessionPlaylist.self,
@@ -361,7 +368,9 @@ struct Faith_JournalApp: App {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ignoresSafeArea()
+            #if os(iOS)
             .background(FullScreenWindowConfigurator())
+            #endif
                 .task {
                 print("🚀 [LAUNCH] App body task started")
                 // Use task instead of onAppear for async initialization
@@ -435,31 +444,35 @@ struct Faith_JournalApp: App {
                 await setupNotifications()
                 print("🚀 [LAUNCH] Notifications setup complete")
             }
+            #if os(iOS)
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                // Also clear badge when app comes to foreground
                 Task { @MainActor in
                     notificationService.clearBadge()
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                // Clear badge when app becomes active
                 Task { @MainActor in
                     notificationService.clearBadge()
-                    
-                    // Check for pending sync when app becomes active
                     if #available(iOS 17.0, *) {
                         // Get ModelContext from environment and check for sync
-                        // Note: We'll handle this in AppRootView where we have access to ModelContext
                     }
                 }
             }
+            #endif
         }
         .modelContainer(sharedModelContainer)
     }
     
     private func setupNotifications() async {
         // Request notification authorization
-        _ = await notificationService.requestAuthorization()
+        let granted = await notificationService.requestAuthorization()
+        #if os(iOS)
+        if granted {
+            await MainActor.run {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
+        }
+        #endif
         // Schedule daily prompt notification at 9 AM
         var dateComponents = DateComponents()
         dateComponents.hour = 9
@@ -473,7 +486,8 @@ struct Faith_JournalApp: App {
     
 }
 
-// MARK: - Full Screen Window Configurator
+// MARK: - Full Screen Window Configurator (iOS only)
+#if os(iOS)
 struct FullScreenWindowConfigurator: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         let controller = UIViewController()
@@ -505,3 +519,4 @@ struct FullScreenWindowConfigurator: UIViewControllerRepresentable {
         }
     }
 }
+#endif

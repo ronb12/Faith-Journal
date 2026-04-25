@@ -62,7 +62,7 @@ struct AchievementsView: View {
                     .frame(maxWidth: .infinity)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(.systemBackground))
+                            .fill(Color.platformSystemBackground)
                             .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
                     )
                     .padding(.horizontal)
@@ -100,6 +100,7 @@ struct AchievementsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Achievements")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -108,6 +109,15 @@ struct AchievementsView: View {
                     }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            #endif
         }
         .onAppear {
             initializeAchievements()
@@ -174,7 +184,7 @@ struct AchievementCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         )
         .opacity(isUnlocked ? 1.0 : 0.6)

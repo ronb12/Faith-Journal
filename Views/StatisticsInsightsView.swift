@@ -46,6 +46,7 @@ struct StatisticsInsightsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Insights")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -54,6 +55,15 @@ struct StatisticsInsightsView: View {
                     }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            #endif
         }
     }
 }

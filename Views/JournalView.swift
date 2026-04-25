@@ -1,9 +1,11 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
-import AVFoundation
+#if os(iOS)
 import PencilKit
 import Speech
+import AVFoundation
+#endif
 import CoreLocation
 import MapKit
 
@@ -31,6 +33,17 @@ struct JournalView: View {
         return filtered
     }
     
+    /// Removes duplicate entries with the same title and content (e.g. from templates/prompts), keeping the most recent.
+    var displayedEntries: [JournalEntry] {
+        var seen = Set<String>()
+        return filteredEntries.filter { entry in
+            let key = "\(entry.title)|\(entry.content)"
+            if seen.contains(key) { return false }
+            seen.insert(key)
+            return true
+        }
+    }
+    
     private func applySearchFilter(to entries: [JournalEntry]) -> [JournalEntry] {
         return entries.filter { entry in
             entry.title.localizedCaseInsensitiveContains(searchText) ||
@@ -48,7 +61,7 @@ struct JournalView: View {
         case .public:
             return entries.filter { !$0.isPrivate }
         case .withMedia:
-            return entries.filter { !$0.photoURLs.isEmpty || $0.audioURL != nil || $0.drawingData != nil }
+            return entries.filter { !$0.photoURLs.isEmpty || $0.drawingData != nil }
         case .mood(let mood):
             return entries.filter { $0.mood == mood }
         }
@@ -63,17 +76,16 @@ struct JournalView: View {
                         selectedFilter: $selectedFilter
                     )
                     .padding()
-                    .background(Color(.systemBackground))
+                    .background(Color.platformSystemBackground)
                     
-                    if filteredEntries.isEmpty {
+                    if displayedEntries.isEmpty {
                         VStack(spacing: 20) {
                             Image(systemName: "book.closed")
                                 .font(.system(size: 60))
                                 .foregroundColor(.gray)
                             
                             Text("No Journal Entries")
-                                .font(.title2)
-                                .font(.body.weight(.semibold))
+                                .font(.title2.weight(.semibold))
                                 .foregroundColor(.primary)
                             
                             Text("Start your faith journey by creating your first journal entry")
@@ -95,17 +107,17 @@ struct JournalView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(.systemGroupedBackground))
+                        .background(Color.platformSystemGroupedBackground)
                     } else {
                         JournalEntriesList(
-                            entries: filteredEntries,
+                            entries: displayedEntries,
                             deleteEntry: deleteEntry
                         )
                     }
                 }
                 .navigationTitle("Journal")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         Button(action: { showingNewEntry = true }) {
                             Image(systemName: "plus")
                         }
@@ -113,6 +125,7 @@ struct JournalView: View {
                 }
                 .sheet(isPresented: $showingNewEntry) {
                     NewJournalEntryView()
+                        .macOSSheetFrameForm()
                 }
             }
             .onAppear {
@@ -137,8 +150,8 @@ struct JournalView: View {
     
     private func deleteEntry(at offsets: IndexSet) {
         for index in offsets {
-            guard index < filteredEntries.count else { continue }
-            let entry = filteredEntries[index]
+            guard index < displayedEntries.count else { continue }
+            let entry = displayedEntries[index]
             modelContext.delete(entry)
         }
         
@@ -208,7 +221,7 @@ struct JournalEntryRow: View {
                         .font(.caption)
                 }
                 
-                if !entry.photoURLs.isEmpty || entry.audioURL != nil || entry.drawingData != nil {
+                if !entry.photoURLs.isEmpty || entry.drawingData != nil {
                     Image(systemName: "paperclip")
                         .foregroundColor(.blue)
                         .font(.caption)
@@ -234,7 +247,7 @@ struct JournalEntryRow: View {
                 Spacer()
                 
                 if !entry.tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 4) {
                             ForEach(entry.tags.prefix(3), id: \.self) { tag in
                                 Text(tag)
@@ -258,22 +271,46 @@ enum JournalFilter: Equatable {
     case all, `private`, `public`, withMedia, mood(String)
 }
 
+@available(iOS 17.0, *)
+struct JournalReadingPlanPrefill: Identifiable, Equatable {
+    var id: String { "\(planId.uuidString)-day-\(day)" }
+    let planId: UUID
+    let planTitle: String
+    let day: Int
+    let reference: String
+    let dayDescription: String
+    let reflection: String
+    let notes: String
+}
+
+@available(iOS 17.0, *)
+private func makeReadingPlanPrefillBody(_ p: JournalReadingPlanPrefill) -> String {
+    var parts: [String] = []
+    if !p.dayDescription.isEmpty { parts.append("Passage: \(p.reference)\n\n\(p.dayDescription)") } else { parts.append("Passage: \(p.reference)") }
+    if !p.reflection.isEmpty { parts.append("Reflection (from plan):\n\(p.reflection)") }
+    if !p.notes.isEmpty { parts.append("Notes (from plan):\n\(p.notes)") }
+    return parts.joined(separator: "\n\n")
+}
+
 // MARK: - Mood Data Structure
 struct MoodOption: Identifiable {
-    let id = UUID()
+    var id: String { name }
     let name: String
+    let systemImage: String
     let emoji: String
     let color: Color
 }
 
 @available(iOS 17.0, *)
 struct NewJournalEntryView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     
     // Optional entry for editing mode
     let entryToEdit: JournalEntry?
+    let readingPlanPrefill: JournalReadingPlanPrefill?
     
     // Core fields
     @State private var title = ""
@@ -289,35 +326,47 @@ struct NewJournalEntryView: View {
     // Media
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var photoURLs: [URL] = []
-    @State private var photoImages: [UIImage] = []
-    @State private var isRecording = false
-    @State private var audioRecorder: AVAudioRecorder?
-    @State private var audioURL: URL?
-    @State private var recordingDuration: TimeInterval = 0
+    @State private var photoImages: [PlatformImage] = []
     @State private var showingDrawingSheet = false
     @State private var drawingData: Data?
-    @State private var drawingImage: UIImage?
+    @State private var drawingImage: PlatformImage?
     
     // Additional features
     @State private var location: String = ""
     @State private var weather: String = ""
     @State private var bibleVerse: String = ""
     @State private var linkedPrayerRequestId: UUID?
+    @State private var linkedPrayerTitle: String = ""
+    @State private var linkedReadingPlanId: UUID?
+    @State private var linkedReadingDay: Int?
+    @State private var appliedReadingPlanPrefill = false
+
+    // Voice dictation (iOS only)
+    #if os(iOS)
+    @State private var speechRecognizer: SFSpeechRecognizer?
+    @State private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    @State private var recognitionTask: SFSpeechRecognitionTask?
+    @State private var dictationEngine: AVAudioEngine?
+    @State private var isTranscribing = false
+    #endif
     
     // Initialize for new entry or edit mode
-    init(entry: JournalEntry? = nil) {
+    init(entry: JournalEntry? = nil, readingPlanPrefill: JournalReadingPlanPrefill? = nil) {
         self.entryToEdit = entry
+        self.readingPlanPrefill = readingPlanPrefill
     }
     
     // UI State
     @State private var showingErrorAlert = false
     @State private var errorMessage = ""
+    @State private var showingDiscardConfirmation = false
     @State private var showingPromptPicker = false
     @State private var selectedPrompt: JournalPrompt?
     @State private var isSaving = false
     @State private var showingLocationPicker = false
     @State private var showingBibleVersePicker = false
-    @State private var isTranscribing = false
+    @State private var showingPrayerPicker = false
+    @State private var showingTemplatePicker = false
     @State private var showingSaveSuccess = false
     @State private var showPrivateToast = false
     @State private var toastMessage = ""
@@ -327,86 +376,72 @@ struct NewJournalEntryView: View {
     // Use regular property for singleton, not @StateObject
     private let promptManager = PromptManager.shared
     @StateObject private var locationManager = LocationManager()
-    @State private var speechRecognizer: SFSpeechRecognizer?
-    @State private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
-    @State private var recognitionTask: SFSpeechRecognitionTask?
-    @State private var audioEngine: AVAudioEngine?
     
     // Auto-save
     @State private var autoSaveTimer: Timer?
     @State private var hasUnsavedChanges = false
+    @State private var suggestedTags: [String] = []
     
-    // Mood options with emojis and colors
-    let moodOptions: [MoodOption] = [
-        MoodOption(name: "Happy", emoji: "😊", color: .yellow),
-        MoodOption(name: "Grateful", emoji: "🙏", color: .green),
-        MoodOption(name: "Peaceful", emoji: "☮️", color: .blue),
-        MoodOption(name: "Reflective", emoji: "🤔", color: .purple),
-        MoodOption(name: "Challenged", emoji: "💪", color: .orange),
-        MoodOption(name: "Hopeful", emoji: "✨", color: .pink),
-        MoodOption(name: "Anxious", emoji: "😰", color: .red),
-        MoodOption(name: "Joyful", emoji: "😄", color: .yellow)
-    ]
+    // Mood options: SF Symbols in the row (always render), emoji still available for Picker on macOS.
+    var moodOptions: [MoodOption] {
+        [
+            MoodOption(name: "Happy", systemImage: "face.smiling", emoji: "😊", color: .yellow),
+            MoodOption(name: "Grateful", systemImage: "hands.clap", emoji: "🙏", color: .green),
+            MoodOption(name: "Peaceful", systemImage: "leaf", emoji: "☮️", color: .blue),
+            MoodOption(name: "Reflective", systemImage: "brain", emoji: "🤔", color: themeManager.colors.primary),
+            MoodOption(name: "Challenged", systemImage: "figure.strengthtraining.traditional", emoji: "💪", color: .orange),
+            MoodOption(name: "Hopeful", systemImage: "sparkles", emoji: "✨", color: .pink),
+            MoodOption(name: "Anxious", systemImage: "exclamationmark.triangle.fill", emoji: "😰", color: .red),
+            MoodOption(name: "Joyful", systemImage: "face.smiling.inverse", emoji: "😄", color: .yellow)
+        ]
+    }
     
     enum DateSelectionMode {
         case today, yesterday, custom
+    }
+
+    private var newEntryScrollContent: some View {
+        VStack(spacing: 0) {
+            gradientHeader
+            VStack(spacing: 20) {
+                quickActionsSection
+                titleCard
+                contentCard
+                moodCard
+                tagsCard
+                mediaCard
+                additionalInfoCard
+                privacyCard
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 100)
+        }
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
-                Color(.systemGroupedBackground)
+                Color.platformSystemGroupedBackground
                     .ignoresSafeArea()
-                
                 ScrollView {
-                    VStack(spacing: 0) {
-                        // Gradient Header
-                        gradientHeader
-                        
-                        // Main Content
-                        VStack(spacing: 20) {
-                            // Quick Actions (Prompts & Date)
-                            quickActionsSection
-                            
-                            // Title Card
-                            titleCard
-                            
-                            // Content Card with Voice-to-Text
-                            contentCard
-                            
-                            // Mood Card with Visual Picker
-                            moodCard
-                            
-                            // Tags Card with Chips
-                            tagsCard
-                            
-                            // Media Card with Previews
-                            mediaCard
-                            
-                            // Additional Info Card
-                            additionalInfoCard
-                            
-                            // Privacy Toggle
-                            privacyCard
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 100)
-                    }
+                    newEntryScrollContent
                 }
             }
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .navigationTitle(entryToEdit == nil ? "New Entry" : "Edit Entry")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         if hasUnsavedChanges {
-                            // Could show confirmation dialog
+                            showingDiscardConfirmation = true
+                        } else {
+                            dismiss()
                         }
-                        dismiss()
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button(action: saveEntry) {
                         if isSaving {
                             ProgressView()
@@ -421,15 +456,40 @@ struct NewJournalEntryView: View {
         }
         .sheet(isPresented: $showingDrawingSheet) {
             DrawingView(drawingData: $drawingData)
+                .macOSSheetFrameForm()
         }
         .sheet(isPresented: $showingPromptPicker) {
             PromptPickerView(selectedPrompt: $selectedPrompt, selectedCategory: .constant(nil))
+                .macOSSheetFrameStandard()
         }
         .sheet(isPresented: $showingLocationPicker) {
             LocationPickerView(selectedLocation: $location)
+                .macOSSheetFrameStandard()
         }
         .sheet(isPresented: $showingBibleVersePicker) {
             BibleVersePickerView(selectedVerse: $bibleVerse)
+                .macOSSheetFrameStandard()
+        }
+        .sheet(isPresented: $showingPrayerPicker) {
+            PrayerLinkPickerView(linkedId: $linkedPrayerRequestId, linkedTitle: $linkedPrayerTitle)
+                .macOSSheetFrameStandard()
+        }
+        .sheet(isPresented: $showingTemplatePicker) {
+            EntryTemplatePickerView { template in
+                applyTemplate(template)
+                showingTemplatePicker = false
+            }
+            .macOSSheetFrameStandard()
+        }
+        .confirmationDialog(
+            "Discard Changes?",
+            isPresented: $showingDiscardConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Discard", role: .destructive) { dismiss() }
+            Button("Keep Editing", role: .cancel) { }
+        } message: {
+            Text("Your changes haven't been saved yet.")
         }
         .alert("Error", isPresented: $showingErrorAlert) {
             Button("OK") { }
@@ -438,31 +498,42 @@ struct NewJournalEntryView: View {
         }
         .alert(entryToEdit == nil ? "Entry Saved" : "Entry Updated", isPresented: $showingSaveSuccess) {
             Button("OK") {
-                dismiss()
+                onSaveSuccessTapped()
             }
         } message: {
             Text(entryToEdit == nil ? "Your journal entry has been saved successfully!" : "Your journal entry has been updated successfully!")
         }
         .onAppear {
-            setupAudioRecorder()
-            setupSpeechRecognizer()
             setupAutoSave()
             loadLocationAndWeather()
-            
-            // If editing, load entry data
+            suggestedTags = fetchSuggestedTags()
+            #if os(iOS)
+            setupSpeechRecognizer()
+            #endif
             if let entry = entryToEdit {
                 loadEntryForEditing(entry)
+            } else if !appliedReadingPlanPrefill, let pre = readingPlanPrefill {
+                appliedReadingPlanPrefill = true
+                title = pre.planTitle.isEmpty ? "Reading — Day \(pre.day)" : "\(pre.planTitle) — Day \(pre.day)"
+                bibleVerse = pre.reference
+                content = makeReadingPlanPrefillBody(pre)
+                linkedReadingPlanId = pre.planId
+                linkedReadingDay = pre.day
+                for tag in ["Bible", "Reading plan", "Devotional"] where !entryTags.contains(tag) { entryTags.append(tag) }
             }
         }
         .onDisappear {
             autoSaveTimer?.invalidate()
+            #if os(iOS)
+            stopDictation()
+            #endif
         }
         .onChange(of: selectedPhotos) { _, newValue in
             loadPhotos(from: newValue)
         }
         .onChange(of: drawingData) { _, newValue in
             if let data = newValue {
-                drawingImage = UIImage(data: data)
+                drawingImage = platformImageFromData(data)
             }
         }
         .onChange(of: selectedPrompt) { _, newValue in
@@ -489,15 +560,12 @@ struct NewJournalEntryView: View {
                 }
             }
             
-            // Auto-save entry when private status changes (if entry has minimum required fields)
-            if !title.isEmpty && !content.isEmpty {
+            // For existing entries only: persist privacy change immediately.
+            // For new entries, the change is captured at final save to avoid creating duplicates.
+            if let _ = entryToEdit, !title.isEmpty && !content.isEmpty {
                 hasUnsavedChanges = true
-                // Save immediately to register the private status
-                Task {
-                    await saveEntryImmediately()
-                }
+                Task { await saveEntryImmediately() }
             } else {
-                // Update draft even if not ready to save
                 hasUnsavedChanges = true
                 saveDraft()
             }
@@ -512,15 +580,14 @@ struct NewJournalEntryView: View {
                                 .foregroundColor(.white)
                                 .font(.title3)
                             Text(toastMessage)
-                                .font(.subheadline)
-                                .font(.body.weight(.medium))
+                                .font(.subheadline.weight(.medium))
                                 .foregroundColor(.white)
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 14)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(isPrivate ? Color.purple : Color.blue)
+                                .fill(isPrivate ? themeManager.colors.primary : themeManager.colors.secondary)
                                 .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                         )
                         .padding(.horizontal, 20)
@@ -539,9 +606,9 @@ struct NewJournalEntryView: View {
     private var gradientHeader: some View {
         LinearGradient(
             colors: [
-                Color.purple.opacity(0.8),
-                Color.blue.opacity(0.9),
-                Color.purple.opacity(0.7)
+                themeManager.colors.primary.opacity(0.8),
+                themeManager.colors.secondary.opacity(0.9),
+                themeManager.colors.primary.opacity(0.7)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -554,9 +621,8 @@ struct NewJournalEntryView: View {
                     Image(systemName: "book.closed.fill")
                         .font(.system(size: 32))
                         .foregroundColor(.white)
-                    Text("New Journal Entry")
-                        .font(.title2)
-                        .font(.body.weight(.bold))
+                    Text(entryToEdit == nil ? "New Journal Entry" : "Edit Journal Entry")
+                        .font(.title2.weight(.bold))
                         .foregroundColor(.white)
                     Spacer()
                 }
@@ -569,18 +635,31 @@ struct NewJournalEntryView: View {
     private var quickActionsSection: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
+                // Template Button
+                Button(action: { showingTemplatePicker = true }) {
+                    HStack {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundColor(.purple)
+                        Text("Template")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.platformSystemGray6)
+                    .cornerRadius(12)
+                }
+
                 // Journal Prompt Button
                 Button(action: { showingPromptPicker = true }) {
                     HStack {
                         Image(systemName: "lightbulb.fill")
                             .foregroundColor(.yellow)
                         Text("Use Prompt")
-                            .font(.subheadline)
-                            .font(.body.weight(.medium))
+                            .font(.subheadline.weight(.medium))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
                 }
                 
@@ -610,12 +689,11 @@ struct NewJournalEntryView: View {
                         Image(systemName: "calendar")
                             .foregroundColor(.blue)
                         Text(dateSelectionMode == .today ? "Today" : dateSelectionMode == .yesterday ? "Yesterday" : "Custom")
-                            .font(.subheadline)
-                            .font(.body.weight(.medium))
+                            .font(.subheadline.weight(.medium))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
                 }
             }
@@ -624,7 +702,7 @@ struct NewJournalEntryView: View {
                 DatePicker("Entry Date", selection: $entryDate, displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
             }
         }
@@ -635,7 +713,7 @@ struct NewJournalEntryView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "text.bubble.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Title")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -643,11 +721,11 @@ struct NewJournalEntryView: View {
             TextField("Give your entry a title...", text: $title)
                 .textFieldStyle(.plain)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -656,25 +734,10 @@ struct NewJournalEntryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "text.alignleft")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Content")
                     .font(.headline)
                     .foregroundColor(.primary)
-                Spacer()
-                // Voice-to-Text Button
-                Button(action: startVoiceToText) {
-                    HStack(spacing: 4) {
-                        Image(systemName: isTranscribing ? "waveform" : "mic.fill")
-                            .font(.caption)
-                        Text(isTranscribing ? "Listening..." : "Voice")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(isTranscribing ? Color.red : Color.blue)
-                    .cornerRadius(8)
-                }
             }
             
             ZStack(alignment: .topLeading) {
@@ -689,11 +752,27 @@ struct NewJournalEntryView: View {
                     .scrollContentBackground(.hidden)
             }
             .padding(8)
-            .background(Color(.systemGray6))
+            .background(Color.platformSystemGray6)
             .cornerRadius(12)
             
-            // Character count
+            // Character count + voice dictation
             HStack {
+                #if os(iOS)
+                Button(action: toggleDictation) {
+                    HStack(spacing: 5) {
+                        Image(systemName: isTranscribing ? "mic.fill" : "mic")
+                            .font(.caption.weight(.semibold))
+                        Text(isTranscribing ? "Listening…" : "Dictate")
+                            .font(.caption.weight(.medium))
+                    }
+                    .foregroundColor(isTranscribing ? .white : themeManager.colors.primary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(isTranscribing ? themeManager.colors.primary : themeManager.colors.primary.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+                .accessibilityLabel(isTranscribing ? "Stop dictation" : "Start dictation")
+                #endif
                 Spacer()
                 Text("\(content.count) characters")
                     .font(.caption)
@@ -701,7 +780,7 @@ struct NewJournalEntryView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -710,29 +789,45 @@ struct NewJournalEntryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "face.smiling.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("How are you feeling?")
                     .font(.headline)
                     .foregroundColor(.primary)
             }
             
-            // Visual Mood Picker
-            ScrollView(.horizontal, showsIndicators: false) {
+            #if os(macOS)
+            // Dropdown on macOS — horizontal scroll unreliable
+            Picker("Mood", selection: $selectedMood) {
+                Text("None").tag("")
+                ForEach(moodOptions) { mood in
+                    Label {
+                        Text(mood.name)
+                    } icon: {
+                        Image(systemName: mood.systemImage)
+                    }
+                    .tag(mood.name)
+                }
+            }
+            .pickerStyle(.menu)
+            #else
+            // Visual Mood Picker on iOS
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(moodOptions) { mood in
                         Button(action: {
                             selectedMood = mood.name
                         }) {
                             VStack(spacing: 8) {
-                                Text(mood.emoji)
-                                    .font(.system(size: 40))
+                                Image(systemName: mood.systemImage)
+                                    .font(.system(size: 32, weight: .semibold, design: .default))
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(selectedMood == mood.name ? .white : mood.color)
                                 Text(mood.name)
-                                    .font(.caption)
-                                    .font(.body.weight(.medium))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundColor(selectedMood == mood.name ? .white : .primary)
                             }
-                            .foregroundColor(selectedMood == mood.name ? .white : .primary)
                             .frame(width: 80, height: 100)
-                            .background(selectedMood == mood.name ? mood.color : Color(.systemGray6))
+                            .background(selectedMood == mood.name ? mood.color : Color.platformSystemGray6)
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -743,6 +838,7 @@ struct NewJournalEntryView: View {
                 }
                 .padding(.horizontal, 4)
             }
+            #endif
             
             // Mood Intensity Slider (if mood selected)
             if !selectedMood.isEmpty {
@@ -753,18 +849,17 @@ struct NewJournalEntryView: View {
                             .foregroundColor(.secondary)
                         Spacer()
                         Text("\(Int(moodIntensity))")
-                            .font(.subheadline)
-                            .font(.body.weight(.semibold))
-                            .foregroundColor(.purple)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(themeManager.colors.primary)
                     }
                     Slider(value: $moodIntensity, in: 1...10, step: 1)
-                        .tint(.purple)
+                        .tint(themeManager.colors.primary)
                 }
                 .padding(.top, 8)
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -773,7 +868,7 @@ struct NewJournalEntryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "tag.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Tags")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -781,7 +876,7 @@ struct NewJournalEntryView: View {
             
             // Tag Chips
             if !entryTags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 8) {
                         ForEach(entryTags, id: \.self) { tag in
                             HStack(spacing: 6) {
@@ -797,7 +892,7 @@ struct NewJournalEntryView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Color.purple)
+                            .background(themeManager.colors.primary)
                             .cornerRadius(16)
                         }
                     }
@@ -813,24 +908,38 @@ struct NewJournalEntryView: View {
                     }
                 Button(action: addTag) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                         .font(.title3)
                 }
                 .disabled(newTagText.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformSystemGray6)
             .cornerRadius(12)
             
             // Suggested Tags (from previous entries)
-            if let suggestions = getSuggestedTags(), !suggestions.isEmpty {
+            if !suggestedTags.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Suggestions")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    #if os(macOS)
+                    // Dropdown on macOS — horizontal scroll unreliable
+                    Menu {
+                        ForEach(suggestedTags.prefix(10), id: \.self) { tag in
+                            Button(tag) {
+                                if !entryTags.contains(tag) {
+                                    entryTags.append(tag)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Add suggested tag", systemImage: "tag.badge.plus")
+                    }
+                    #else
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
-                            ForEach(suggestions.prefix(5), id: \.self) { tag in
+                            ForEach(suggestedTags.prefix(5), id: \.self) { tag in
                                 Button(action: {
                                     if !entryTags.contains(tag) {
                                         entryTags.append(tag)
@@ -840,18 +949,19 @@ struct NewJournalEntryView: View {
                                         .font(.caption)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
-                                        .background(Color(.systemGray5))
+                                        .background(Color.platformSystemGray5)
                                         .foregroundColor(.primary)
                                         .cornerRadius(12)
                                 }
                             }
                         }
                     }
+                    #endif
                 }
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -860,12 +970,12 @@ struct NewJournalEntryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "photo.on.rectangle")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Media")
                     .font(.headline)
                     .foregroundColor(.primary)
                 Spacer()
-                if !photoURLs.isEmpty || audioURL != nil || drawingData != nil {
+                if !photoURLs.isEmpty || drawingData != nil {
                     Text("\(mediaCount) attached")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -874,11 +984,11 @@ struct NewJournalEntryView: View {
             
             // Photo Previews
             if !photoImages.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         ForEach(Array(photoImages.enumerated()), id: \.offset) { index, image in
                             ZStack(alignment: .topTrailing) {
-                                Image(uiImage: image)
+                                platformImage(image)
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
                                     .frame(width: 100, height: 100)
@@ -904,7 +1014,7 @@ struct NewJournalEntryView: View {
             // Drawing Preview
             if let drawingImage = drawingImage {
                 HStack {
-                    Image(uiImage: drawingImage)
+                    platformImage(drawingImage)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 80)
@@ -921,35 +1031,7 @@ struct NewJournalEntryView: View {
                     Spacer()
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
-            }
-            
-            // Audio Preview
-            if audioURL != nil {
-                HStack {
-                    Image(systemName: "waveform")
-                        .foregroundColor(.blue)
-                        .font(.title2)
-                    VStack(alignment: .leading) {
-                        Text("Audio Recording")
-                            .font(.subheadline)
-                            .font(.body.weight(.medium))
-                        Text(formatDuration(recordingDuration))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Button(action: {
-                        self.audioURL = nil
-                        recordingDuration = 0
-                    }) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
-                    }
-                }
-                .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
             }
             
@@ -964,19 +1046,6 @@ struct NewJournalEntryView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                
-                Button(action: toggleRecording) {
-                    HStack {
-                        Image(systemName: isRecording ? "stop.circle.fill" : "mic.fill")
-                        Text(isRecording ? "Stop" : "Record")
-                    }
-                    .font(.subheadline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(isRecording ? Color.red : Color.green)
                     .foregroundColor(.white)
                     .cornerRadius(12)
                 }
@@ -996,7 +1065,7 @@ struct NewJournalEntryView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -1005,7 +1074,7 @@ struct NewJournalEntryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "info.circle.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Additional Info")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -1025,7 +1094,7 @@ struct NewJournalEntryView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
             }
             
@@ -1035,10 +1104,11 @@ struct NewJournalEntryView: View {
                     Image(systemName: "cloud.sun.fill")
                         .foregroundColor(.orange)
                     Text(weather)
+                        .lineLimit(2)
                     Spacer()
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
             }
             
@@ -1046,9 +1116,10 @@ struct NewJournalEntryView: View {
             Button(action: { showingBibleVersePicker = true }) {
                 HStack {
                     Image(systemName: "book.fill")
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                     Text(bibleVerse.isEmpty ? "Add Bible Verse" : bibleVerse)
                         .foregroundColor(bibleVerse.isEmpty ? .secondary : .primary)
+                        .lineLimit(2)
                     Spacer()
                     if !bibleVerse.isEmpty {
                         Image(systemName: "checkmark.circle.fill")
@@ -1056,12 +1127,69 @@ struct NewJournalEntryView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
+                .cornerRadius(12)
+            }
+
+            // Linked Prayer Request
+            Button(action: { showingPrayerPicker = true }) {
+                HStack {
+                    Image(systemName: "hands.clap.fill")
+                        .foregroundColor(.orange)
+                    if linkedPrayerRequestId != nil {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Linked Prayer")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text(linkedPrayerTitle.isEmpty ? "Prayer Request" : linkedPrayerTitle)
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                        }
+                    } else {
+                        Text("Link Prayer Request")
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    if linkedPrayerRequestId != nil {
+                        Button {
+                            linkedPrayerRequestId = nil
+                            linkedPrayerTitle = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+                .background(Color.platformSystemGray6)
+                .cornerRadius(12)
+            }
+            
+            if linkedReadingPlanId != nil, let d = linkedReadingDay {
+                HStack {
+                    Image(systemName: "book.pages.fill")
+                        .foregroundColor(.purple)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Linked reading plan")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("Day \(d) — this entry is tied to your plan reading.")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                    Spacer()
+                }
+                .padding()
+                .background(Color.purple.opacity(0.08))
                 .cornerRadius(12)
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -1070,7 +1198,7 @@ struct NewJournalEntryView: View {
         VStack(spacing: 12) {
             HStack {
                 Image(systemName: "lock.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Private Entry")
                     .font(.headline)
                 Spacer()
@@ -1084,8 +1212,7 @@ struct NewJournalEntryView: View {
                     .font(.caption)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Privacy Notice")
-                        .font(.caption)
-                        .font(.body.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundColor(.primary)
                     Text("All journal entries are stored securely on your device and synced via Firebase. Private entries are only visible to you and are not shared with anyone.")
                         .font(.caption2)
@@ -1099,7 +1226,7 @@ struct NewJournalEntryView: View {
             .cornerRadius(10)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -1107,7 +1234,6 @@ struct NewJournalEntryView: View {
     private var mediaCount: Int {
         var count = 0
         if !photoURLs.isEmpty { count += photoURLs.count }
-        if audioURL != nil { count += 1 }
         if drawingData != nil { count += 1 }
         return count
     }
@@ -1123,25 +1249,85 @@ struct NewJournalEntryView: View {
         }
     }
     
-    private func getSuggestedTags() -> [String]? {
-        // Get tags from recent entries
+    #if os(iOS)
+    private func setupSpeechRecognizer() {
+        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    }
+    private func toggleDictation() {
+        if isTranscribing { stopDictation() } else { startDictation() }
+    }
+    private func startDictation() {
+        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
+            errorMessage = "Speech recognition is not available on this device."
+            showingErrorAlert = true; return
+        }
+        SFSpeechRecognizer.requestAuthorization { status in
+            DispatchQueue.main.async {
+                guard status == .authorized else {
+                    self.errorMessage = "Enable Speech Recognition in Settings → Privacy & Security."
+                    self.showingErrorAlert = true; return
+                }
+                self.isTranscribing = true
+                self.beginRecording()
+            }
+        }
+    }
+    private func stopDictation() {
+        dictationEngine?.stop()
+        dictationEngine?.inputNode.removeTap(onBus: 0)
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionRequest = nil; recognitionTask = nil
+        isTranscribing = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+    private func beginRecording() {
+        dictationEngine = AVAudioEngine()
+        guard let engine = dictationEngine else { return }
+        let inputNode = engine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let request = recognitionRequest else { return }
+        request.shouldReportPartialResults = true
+        let snapshot = content
+        recognitionTask = speechRecognizer?.recognitionTask(with: request) { result, error in
+            if let result = result {
+                DispatchQueue.main.async {
+                    let spoken = result.bestTranscription.formattedString
+                    self.content = snapshot.isEmpty ? spoken : snapshot + " " + spoken
+                }
+            }
+            if error != nil || result?.isFinal == true {
+                DispatchQueue.main.async { self.isTranscribing = false }
+                engine.stop(); inputNode.removeTap(onBus: 0)
+                self.recognitionRequest = nil; self.recognitionTask = nil
+            }
+        }
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in request.append(buffer) }
+        engine.prepare()
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.record, mode: .measurement, options: .duckOthers)
+            try AVAudioSession.sharedInstance().setActive(true, options: .notifyOthersOnDeactivation)
+            try engine.start()
+        } catch {
+            errorMessage = "Could not start microphone: \(error.localizedDescription)"
+            showingErrorAlert = true; isTranscribing = false
+        }
+    }
+    #endif
+
+    private func fetchSuggestedTags() -> [String] {
         let request = FetchDescriptor<JournalEntry>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
-        if let entries = try? modelContext.fetch(request) {
-            let allTags = entries.flatMap { $0.tags }
-            let tagCounts = Dictionary(grouping: allTags, by: { $0 })
-                .mapValues { $0.count }
-                .sorted { $0.value > $1.value }
-            return Array(tagCounts.prefix(10).map { $0.key })
-        }
-        return nil
-    }
-    
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let minutes = Int(duration) / 60
-        let seconds = Int(duration) % 60
-        return String(format: "%d:%02d", minutes, seconds)
+        guard let entries = try? modelContext.fetch(request) else { return [] }
+        let allTags = entries.flatMap { $0.tags }
+        let tagCounts = Dictionary(grouping: allTags, by: { $0 })
+            .mapValues { $0.count }
+            .sorted { first, second in
+                first.value != second.value ? first.value > second.value : first.key < second.key
+            }
+        return Array(tagCounts.prefix(10).map { $0.key })
     }
     
     private func loadPhotos(from items: [PhotosPickerItem]) {
@@ -1150,11 +1336,11 @@ struct NewJournalEntryView: View {
             photoImages = []
             for item in items {
                 if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data),
+                   let image = platformImageFromData(data),
                    let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
                     let fileName = "\(UUID().uuidString).jpg"
                     let fileURL = documentsPath.appendingPathComponent(fileName)
-                    if let jpegData = image.jpegData(compressionQuality: 0.8) {
+                    if let jpegData = platformImageToJPEGData(image, quality: 0.8) {
                         try? jpegData.write(to: fileURL)
                         photoURLs.append(fileURL)
                         photoImages.append(image)
@@ -1163,143 +1349,6 @@ struct NewJournalEntryView: View {
             }
             hasUnsavedChanges = true
         }
-    }
-    
-    private func setupAudioRecorder() {
-        // Only setup audio session, don't create file until recording starts
-        let audioSession = AVAudioSession.sharedInstance()
-        do {
-            try audioSession.setCategory(.playAndRecord, mode: .default)
-            try audioSession.setActive(true)
-        } catch {
-            print("❌ Audio session setup failed: \(error.localizedDescription)")
-        }
-    }
-    
-    private func createAudioRecorder() -> AVAudioRecorder? {
-        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return nil
-        }
-        
-        let audioFileName = "\(UUID().uuidString).m4a"
-        let audioFileURL = documentsPath.appendingPathComponent(audioFileName)
-        
-        let settings = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 12000,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
-        
-        do {
-            let recorder = try AVAudioRecorder(url: audioFileURL, settings: settings)
-            audioURL = audioFileURL
-            return recorder
-        } catch {
-            print("❌ Audio recorder creation failed: \(error.localizedDescription)")
-            return nil
-        }
-    }
-    
-    private func setupSpeechRecognizer() {
-        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-    }
-    
-    private func startVoiceToText() {
-        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
-            errorMessage = "Speech recognition is not available."
-            showingErrorAlert = true
-            return
-        }
-        
-        SFSpeechRecognizer.requestAuthorization { authStatus in
-            DispatchQueue.main.async {
-                if authStatus == .authorized {
-                    self.isTranscribing = true
-                    self.startRecording()
-                } else {
-                    self.errorMessage = "Speech recognition permission denied."
-                    self.showingErrorAlert = true
-                }
-            }
-        }
-    }
-    
-    private func startRecording() {
-        audioEngine = AVAudioEngine()
-        guard let audioEngine = audioEngine else { return }
-        
-        let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            self.recognitionRequest?.append(buffer)
-        }
-        
-        audioEngine.prepare()
-        
-        do {
-            try audioEngine.start()
-            recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-            guard let recognitionRequest = recognitionRequest else { return }
-            
-            recognitionRequest.shouldReportPartialResults = true
-            
-            recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { result, error in
-                if let result = result {
-                    DispatchQueue.main.async {
-                        self.content = result.bestTranscription.formattedString
-                    }
-                }
-                
-                if error != nil || result?.isFinal == true {
-                    self.audioEngine?.stop()
-                    inputNode.removeTap(onBus: 0)
-                    self.recognitionRequest = nil
-                    self.recognitionTask = nil
-                    self.isTranscribing = false
-                }
-            }
-        } catch {
-            errorMessage = "Failed to start recording: \(error.localizedDescription)"
-            showingErrorAlert = true
-            isTranscribing = false
-        }
-    }
-    
-    private func toggleRecording() {
-        if isRecording {
-            // Stop recording
-            audioRecorder?.stop()
-            isRecording = false
-            // Calculate duration when stopping
-            if let recorder = audioRecorder {
-                recordingDuration = recorder.currentTime
-            }
-            // Only keep audioURL if recording duration > 0 (user actually recorded something)
-            if recordingDuration <= 0 {
-                audioURL = nil
-                audioRecorder = nil
-            }
-        } else {
-            // Start recording - create recorder and file only now
-            recordingDuration = 0
-            if let recorder = createAudioRecorder() {
-                audioRecorder = recorder
-                if recorder.record() {
-                    isRecording = true
-                } else {
-                    errorMessage = "Failed to start recording."
-                    showingErrorAlert = true
-                    audioURL = nil
-                    audioRecorder = nil
-                }
-            } else {
-                errorMessage = "Failed to create audio recorder."
-                showingErrorAlert = true
-            }
-        }
-        hasUnsavedChanges = true
     }
     
     private func setupAutoSave() {
@@ -1369,6 +1418,9 @@ struct NewJournalEntryView: View {
             // Update existing entry
             existingEntry.isPrivate = isPrivate
             existingEntry.updatedAt = Date()
+            existingEntry.linkedPrayerRequestId = linkedPrayerRequestId
+            existingEntry.linkedReadingPlanId = linkedReadingPlanId
+            existingEntry.linkedReadingDay = linkedReadingDay
             
             do {
                 try modelContext.save()
@@ -1395,16 +1447,18 @@ struct NewJournalEntryView: View {
             )
             entry.date = entryDate
             entry.photoURLs = photoURLs
-            entry.audioURL = audioURL
             entry.drawingData = drawingData
-            
+            entry.linkedPrayerRequestId = linkedPrayerRequestId
+            entry.linkedReadingPlanId = linkedReadingPlanId
+            entry.linkedReadingDay = linkedReadingDay
+
             // Add Bible verse to content if provided
             if !bibleVerse.isEmpty {
                 entry.content = "📖 \(bibleVerse)\n\n\(content)"
             }
-            
+
             modelContext.insert(entry)
-            
+
             do {
                 try modelContext.save()
                 hasUnsavedChanges = false
@@ -1432,9 +1486,11 @@ struct NewJournalEntryView: View {
         selectedMood = entry.mood ?? ""
         entryDate = entry.date
         photoURLs = entry.photoURLs
-        audioURL = entry.audioURL
         drawingData = entry.drawingData
         location = entry.location ?? ""
+        linkedPrayerRequestId = entry.linkedPrayerRequestId
+        linkedReadingPlanId = entry.linkedReadingPlanId
+        linkedReadingDay = entry.linkedReadingDay
         
         // Extract Bible verse from content if present
         if content.hasPrefix("📖") {
@@ -1449,12 +1505,28 @@ struct NewJournalEntryView: View {
         photoImages = []
         for url in photoURLs {
             if let data = try? Data(contentsOf: url),
-               let image = UIImage(data: data) {
+               let image = platformImageFromData(data) {
                 photoImages.append(image)
             }
         }
     }
     
+    private func onSaveSuccessTapped() {
+        RewardedInterstitialManager.shared.tryShowAd { dismiss() }
+    }
+
+    // MARK: - Templates
+
+    private func applyTemplate(_ template: JournalEntryTemplate) {
+        if title.isEmpty { title = template.name }
+        let separator = content.isEmpty ? "" : "\n\n---\n\n"
+        content = content + separator + template.contentTemplate
+        for tag in template.suggestedTags where !entryTags.contains(tag) {
+            entryTags.append(tag)
+        }
+        hasUnsavedChanges = true
+    }
+
     private func saveEntry() {
         isSaving = true
         
@@ -1469,8 +1541,10 @@ struct NewJournalEntryView: View {
             existingEntry.isPrivate = isPrivate
             existingEntry.date = entryDate
             existingEntry.photoURLs = photoURLs
-            existingEntry.audioURL = audioURL
             existingEntry.drawingData = drawingData
+            existingEntry.linkedPrayerRequestId = linkedPrayerRequestId
+            existingEntry.linkedReadingPlanId = linkedReadingPlanId
+            existingEntry.linkedReadingDay = linkedReadingDay
             existingEntry.updatedAt = Date()
             
             // Add Bible verse to content if provided
@@ -1509,16 +1583,18 @@ struct NewJournalEntryView: View {
             )
             entry.date = entryDate
             entry.photoURLs = photoURLs
-            entry.audioURL = audioURL
             entry.drawingData = drawingData
-            
+            entry.linkedPrayerRequestId = linkedPrayerRequestId
+            entry.linkedReadingPlanId = linkedReadingPlanId
+            entry.linkedReadingDay = linkedReadingDay
+
             // Add Bible verse to content if provided
             if !bibleVerse.isEmpty {
                 entry.content = "📖 \(bibleVerse)\n\n\(content)"
             }
-            
+
             modelContext.insert(entry)
-            
+
             do {
                 try modelContext.save()
                 print("✅ [STORAGE] Journal entry saved locally: \(entry.title)")
@@ -1551,6 +1627,7 @@ struct NewJournalEntryView: View {
 
 @available(iOS 17.0, *)
 struct LocationPickerView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedLocation: String
     @StateObject private var locationManager = LocationManager()
@@ -1584,7 +1661,7 @@ struct LocationPickerView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 
                 // Map View (using iOS 17+ Map API)
                 if let mapItem = selectedMapItem {
@@ -1593,7 +1670,7 @@ struct LocationPickerView: View {
                             "Location",
                             coordinate: mapItem.placemark.coordinate
                         )
-                        .tint(.purple)
+                        .tint(themeManager.colors.primary)
                     }
                     .mapStyle(.standard)
                     .frame(height: 300)
@@ -1679,7 +1756,7 @@ struct LocationPickerView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.purple)
+                            .background(themeManager.colors.primary)
                             .foregroundColor(.white)
                             .cornerRadius(12)
                         }
@@ -1695,9 +1772,11 @@ struct LocationPickerView: View {
                 Spacer()
             }
             .navigationTitle("Add Location")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -1732,8 +1811,9 @@ struct LocationPickerView: View {
     }
 }
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct BibleVersePickerView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedVerse: String
     @State private var reference = ""
@@ -1834,7 +1914,20 @@ struct BibleVersePickerView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Category Picker
-                ScrollView(.horizontal, showsIndicators: false) {
+                #if os(macOS)
+                // Dropdown on macOS — horizontal scroll unreliable
+                Picker("Category", selection: $selectedCategory) {
+                    ForEach(VerseCategory.allCases, id: \.self) { category in
+                        Text(category.rawValue).tag(category)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.platformSystemBackground)
+                #else
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         ForEach(VerseCategory.allCases, id: \.self) { category in
                             Button(action: {
@@ -1846,7 +1939,7 @@ struct BibleVersePickerView: View {
                                     .foregroundColor(selectedCategory == category ? .white : .primary)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .background(selectedCategory == category ? Color.purple : Color(.systemGray6))
+                                    .background(selectedCategory == category ? themeManager.colors.primary : Color.platformSystemGray6)
                                     .cornerRadius(20)
                             }
                         }
@@ -1854,7 +1947,8 @@ struct BibleVersePickerView: View {
                     .padding(.horizontal)
                 }
                 .padding(.vertical, 12)
-                .background(Color(.systemBackground))
+                .background(Color.platformSystemBackground)
+                #endif
                 
                 // Search Bar
                 HStack {
@@ -1863,7 +1957,7 @@ struct BibleVersePickerView: View {
                     TextField("Search verses...", text: $searchText)
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 
                 // Verse List
                 List {
@@ -1875,7 +1969,7 @@ struct BibleVersePickerView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(verse.reference)
                                     .font(.headline)
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(themeManager.colors.primary)
                                 Text(verse.text)
                                     .font(.body)
                                     .foregroundColor(.primary)
@@ -1912,11 +2006,18 @@ struct BibleVersePickerView: View {
                         .buttonStyle(.borderedProminent)
                     }
                 }
+                #if os(macOS)
+                .scrollContentBackground(.hidden)
+                .formStyle(.grouped)
+                .padding(.horizontal, 20)
+                #endif
             }
             .navigationTitle("Add Bible Verse")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -1991,8 +2092,7 @@ struct JournalEntryDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(entry.title)
-                            .font(.title)
-                            .font(.body.weight(.bold))
+                            .font(.title.weight(.bold))
                         
                         Spacer()
                         
@@ -2022,7 +2122,7 @@ struct JournalEntryDetailView: View {
                 
                 // Tags
                 if !entry.tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(entry.tags, id: \.self) { tag in
                                 Text(tag)
@@ -2038,14 +2138,14 @@ struct JournalEntryDetailView: View {
                 }
                 
                 // Media Attachments
-                if !entry.photoURLs.isEmpty || entry.audioURL != nil || entry.drawingData != nil {
+                if !entry.photoURLs.isEmpty || entry.drawingData != nil {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Attachments")
                             .font(.headline)
                         
                         // Photos
                         if !entry.photoURLs.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 8) {
                                     ForEach(entry.photoURLs, id: \.self) { url in
                                         AsyncImage(url: url) { image in
@@ -2063,26 +2163,32 @@ struct JournalEntryDetailView: View {
                             }
                         }
                         
-                        // Audio
-                        if let audioURL = entry.audioURL {
-                            AudioPlayerView(audioURL: audioURL)
-                        }
-                        
-                        // Drawing - Handle both PencilKit format and legacy UIImage format
+                        // Drawing - Handle both PencilKit format (iOS) and legacy image format
                         if let drawingData = entry.drawingData {
+                            #if os(iOS)
                             if let drawing = try? PKDrawing(data: drawingData) {
                                 // Render PencilKit drawing
                                 PencilKitDrawingView(drawing: drawing)
                                     .frame(maxHeight: 200)
                                     .cornerRadius(8)
-                            } else if let uiImage = UIImage(data: drawingData) {
-                                // Render legacy UIImage format
-                                Image(uiImage: uiImage)
+                            } else if let platformImg = platformImageFromData(drawingData) {
+                                // Render legacy image format
+                                platformImage(platformImg)
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
                                     .frame(maxHeight: 200)
                                     .cornerRadius(8)
                             }
+                            #else
+                            if let platformImg = platformImageFromData(drawingData) {
+                                // Render legacy image format
+                                platformImage(platformImg)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxHeight: 200)
+                                    .cornerRadius(8)
+                            }
+                            #endif
                         }
                     }
                 }
@@ -2090,9 +2196,11 @@ struct JournalEntryDetailView: View {
             .padding()
         }
         .navigationTitle("Entry Details")
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Menu {
                     Button(action: { showingShareSheet = true }) {
                         Label("Share", systemImage: "square.and.arrow.up")
@@ -2106,9 +2214,11 @@ struct JournalEntryDetailView: View {
         }
         .sheet(isPresented: $showingShareSheet) {
             ActivityView(activityItems: [shareText])
+                .macOSSheetFrameCompact()
         }
         .sheet(isPresented: $showingEditSheet) {
             NewJournalEntryView(entry: entry)
+                .macOSSheetFrameForm()
         }
         .alert("Delete Entry", isPresented: $showingDeleteAlert) {
             Button("Delete", role: .destructive) {
@@ -2130,53 +2240,6 @@ struct JournalEntryDetailView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Are you sure you want to delete this entry? This action cannot be undone.")
-        }
-    }
-}
-
-@available(iOS 17.0, *)
-struct AudioPlayerView: View {
-    let audioURL: URL
-    @State private var isPlaying = false
-    @State private var audioPlayer: AVAudioPlayer?
-    
-    var body: some View {
-        HStack {
-            Button(action: togglePlayback) {
-                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.blue)
-            }
-            
-            Text("Audio Recording")
-                .font(.subheadline)
-            
-            Spacer()
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
-        .onAppear {
-            setupAudioPlayer()
-        }
-    }
-    
-    private func setupAudioPlayer() {
-        do {
-            audioPlayer = try AVAudioPlayer(contentsOf: audioURL)
-            audioPlayer?.prepareToPlay()
-        } catch {
-            print("Audio player setup failed: \(error)")
-        }
-    }
-    
-    private func togglePlayback() {
-        if isPlaying {
-            audioPlayer?.stop()
-            isPlaying = false
-        } else {
-            audioPlayer?.play()
-            isPlaying = true
         }
     }
 }
@@ -2235,10 +2298,10 @@ struct EditJournalEntryView: View {
             }
             .navigationTitle("Edit Entry")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Save") { saveChanges() }
                         .disabled(title.isEmpty || content.isEmpty)
                 }
@@ -2280,11 +2343,11 @@ struct JournalSearchAndFilterBar: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color(.systemGray6))
+            .background(Color.platformSystemGray6)
             .cornerRadius(10)
             
             HStack {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 8) {
                         FilterChip(title: "All", isSelected: selectedFilter == .all) {
                             selectedFilter = .all
@@ -2327,6 +2390,7 @@ struct JournalEntriesList: View {
     }
 }
 
+#if os(iOS)
 // Helper view to render PencilKit drawings in read-only mode
 struct PencilKitDrawingView: UIViewRepresentable {
     let drawing: PKDrawing
@@ -2342,4 +2406,177 @@ struct PencilKitDrawingView: UIViewRepresentable {
     func updateUIView(_ uiView: PKCanvasView, context: Context) {
         uiView.drawing = drawing
     }
-} 
+}
+#endif
+
+// MARK: - Journal Entry Template Model
+
+struct JournalEntryTemplate: Identifiable {
+    let id = UUID()
+    let name: String
+    let icon: String
+    let description: String
+    let contentTemplate: String
+    let suggestedTags: [String]
+}
+
+// MARK: - Entry Template Picker View
+
+@available(iOS 17.0, macOS 14.0, *)
+struct EntryTemplatePickerView: View {
+    let onSelect: (JournalEntryTemplate) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(JournalEntryTemplate.all) { template in
+                Button(action: { onSelect(template) }) {
+                    HStack(spacing: 14) {
+                        Image(systemName: template.icon)
+                            .font(.title2)
+                            .foregroundColor(.purple)
+                            .frame(width: 40, height: 40)
+                            .background(Color.purple.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(template.name).font(.headline).foregroundColor(.primary)
+                            Text(template.description).font(.caption).foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle("Choose Template")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Prayer Link Picker View
+
+@available(iOS 17.0, macOS 14.0, *)
+struct PrayerLinkPickerView: View {
+    @Binding var linkedId: UUID?
+    @Binding var linkedTitle: String
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: [SortDescriptor(\PrayerRequest.date, order: .reverse)]) var prayers: [PrayerRequest]
+    @State private var searchText = ""
+
+    private var filtered: [PrayerRequest] {
+        guard !searchText.isEmpty else { return prayers }
+        return prayers.filter {
+            $0.title.localizedCaseInsensitiveContains(searchText) ||
+            $0.details.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if prayers.isEmpty {
+                    ContentUnavailableView(
+                        "No Prayer Requests",
+                        systemImage: "hands.clap",
+                        description: Text("Create a prayer request first to link it here.")
+                    )
+                } else {
+                    List(filtered) { prayer in
+                        Button(action: {
+                            linkedId = prayer.id
+                            linkedTitle = prayer.title
+                            dismiss()
+                        }) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(prayer.title).font(.headline).foregroundColor(.primary)
+                                    Text(prayer.status.rawValue)
+                                        .font(.caption)
+                                        .foregroundColor(prayer.isAnswered ? .green : .orange)
+                                }
+                                Spacer()
+                                if linkedId == prayer.id {
+                                    Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                    .searchable(text: $searchText, prompt: "Search prayers")
+                }
+            }
+            .navigationTitle("Link Prayer Request")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                if linkedId != nil {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Remove Link") {
+                            linkedId = nil; linkedTitle = ""; dismiss()
+                        }
+                        .foregroundColor(.red)
+                    }
+                }
+            }
+        }
+    }
+}
+
+extension JournalEntryTemplate {
+    static let all: [JournalEntryTemplate] = [
+        JournalEntryTemplate(
+            name: "Daily Reflection",
+            icon: "sun.max.fill",
+            description: "Review your day through a faith lens",
+            contentTemplate: "🌅 Morning Thoughts:\n\n\n📖 Scripture for Today:\n\n\n✨ What happened today:\n\n\n💡 What I learned:\n\n\n🙏 How I saw God at work:\n\n\n❤️ What I'm grateful for:\n\n\n🌙 Prayer for tomorrow:\n",
+            suggestedTags: ["daily", "reflection", "gratitude"]
+        ),
+        JournalEntryTemplate(
+            name: "Sermon Notes",
+            icon: "building.columns.fill",
+            description: "Capture key insights from a message",
+            contentTemplate: "🎤 Preacher / Speaker:\n\n📖 Scripture Text:\n\n🗓 Date:\n\n\n📝 Key Points:\n• \n• \n• \n\n\n💬 Memorable Quotes:\n\n\n🔑 Application — How can I live this out?\n\n\n🙏 My Prayer Response:\n",
+            suggestedTags: ["sermon", "notes", "church"]
+        ),
+        JournalEntryTemplate(
+            name: "Gratitude List",
+            icon: "heart.fill",
+            description: "Count your blessings intentionally",
+            contentTemplate: "🙏 Three Things I'm Grateful For Today:\n1. \n2. \n3. \n\n\n💭 Why these matter to me:\n\n\n📖 A scripture that reflects my gratitude:\n\n\n✉️ Who can I thank or encourage today?\n",
+            suggestedTags: ["gratitude", "thankfulness", "blessings"]
+        ),
+        JournalEntryTemplate(
+            name: "Prayer Journal",
+            icon: "hands.clap.fill",
+            description: "Document prayers and watch God move",
+            contentTemplate: "🙏 What I'm Bringing to God Today:\n\n\n📖 Scripture I'm Standing On:\n\n\n🌟 What I Believe God Will Do:\n\n\n📜 How I've Seen God Move Before:\n\n\n✅ Previous Prayers God Has Answered:\n\n",
+            suggestedTags: ["prayer", "faith", "answered-prayers"]
+        ),
+        JournalEntryTemplate(
+            name: "Faith Milestone",
+            icon: "flag.fill",
+            description: "Mark a significant moment in your journey",
+            contentTemplate: "🎯 What Happened:\n\n\n💎 Why This Moment Is Significant:\n\n\n🔥 How This Impacted My Faith:\n\n\n📖 Scripture That Speaks to This Moment:\n\n\n👣 My Next Step of Faith:\n\n\n📅 Date to Remember:\n",
+            suggestedTags: ["milestone", "testimony", "faith-journey"]
+        ),
+        JournalEntryTemplate(
+            name: "Weekly Review",
+            icon: "calendar",
+            description: "Reflect on your week with intention",
+            contentTemplate: "📅 Week of:\n\n\n🌟 Highlights:\n• \n• \n\n\n⚔️ Challenges I Faced:\n• \n• \n\n\n💡 Lessons Learned:\n• \n• \n\n\n🌱 How I Grew in Faith:\n\n\n🙏 Prayers for Next Week:\n\n",
+            suggestedTags: ["weekly", "review", "growth"]
+        )
+    ]
+}

@@ -2,15 +2,21 @@ import SwiftUI
 import LocalAuthentication
 import AuthenticationServices
 import CryptoKit
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 // Try to import Firebase - if it fails, we'll handle it at runtime
 #if canImport(FirebaseAuth)
 import FirebaseAuth
-#else
-// Package is linked but compiler can't find it - will check at runtime
+#endif
+#if canImport(FirebaseFirestore)
+import FirebaseFirestore
 #endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct LoginView: View {
     @Binding var hasLoggedIn: Bool
     @State private var isAuthenticating = false
@@ -34,6 +40,8 @@ struct LoginView: View {
 
     // Apple Sign-In nonce (required for Firebase Auth with Apple)
     @State private var currentNonce: String?
+    /// Retains the coordinator until Sign in with Apple flow completes.
+    @State private var appleSignInCoordinator: AppleSignInCoordinator?
     
     init(hasLoggedIn: Binding<Bool> = .constant(false)) {
         _hasLoggedIn = hasLoggedIn
@@ -42,16 +50,30 @@ struct LoginView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Gradient Background matching landing page
-                LinearGradient(
-                    colors: [
-                        Color.purple.opacity(0.8),
-                        Color.blue.opacity(0.9),
-                        Color.purple.opacity(0.7)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                // Gradient Background - more opaque on macOS so sheet stands out from landing page
+                Group {
+                    #if os(macOS)
+                    LinearGradient(
+                        colors: [
+                            Color.purple.opacity(0.95),
+                            Color.blue.opacity(0.95),
+                            Color.purple.opacity(0.9)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    #else
+                    LinearGradient(
+                        colors: [
+                            Color.purple.opacity(0.8),
+                            Color.blue.opacity(0.9),
+                            Color.purple.opacity(0.7)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    #endif
+                }
                 .ignoresSafeArea(.all, edges: .all)
                 
                 // Decorative circles
@@ -63,6 +85,30 @@ struct LoginView: View {
                     .fill(Color.white.opacity(0.05))
                     .frame(width: 200, height: 200)
                     .offset(x: geometry.size.width - 100, y: geometry.size.height - 200)
+                
+                #if os(macOS)
+                // Red close button to dismiss sheet and return to main window
+                VStack {
+                    HStack {
+                        Button(action: { dismiss() }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 28, height: 28)
+                                .background(Circle().fill(Color.red.opacity(0.9)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Close")
+                        .accessibilityHint("Return to main window")
+                        Spacer()
+                    }
+                    .padding(.top, max(geometry.safeAreaInsets.top, 12))
+                    .padding(.leading, 20)
+                    Spacer()
+                }
+                .allowsHitTesting(true)
+                .zIndex(10)
+                #endif
                 
                 ScrollView {
                     VStack(spacing: 32) {
@@ -104,43 +150,44 @@ struct LoginView: View {
                                 .cornerRadius(12)
                             }
                             
-                            // Show biometric first if previously logged in
-                            if hasPreviouslyLoggedIn && biometricType != .none {
-                                biometricButton
-                                    .disabled(isAuthenticating)
-                                
-                                Divider()
-                                    .background(Color.white.opacity(0.3))
-                            }
-                            
-                            // Email/Password Authentication Section
+                            // Email/Password Authentication Section — Apple and Email always first so "Sign in with Apple" is never confused with Touch ID
                             if showEmailPasswordAuth {
                                 // Always show the form - let FirebaseInitializer handle availability
                                 // The form will show appropriate errors if Firebase isn't available
                                 emailPasswordAuthView
                             } else {
-                                // Sign in with Apple Button (primary authentication method)
-                                SignInWithAppleButton(
-                                    onRequest: { request in
-                                        // Firebase requires a nonce to prevent replay attacks.
-                                        let nonce = randomNonceString()
-                                        currentNonce = nonce
-                                        request.nonce = sha256(nonce)
-                                        request.requestedScopes = [.fullName, .email]
-                                        print("🔍 [APPLE SIGN IN] Button tapped, requesting authorization...")
-                                    },
-                                    onCompletion: { result in
-                                        print("🔍 [APPLE SIGN IN] Authorization completed")
-                                        handleAppleSignIn(result: result)
+                                // Sign in with Apple — same design as Email and Demo (per App Store guideline)
+                                Button(action: { performAppleSignIn() }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "apple.logo")
+                                        Text("Sign in with Apple")
                                     }
-                                )
-                                .signInWithAppleButtonStyle(.white)
-                                .frame(height: 50)
-                                .cornerRadius(16)
-                                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(width: 300, height: 44)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color.black, Color.black.opacity(0.85)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .cornerRadius(16)
+                                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                                }
+                                .buttonStyle(.plain)
                                 .disabled(isAuthenticating)
+                                .accessibilityLabel("Sign in with Apple")
+                                .accessibilityHint("Signs you in with your Apple ID. Your device may ask for Touch ID or password to verify.")
+                                if biometricType != .none {
+                                    Text("Your device may ask for Touch ID or password to verify your Apple ID.")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.85))
+                                        .multilineTextAlignment(.center)
+                                        .padding(.top, 4)
+                                }
                                 
-                                // Toggle to email/password
+                                // Sign in with Email — same size as Sign in with Apple (300×44)
                                 Button(action: {
                                     withAnimation {
                                         showEmailPasswordAuth = true
@@ -150,8 +197,7 @@ struct LoginView: View {
                                         .font(.headline)
                                         .font(.body.weight(.semibold))
                                         .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
+                                        .frame(width: 300, height: 44)
                                         .background(
                                             LinearGradient(
                                                 colors: [Color.purple, Color.purple.opacity(0.8)],
@@ -163,13 +209,19 @@ struct LoginView: View {
                                         .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                                 }
                                 .padding(.top, 8)
+                                .accessibilityLabel("Sign in with Email")
+                                .accessibilityHint("Sign in or create an account using email and password")
                             }
                             
-                            // Show biometric as alternative if not shown above
-                            if !hasPreviouslyLoggedIn && biometricType != .none {
+                            // Quick unlock with Touch ID / Face ID — only for returning users, clearly separate from Sign in with Apple
+                            if biometricType != .none {
                                 Divider()
                                     .background(Color.white.opacity(0.3))
-                                
+                                if hasPreviouslyLoggedIn {
+                                    Text("Already signed in? Unlock with biometrics")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
                                 biometricButton
                                     .disabled(isAuthenticating)
                             }
@@ -208,9 +260,11 @@ struct LoginView: View {
                                     // Wait a moment for the write to complete
                                     try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
                                     
-                                    // Now sync existing data
+                                    // Now sync existing data (only when Firebase is linked for this target)
                                     print("🔄 [DEMO] Syncing existing data to Firebase...")
+                                    #if canImport(FirebaseFirestore)
                                     await FirebaseSyncService.shared.syncAllData()
+                                    #endif
                                     
                                     print("✅ [DEMO] Demo mode setup complete!")
                                     print("✅ [DEMO] Check Firebase Console - you should see:")
@@ -224,8 +278,7 @@ struct LoginView: View {
                                 }
                                 .font(.headline)
                                 .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                                .frame(width: 300, height: 44)
                                 .background(
                                     LinearGradient(
                                         colors: [Color.orange, Color.orange.opacity(0.8)],
@@ -237,12 +290,26 @@ struct LoginView: View {
                                 .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                             }
                             .disabled(isAuthenticating)
+                            .accessibilityLabel("Try Demo")
+                            .accessibilityHint("Sign in as a test user for simulator or testing")
                         }
+                        .frame(maxWidth: .infinity)
                         .padding(28)
                         .background(
-                            RoundedRectangle(cornerRadius: 28)
-                                .fill(.ultraThinMaterial)
-                                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+                            Group {
+                                #if os(macOS)
+                                RoundedRectangle(cornerRadius: 28)
+                                    .fill(.regularMaterial)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 28)
+                                            .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                                    )
+                                #else
+                                RoundedRectangle(cornerRadius: 28)
+                                    .fill(.ultraThinMaterial)
+                                #endif
+                            }
+                            .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
                         )
                         .padding(.horizontal, 24)
                         
@@ -377,10 +444,9 @@ struct LoginView: View {
                 print("✅ [APPLE SIGN IN] User ID: \(appleIDCredential.user)")
                 print("✅ [APPLE SIGN IN] Email: \(appleIDCredential.email ?? "not provided")")
                 print("✅ [APPLE SIGN IN] Full Name: \(appleIDCredential.fullName?.givenName ?? "not provided")")
-                
-                Task {
-                    // Sign in to Firebase Auth with Apple credential for cross-device sync
-                    await signInToFirebaseWithApple(appleIDCredential: appleIDCredential)
+                Task { @MainActor in
+                    let nonceToUse = currentNonce
+                    await signInToFirebaseWithApple(appleIDCredential: appleIDCredential, nonce: nonceToUse)
                 }
             } else {
                 let credentialType = type(of: authorization.credential)
@@ -407,20 +473,14 @@ struct LoginView: View {
                 
                 // Check if we're in simulator - authentication errors are expected
                 #if targetEnvironment(simulator)
-                // In simulator, Sign in with Apple may not work properly
-                // Silently handle common simulator authentication errors
-                if let authError = error as? ASAuthorizationError {
-                    // Error code 1000 is common in simulator
-                    if authError.code.rawValue == 1000 {
-                        print("⚠️ [AUTH] Sign in with Apple not available in simulator. Use 'Try Demo' button instead.")
-                        // Don't show error to user in simulator - they can use "Try Demo" button
-                        return
-                    }
+                if let authError = error as? ASAuthorizationError, authError.code.rawValue == 1000 {
+                    print("⚠️ [AUTH] Sign in with Apple not available in simulator. Use 'Try Demo' button instead.")
+                    errorMessage = "Sign in with Apple isn't available in the Simulator. Use a real device or tap Try Demo below."
+                    return
                 }
-                
-                // Check for AKAuthenticationError Code -7026 (simulator limitation)
                 if nsError.domain == "AKAuthenticationError" && nsError.code == -7026 {
                     print("⚠️ [AUTH] Authentication services not fully supported in simulator.")
+                    errorMessage = "Sign in with Apple isn't available in the Simulator. Use a real device or tap Try Demo below."
                     return
                 }
                 #endif
@@ -448,8 +508,8 @@ struct LoginView: View {
                         if !errorInfo.isEmpty {
                             print("❌ [APPLE SIGN IN] Error userInfo: \(errorInfo)")
                         }
-                        // Check if this is a Firebase configuration issue
-                        errorMessage = "Sign in failed. Please check your internet connection and try again."
+                        // Apple sometimes reports "not connected" when the device is online (VPN, captive portal, or server issue)
+                        errorMessage = "Sign-in didn't complete. Try again, use a different network, or turn off VPN. If it keeps happening, use Sign in with Email."
                         #endif
                     case .notInteractive:
                         errorMessage = "Sign in requires user interaction."
@@ -487,7 +547,67 @@ struct LoginView: View {
         }
     }
     
-    private func signInToFirebaseWithApple(appleIDCredential: ASAuthorizationAppleIDCredential) async {
+    /// Programmatic Sign in with Apple (used by custom-styled button so design matches other login buttons).
+    /// Work is deferred so performRequests() runs in a separate run-loop pass, avoiding priority inversion (user-interactive waiting on default).
+    private func performAppleSignIn() {
+        print("🔍 [APPLE SIGN IN] Button tapped, requesting authorization...")
+        DispatchQueue.global(qos: .default).async { [self] in
+            let nonce = randomNonceString()
+            let hashedNonce = sha256(nonce)
+            let provider = ASAuthorizationAppleIDProvider()
+            let request = provider.createRequest()
+            request.nonce = hashedNonce
+            request.requestedScopes = [.fullName, .email]
+            DispatchQueue.main.async(qos: .default) {
+                let coordinator = AppleSignInCoordinator { [self] result in
+                    DispatchQueue.main.async {
+                        self.handleAppleSignIn(result: result)
+                        self.appleSignInCoordinator = nil
+                    }
+                }
+                let controller = ASAuthorizationController(authorizationRequests: [request])
+                controller.delegate = coordinator
+                controller.presentationContextProvider = coordinator
+                coordinator.cachedPresentationAnchor = Self.resolvePresentationAnchor()
+                currentNonce = nonce
+                appleSignInCoordinator = coordinator
+                // Defer to next run loop so main thread is not in user-interactive context when ASAuthorizationController runs (avoids hang risk diagnostic).
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, qos: .default) {
+                    controller.performRequests()
+                }
+            }
+        }
+    }
+    
+    private static func resolvePresentationAnchor() -> ASPresentationAnchor {
+        #if os(iOS)
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        if let window = scene?.windows.first(where: { $0.isKeyWindow }) ?? scene?.windows.first {
+            return window
+        }
+        if let anyWindow = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first {
+            return anyWindow
+        }
+        fatalError("Faith Journal: No window available for Sign in with Apple. Please ensure the app is in the foreground.")
+        #elseif os(macOS)
+        if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow {
+            return window
+        }
+        if let window = NSApplication.shared.windows.first(where: { $0.isVisible }) ?? NSApplication.shared.windows.first {
+            return window
+        }
+        fatalError("Faith Journal: No window available for Sign in with Apple. Please ensure the app window is open.")
+        #else
+        fatalError("Unsupported platform")
+        #endif
+    }
+    
+    private func signInToFirebaseWithApple(appleIDCredential: ASAuthorizationAppleIDCredential, nonce explicitNonce: String? = nil) async {
         print("🔍 [FIREBASE AUTH] Starting Firebase Auth sign-in with Apple...")
         
         #if canImport(FirebaseAuth)
@@ -502,7 +622,13 @@ struct LoginView: View {
             return
         }
 
-        guard let nonce = currentNonce else {
+        let nonce: String?
+        if let explicit = explicitNonce, !explicit.isEmpty {
+            nonce = explicit
+        } else {
+            nonce = await MainActor.run { currentNonce }
+        }
+        guard let nonce = nonce, !nonce.isEmpty else {
             print("❌ [FIREBASE AUTH] Missing nonce. Apple request did not include nonce.")
             await MainActor.run {
                 errorMessage = "Sign in failed. Please try again."
@@ -533,19 +659,14 @@ struct LoginView: View {
                 try? auth.signOut()
             }
             
-            // Create Firebase credential from Apple credential
+            // Create Firebase credential from Apple credential (use official Apple API per Firebase docs)
             print("🔍 [FIREBASE AUTH] Creating OAuth credential with Apple ID token...")
             print("🔍 [FIREBASE AUTH] ID Token length: \(idTokenString.count) characters")
             
-            // Create Firebase credential from Apple credential
-            // For Apple Sign In with Firebase, we use the static credential method
-            // providerID must be AuthProviderID.apple, idToken is the Apple ID token,
-            // rawNonce can be empty string if not using nonce, accessToken is optional
-            let credential = OAuthProvider.credential(
-                withProviderID: "apple",
-                idToken: idTokenString,
+            let credential = OAuthProvider.appleCredential(
+                withIDToken: idTokenString,
                 rawNonce: nonce,
-                accessToken: nil
+                fullName: appleIDCredential.fullName
             )
             
             print("✅ [FIREBASE AUTH] OAuth credential created")
@@ -582,10 +703,34 @@ struct LoginView: View {
                     // After successful test, sync all existing data
                     // This ensures all local journal entries are uploaded to Firebase
                     print("🔄 [FIREBASE] Syncing all existing data to Firebase...")
+                    #if canImport(FirebaseFirestore)
                     await FirebaseSyncService.shared.syncAllData()
+                    #endif
                     print("✅ [FIREBASE] All existing data synced to Firebase")
                 }
             }
+            
+            // Save Apple name to Firestore and search index (Apple only provides name on FIRST sign-in)
+            #if canImport(FirebaseFirestore)
+            if let fullName = appleIDCredential.fullName {
+                let given = fullName.givenName ?? ""
+                let family = fullName.familyName ?? ""
+                let displayName = [given, family].filter { !$0.isEmpty }.joined(separator: " ")
+                if !displayName.isEmpty {
+                    do {
+                        try await Firestore.firestore().collection("users").document(firebaseUserId).setData([
+                            "name": displayName,
+                            "nameLower": displayName.lowercased(),
+                            "updatedAt": Timestamp(date: Date())
+                        ], merge: true)
+                        FirebaseSyncService.shared.upsertUserSearchProfile(userId: firebaseUserId, displayName: displayName)
+                        print("✅ [FAITH FRIENDS] Saved Apple name to search index: \(displayName)")
+                    } catch {
+                        print("⚠️ [FAITH FRIENDS] Could not save Apple name: \(error.localizedDescription)")
+                    }
+                }
+            }
+            #endif
             
             await MainActor.run {
                 hasLoggedIn = true
@@ -611,23 +756,67 @@ struct LoginView: View {
                 print("❌ [FIREBASE AUTH] AuthErrorCode: \(authErrorCode)")
                 switch authErrorCode {
                 case .networkError:
-                    errorMessage = "Network error. Please check your internet connection and try again."
+                    // Firebase often returns networkError even when device is online (VPN, firewall, App Check, captive portal)
+                    if let underlying = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError) {
+                        print("❌ [FIREBASE AUTH] networkError underlying: code=\(underlying.code) domain=\(underlying.domain) \(underlying.localizedDescription)")
+                    }
+                    errorMessage = "Sign-in couldn't reach the server. Try again, or use a different network or turn off VPN. If you're on Wi‑Fi, try cellular (or vice versa)."
                 case .invalidCredential:
                     errorMessage = "Invalid credentials. Please try signing in again."
                 case .userDisabled:
                     errorMessage = "This account has been disabled. Please contact support."
                 case .operationNotAllowed:
-                    errorMessage = "Sign in with Apple is not enabled in Firebase. Please check Firebase Console settings."
+                    errorMessage = "Sign in with Apple is not enabled. In Firebase Console go to Authentication → Sign-in method and enable Apple."
                 case .invalidAPIKey:
                     errorMessage = "Firebase configuration error. Please contact support."
                 case .appNotAuthorized:
-                    errorMessage = "App not authorized for Firebase Auth. Please check Firebase Console settings."
+                    errorMessage = "App not authorized for Firebase Auth. Check Firebase Console and ensure the app’s bundle ID is allowed for Apple sign-in."
+                case .accountExistsWithDifferentCredential:
+                    errorMessage = "This Apple ID is not linked to your account. Use \"Sign in with Email\" with your account email instead, or use the same Apple ID you used when you first created the account."
                 default:
-                    errorMessage = "Sign in failed (Error \(nsError.code)). Please try again or contact support."
+                    if nsError.code == 17995 {
+                        errorMessage = "Keychain access failed. If using Simulator, try \"Try Demo\" or restart the Simulator. On a real device, try again."
+                    } else if nsError.code == 17999 {
+                    #if targetEnvironment(simulator)
+                    errorMessage = "Sign in with Apple isn't available in the Simulator. Use a real device or tap Try Demo below."
+                    #else
+                    if let underlying = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError) {
+                        errorMessage = "Sign in with Apple failed (17999). Real error: code=\(underlying.code) domain=\(underlying.domain). If this persists: turn off App Check for Auth in Firebase, check Service ID return URL and Key ID."
+                    } else {
+                        errorMessage = "Sign in with Apple failed (17999). Run from Xcode with iPhone connected and check console for \"17999 underlying\" to see the exact error."
+                    }
+                    #endif
+                        print("❌ [FIREBASE AUTH] 17999 full userInfo: \(nsError.userInfo)")
+                        if let underlying = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError) {
+                            print("❌ [FIREBASE AUTH] 17999 underlying: code=\(underlying.code) domain=\(underlying.domain) \(underlying.localizedDescription)")
+                            print("❌ [FIREBASE AUTH] 17999 underlying userInfo: \(underlying.userInfo)")
+                        }
+                    } else {
+                        errorMessage = "Sign in failed (Error \(nsError.code)). Please try again or use Sign in with Email."
+                    }
                 }
             } else if nsError.domain == "FIRAuthErrorDomain" {
-                // Firebase Auth error but not in AuthErrorCode enum
-                errorMessage = "Authentication error (Code \(nsError.code)). Please try again."
+                if nsError.code == 17999 {
+                    #if targetEnvironment(simulator)
+                    errorMessage = "Sign in with Apple isn't available in the Simulator. Use a real device or tap Try Demo below."
+                    #else
+                    if let underlying = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError) {
+                        errorMessage = "Sign in with Apple failed (17999). Real error: code=\(underlying.code) domain=\(underlying.domain). If this persists: turn off App Check for Auth in Firebase, check Service ID return URL and Key ID."
+                    } else {
+                        errorMessage = "Sign in with Apple failed (17999). Run from Xcode with iPhone connected and check console for \"17999 underlying\" to see the exact error."
+                    }
+                    #endif
+                    print("❌ [FIREBASE AUTH] 17999 full userInfo: \(nsError.userInfo)")
+                    if let underlying = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError) {
+                        print("❌ [FIREBASE AUTH] 17999 underlying: code=\(underlying.code) domain=\(underlying.domain) \(underlying.localizedDescription)")
+                        print("❌ [FIREBASE AUTH] 17999 underlying userInfo: \(underlying.userInfo)")
+                    }
+                } else {
+                    errorMessage = "Authentication error (Code \(nsError.code)). Please try again."
+                }
+            } else if nsError.domain == NSURLErrorDomain && (nsError.code == NSURLErrorNotConnectedToInternet || nsError.code == -1009) {
+                // System reports "The Internet connection appears to be offline" even when connected (VPN, captive portal, DNS)
+                errorMessage = "Sign-in couldn't reach the server. Try again, use a different network, or turn off VPN. If you're on Wi‑Fi, try cellular (or vice versa)."
             } else {
                 errorMessage = "Failed to connect to sync service. Error: \(nsError.localizedDescription)"
             }
@@ -663,7 +852,7 @@ struct LoginView: View {
     private func randomNonceString(length: Int = 32) -> String {
         precondition(length > 0)
         let charset: [Character] =
-        Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
 
         var result = ""
         var remainingLength = length
@@ -710,47 +899,44 @@ struct LoginView: View {
         let context = LAContext()
         var error: NSError?
         
-        // Check if biometric authentication is available
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
-            Task { @MainActor in
-                if let error = error {
-                    errorMessage = "Biometric authentication not available: \(error.localizedDescription)"
-                } else {
-                    errorMessage = "Biometric authentication not available on this device."
-                }
-                isAuthenticating = false
+            if let error = error {
+                errorMessage = "Biometric authentication not available: \(error.localizedDescription)"
+            } else {
+                errorMessage = "Biometric authentication not available on this device."
             }
+            isAuthenticating = false
             return
         }
         
-        // Perform biometric authentication
-        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, authenticationError in
-            Task { @MainActor in
+        let reasonCopy = reason
+        context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reasonCopy) { success, authenticationError in
+            // LAContext calls this on an arbitrary queue; never touch SwiftUI from here.
+            // Schedule all UI work on main, then run async success path from main.
+            DispatchQueue.main.async {
                 isAuthenticating = false
-                
                 if success {
-                    // Biometric authentication successful
-                    // Now verify iCloud authentication
-                    Task {
+                    Task { @MainActor in
                         await verifyiCloudAfterBiometric()
                     }
                 } else {
-                    // Biometric authentication failed
-                    if let authError = authenticationError {
-                        switch authError {
-                        case LAError.userCancel:
+                    if let authError = authenticationError as? LAError {
+                        switch authError.code {
+                        case .userCancel:
                             errorMessage = "Authentication cancelled."
-                        case LAError.userFallback:
-                            errorMessage = "Please use iCloud sign in instead."
-                        case LAError.biometryNotAvailable:
+                        case .userFallback:
+                            errorMessage = "Please use Sign in with Apple or Email instead."
+                        case .biometryNotAvailable:
                             errorMessage = "Biometric authentication not available."
-                        case LAError.biometryNotEnrolled:
+                        case .biometryNotEnrolled:
                             errorMessage = "No biometric data enrolled. Please set up Face ID or Touch ID in Settings."
-                        case LAError.biometryLockout:
-                            errorMessage = "Biometric authentication locked. Please use iCloud sign in."
+                        case .biometryLockout:
+                            errorMessage = "Biometric authentication locked. Please use Sign in with Apple or Email."
                         default:
                             errorMessage = "Biometric authentication failed: \(authError.localizedDescription)"
                         }
+                    } else if let err = authenticationError {
+                        errorMessage = "Biometric authentication failed: \(err.localizedDescription)"
                     } else {
                         errorMessage = "Biometric authentication failed."
                     }
@@ -759,26 +945,34 @@ struct LoginView: View {
         }
     }
     
+    @MainActor
     private func verifyiCloudAfterBiometric() async {
-        // After successful biometric authentication, verify user
         print("🔍 [FACE ID] Verifying authentication after Face ID...")
-        
-        // CloudKit removed - using Firebase for sync
         await userService.checkAuthentication()
-        
-        if userService.isAuthenticated {
-            print("✅ [FACE ID] Authentication verified - Firebase sync enabled")
-            await MainActor.run {
-                hasLoggedIn = true
-                hasPreviouslyLoggedIn = true
-                dismiss()
-            }
+        #if canImport(FirebaseAuth)
+        let configured = FirebaseInitializer.shared.isConfigured
+        let currentUser = configured ? Auth.auth().currentUser : nil
+        let hasFirebaseUser = currentUser != nil
+        if hasFirebaseUser {
+            print("✅ [FACE ID] Firebase session found - signing in with existing account")
+            hasLoggedIn = true
+            hasPreviouslyLoggedIn = true
+            DispatchQueue.main.async { dismiss() }
+        } else if userService.isAuthenticated {
+            print("⚠️ [FACE ID] No Firebase account. Use Sign in with Apple or Email first.")
+            errorMessage = "Use Sign in with Apple or Email to sign in to your account. Face ID can then unlock the app next time."
         } else {
-            print("⚠️ [FACE ID] Authentication failed")
-            await MainActor.run {
-                errorMessage = "Authentication failed. Please try again."
-            }
+            errorMessage = "Authentication failed. Please try again."
         }
+        #else
+        if userService.isAuthenticated {
+            hasLoggedIn = true
+            hasPreviouslyLoggedIn = true
+            DispatchQueue.main.async { dismiss() }
+        } else {
+            errorMessage = "Authentication failed. Please try again."
+        }
+        #endif
     }
     
     // MARK: - Email/Password Authentication
@@ -799,9 +993,15 @@ struct LoginView: View {
                     }
                 }) {
                     Image(systemName: "chevron.left")
+                        #if os(macOS)
+                        .foregroundColor(.primary)
+                        #else
                         .foregroundColor(.white)
+                        #endif
                         .font(.headline)
                 }
+                .accessibilityLabel("Back")
+                .accessibilityHint("Return to Sign in with Apple and Email options")
                 
                 Spacer()
                 
@@ -821,8 +1021,13 @@ struct LoginView: View {
                     Text(isSignUpMode ? "Sign In" : "Sign Up")
                         .font(.subheadline)
                         .font(.body.weight(.semibold))
-                        .foregroundColor(.blue)
+                        #if os(macOS)
+                        .foregroundColor(.primary)
+                        #else
+                        .foregroundColor(.white)
+                        #endif
                 }
+                .accessibilityLabel(isSignUpMode ? "Switch to Sign In" : "Switch to Sign Up")
             }
             .padding(.horizontal)
             
@@ -838,7 +1043,9 @@ struct LoginView: View {
                         .background(Color.white.opacity(0.2))
                         .cornerRadius(12)
                         .foregroundColor(.white)
-                        .autocapitalization(.words)
+                        #if os(iOS)
+                        .textInputAutocapitalization(.words)
+                        #endif
                 }
             }
             
@@ -853,8 +1060,10 @@ struct LoginView: View {
                     .background(Color.white.opacity(0.2))
                     .cornerRadius(12)
                     .foregroundColor(.white)
+                    #if os(iOS)
                     .keyboardType(.emailAddress)
-                    .autocapitalization(.none)
+                    .textInputAutocapitalization(.never)
+                    #endif
                     .autocorrectionDisabled()
             }
             
@@ -918,6 +1127,7 @@ struct LoginView: View {
                 .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
             }
             .disabled(isAuthenticating || email.isEmpty || password.isEmpty || (isSignUpMode && (confirmPassword.isEmpty || username.isEmpty)))
+            .accessibilityLabel(isSignUpMode ? "Create Account" : "Sign In with Email")
             
             // Forgot password (sign in only)
             if !isSignUpMode {
@@ -928,6 +1138,8 @@ struct LoginView: View {
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.8))
                 }
+                .accessibilityLabel("Forgot Password")
+                .accessibilityHint("Send a password reset link to your email")
             }
         }
         .padding()
@@ -935,8 +1147,10 @@ struct LoginView: View {
         .cornerRadius(20)
         .alert("Reset Password", isPresented: $showPasswordResetAlert) {
             TextField("Enter your email", text: $email)
+                #if os(iOS)
                 .keyboardType(.emailAddress)
-                .autocapitalization(.none)
+                .textInputAutocapitalization(.never)
+                #endif
             Button("Cancel", role: .cancel) {
                 email = ""
             }
@@ -1095,7 +1309,9 @@ struct LoginView: View {
                 Task {
                     await FirebaseSyncService.shared.testFirebaseConnection()
                     print("🔄 [FIREBASE] Syncing all existing data to Firebase...")
+                    #if canImport(FirebaseFirestore)
                     await FirebaseSyncService.shared.syncAllData()
+                    #endif
                     print("✅ [FIREBASE] All existing data synced to Firebase")
                 }
             }
@@ -1120,7 +1336,7 @@ struct LoginView: View {
                 case .wrongPassword:
                     errorMessage = "Incorrect password."
                 case .userNotFound:
-                    errorMessage = "No account found with this email."
+                    errorMessage = "No account found with this email. Sign up, or use the email you used when you first created your account."
                 case .userDisabled:
                     errorMessage = "This account has been disabled."
                 case .networkError:
@@ -1130,11 +1346,16 @@ struct LoginView: View {
                 case .operationNotAllowed:
                     errorMessage = "Email/password sign-in is not enabled for this app. Enable it in Firebase Console → Authentication → Sign-in method."
                 case .invalidCredential:
-                    errorMessage = "This email can’t be used with a password on this app. Try Sign in with Apple, or create an email/password account."
+                    errorMessage = "Incorrect email or password, or no account with this email. Use the email you signed up with, or create an account."
                 case .accountExistsWithDifferentCredential:
                     errorMessage = "This email is already linked to a different sign-in method. Try Sign in with Apple."
                 default:
-                    errorMessage = "Sign in failed: \(error.localizedDescription)"
+                    // Keychain error (17995) - common in Simulator
+                    if nsError.code == 17995 {
+                        errorMessage = "Keychain access failed. If using Simulator, try \"Try Demo\" or restart the Simulator. On a real device, try again."
+                    } else {
+                        errorMessage = "Sign in failed: \(error.localizedDescription)"
+                    }
                 }
                 isAuthenticating = false
             }
@@ -1193,7 +1414,9 @@ struct LoginView: View {
                 Task {
                     await FirebaseSyncService.shared.testFirebaseConnection()
                     print("🔄 [FIREBASE] Syncing all existing data to Firebase...")
+                    #if canImport(FirebaseFirestore)
                     await FirebaseSyncService.shared.syncAllData()
+                    #endif
                     print("✅ [FIREBASE] All existing data synced to Firebase")
                 }
             }
@@ -1224,7 +1447,11 @@ struct LoginView: View {
                 case .operationNotAllowed:
                     errorMessage = "Email/password sign-up is not enabled for this app. Enable it in Firebase Console → Authentication → Sign-in method."
                 default:
-                    errorMessage = "Sign up failed: \(error.localizedDescription)"
+                    if nsError.code == 17995 {
+                        errorMessage = "Keychain access failed. If using Simulator, try \"Try Demo\" or restart the Simulator. On a real device, try again."
+                    } else {
+                        errorMessage = "Sign up failed: \(error.localizedDescription)"
+                    }
                 }
                 isAuthenticating = false
             }
@@ -1256,7 +1483,53 @@ struct ModernTextFieldStyle: TextFieldStyle {
     }
 }
 
-@available(iOS 17.0, *)
+// MARK: - Programmatic Sign in with Apple (same design as other login buttons)
+@available(iOS 17.0, macOS 14.0, *)
+private final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private let completion: (Result<ASAuthorization, Error>) -> Void
+    /// Set on main before performRequests() so presentationAnchor can return without touching UIKit/AppKit from background (avoids priority inversion).
+    var cachedPresentationAnchor: ASPresentationAnchor?
+    
+    init(completion: @escaping (Result<ASAuthorization, Error>) -> Void) {
+        self.completion = completion
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        completion(.success(authorization))
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        completion(.failure(error))
+    }
+    
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        if let cached = cachedPresentationAnchor { return cached }
+        #if os(iOS)
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        if let window = scene?.windows.first(where: { $0.isKeyWindow }) ?? scene?.windows.first {
+            return window
+        }
+        if let anyWindow = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first {
+            return anyWindow
+        }
+        fatalError("Faith Journal: No window available for Sign in with Apple.")
+        #elseif os(macOS)
+        if let window = NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow ?? NSApplication.shared.windows.first(where: { $0.isVisible }) ?? NSApplication.shared.windows.first {
+            return window
+        }
+        fatalError("Faith Journal: No window available for Sign in with Apple.")
+        #else
+        fatalError("Unsupported platform")
+        #endif
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
 #Preview {
     LoginView()
 }

@@ -3,6 +3,11 @@ import SwiftData
 import Foundation
 import UserNotifications
 import LocalAuthentication
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 #if canImport(FirebaseAuth)
 import FirebaseAuth
@@ -12,8 +17,15 @@ import FirebaseAuth
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var themeManager = ThemeManager.shared
+    @ObservedObject private var profileManager = ProfileManager.shared
+    @ObservedObject private var firebaseSync = FirebaseSyncService.shared
     @Query var userProfiles: [UserProfile]
     private var userProfile: UserProfile? { userProfiles.first }
+    /// Display name: prefer ProfileManager (Firebase) since ProfileEditView saves there; fall back to local UserProfile
+    private var profileDisplayName: String {
+        if !profileManager.userName.isEmpty { return profileManager.userName }
+        return userProfile?.name ?? ""
+    }
     @AppStorage("selectedTheme") private var selectedTheme: String = "System"
     // Default notification times (users can change these in settings)
     // Bible Verse: 7am, Journal Reminder: 8am, Devotional: 9am
@@ -39,6 +51,9 @@ struct SettingsView: View {
         reminderTime = Date(timeIntervalSince1970: reminderTimeInterval)
     }
     @State private var showResetAlert = false
+    @State private var showDeleteTestSessionsAlert = false
+    @State private var showFirebaseLiveSessionsRemovedAlert = false
+    @State private var firebaseLiveSessionsRemovedCount = 0
     @State private var showExportSheet = false
     @State private var exportData: String = ""
     @State private var showAuthLock = false
@@ -46,15 +61,22 @@ struct SettingsView: View {
     @State private var showingProfileEdit = false
     @State private var showingTermsOfService = false
     @State private var showingPrivacyPolicy = false
-    @State private var showingBibleStudy = false
-    @State private var showingBibleView = false
-    @State private var showingLiveSessions = false
-    @State private var showingMoodAnalytics = false
-    @State private var showingReadingPlans = false
-    @State private var showingStatistics = false
-    @State private var showingGlobalSearch = false
     @State private var syncStatusText: String = "Checking..."
     @State private var syncStatusIconColor: Color = .secondary
+    /// Derived from FirebaseSyncService so status always matches (avoids stale @State)
+    private var syncStatusDisplay: (text: String, color: Color, icon: String) {
+        if firebaseSync.isSyncing {
+            return ("Syncing...", .blue, "arrow.clockwise")
+        }
+        if let lastSync = firebaseSync.lastSyncDate {
+            return ("Synced \(lastSyncTimeString(from: lastSync))", .green, "checkmark.circle.fill")
+        }
+        if let err = firebaseSync.syncError {
+            let isAuth = err.contains("authenticated") || err.contains("Sign in")
+            return (err, isAuth ? .orange : .red, "exclamationmark.triangle.fill")
+        }
+        return ("Ready", .green, "checkmark.circle.fill")
+    }
     @State private var showingContactSupport = false
     @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
     @AppStorage("hasLoggedIn") private var hasLoggedIn = false
@@ -68,13 +90,22 @@ struct SettingsView: View {
         if let avatarURLString = profile.avatarPhotoURL,
            let avatarURL = URL(string: avatarURLString),
            let imageData = try? Data(contentsOf: avatarURL),
-           let avatarImage = UIImage(data: imageData) {
+           let avatarImage = platformImageFromData(imageData) {
+            #if os(iOS)
             Image(uiImage: avatarImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 40, height: 40)
                 .clipShape(Circle())
                 .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            #else
+            Image(nsImage: avatarImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            #endif
         } else {
             Circle()
                 .fill(
@@ -97,6 +128,44 @@ struct SettingsView: View {
             .foregroundColor(.white)
     }
     
+    /// Avatar from ProfileManager so it updates immediately when user saves a new picture.
+    @ViewBuilder
+    private func profileAvatarViewFromManager(profile: UserProfile?) -> some View {
+        if let urlString = profileManager.profileImageURL,
+           let url = URL(string: urlString),
+           let imageData = try? Data(contentsOf: url),
+           let avatarImage = platformImageFromData(imageData) {
+            #if os(iOS)
+            Image(uiImage: avatarImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            #else
+            Image(nsImage: avatarImage)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.gray.opacity(0.2), lineWidth: 1))
+            #endif
+        } else if let profile = profile {
+            profileAvatarView(profile: profile)
+        } else {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [themeManager.colors.primary, themeManager.colors.secondary],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 40, height: 40)
+                .overlay(Text(String(profileDisplayName.prefix(1).uppercased())).font(.headline).font(.body.weight(.semibold)).foregroundColor(.white))
+        }
+    }
+    
     private func profileInitialCircle(profile: UserProfile) -> some View {
         Circle()
             .fill(profileGradient)
@@ -113,12 +182,12 @@ struct SettingsView: View {
     }
     
     @ViewBuilder
-    private func profileInfoView(profile: UserProfile) -> some View {
+    private func profileInfoView(profile: UserProfile?, displayName: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(profile.name)
+            Text(displayName.isEmpty ? "No Profile Set" : displayName)
                 .font(.headline)
             
-            if let email = profile.email {
+            if let email = profile?.email, !email.isEmpty {
                 Text(email)
                     .font(.caption)
                     .foregroundColor(.primary)
@@ -200,19 +269,48 @@ struct SettingsView: View {
     
     var body: some View {
         if #available(iOS 17.0, *) {
+            #if os(macOS)
+            // On macOS, avoid nested NavigationStack (we're already inside MoreView's stack)
+            settingsContent
+            #else
             NavigationStack {
-                ZStack {
-                    Color(.systemGroupedBackground)
-                        .ignoresSafeArea(.all, edges: .all)
-                    
-                    Form {
+                settingsContent
+            }
+            #endif
+        } else {
+            Text("Settings require iOS 17 or later")
+        }
+    }
+    
+    private var settingsContent: some View {
+        ZStack {
+            // Gradient background matching other pages (Devotionals, etc.)
+            LinearGradient(
+                colors: [
+                    Color.purple.opacity(0.1),
+                    Color.blue.opacity(0.05),
+                    Color.platformSystemGroupedBackground
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            #if os(macOS)
+            .ignoresSafeArea(.all, edges: [.bottom, .leading, .trailing])
+            #else
+            .ignoresSafeArea(.all, edges: .all)
+            #endif
+            
+            Form {
                         Section(header: Text("Profile")) {
                         HStack {
-                            if let profile = userProfile, !profile.name.isEmpty {
-                                // Profile Avatar
-                                profileAvatarView(profile: profile)
+                            if let profile = userProfile {
+                                // Profile Avatar - prefer ProfileManager so it updates when picture is saved
+                                profileAvatarViewFromManager(profile: profile)
+                                    .id(profileManager.profileImageURL ?? "no-avatar")
                                 
-                                profileInfoView(profile: profile)
+                                profileInfoView(profile: profile, displayName: profileDisplayName)
+                            } else if !profileDisplayName.isEmpty {
+                                profileInfoView(profile: nil, displayName: profileDisplayName)
                             } else {
                                 noProfileView()
                             }
@@ -362,28 +460,22 @@ struct SettingsView: View {
                     Section(header: Text("Data"), footer: Text("Your data automatically syncs across all your devices when signed in with Apple. Changes sync in real-time via Firebase.")) {
                         // CloudKit Sync Section - Simple and user-friendly
                         if #available(iOS 17.0, *) {
-                            // Simple sync status indicator
-                            HStack {
+                            // Sync status: derived from firebaseSync; shows actual error message when present
+                            HStack(alignment: .top) {
                                 Label("Sync Status", systemImage: "cloud.fill")
                                 Spacer()
                                 HStack(spacing: 4) {
-                                    Image(systemName: syncStatusText == "Synced" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                        .foregroundColor(syncStatusIconColor)
+                                    Image(systemName: syncStatusDisplay.icon)
+                                        .foregroundColor(syncStatusDisplay.color)
                                         .font(.caption)
-                                    Text(syncStatusText)
+                                    Text(syncStatusDisplay.text)
                                         .font(.caption)
-                                        .foregroundColor(syncStatusIconColor)
+                                        .foregroundColor(syncStatusDisplay.color)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.trailing)
                                 }
                             }
-                            .task {
-                                // Using Firebase for sync - check sync status
-                                await MainActor.run {
-                                    updateSyncStatus()
-                                }
-                            }
-                            .onChange(of: FirebaseSyncService.shared.isSyncing) { _, _ in
-                                updateSyncStatus()
-                            }
+                            .id("\(firebaseSync.isSyncing)-\(firebaseSync.lastSyncDate?.timeIntervalSince1970 ?? 0)-\(firebaseSync.syncError ?? "")")
                             
                             // Manual sync button
                             Button(action: {
@@ -396,22 +488,14 @@ struct SettingsView: View {
                                     Text("Sync Now")
                                 }
                             }
-                            .disabled(FirebaseSyncService.shared.isSyncing)
-                            
-                            // Show user ID for debugging (helpful for troubleshooting sync issues)
-                            #if DEBUG
-                            if let userId = getFirebaseUserId() {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("User ID (Debug)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text(userId)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                        .textSelection(.enabled)
+                            .disabled(firebaseSync.isSyncing)
+                            if firebaseSync.isSyncing {
+                                Button("Reset sync status") {
+                                    firebaseSync.clearStuckSyncState()
                                 }
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                             }
-                            #endif
                             
                             Divider()
                         }
@@ -427,6 +511,26 @@ struct SettingsView: View {
                             showExportSheet = true
                         }) {
                             Label("Export Data", systemImage: "square.and.arrow.up")
+                        }
+                        
+                        if profileManager.isFirebaseAppAdmin {
+                            Button(role: .destructive, action: {
+                                showDeleteTestSessionsAlert = true
+                            }) {
+                                Label("Delete All Test Live Sessions", systemImage: "video.slash")
+                            }
+                            
+                            Button(role: .destructive, action: {
+                                Task {
+                                    let count = await FirebaseSyncService.shared.deleteAllMyLiveSessionsFromFirebase()
+                                    await MainActor.run {
+                                        firebaseLiveSessionsRemovedCount = count
+                                        showFirebaseLiveSessionsRemovedAlert = true
+                                    }
+                                }
+                            }) {
+                                Label("Remove All My Live Sessions from Firebase", systemImage: "cloud.slash")
+                            }
                         }
                         
                         Button(role: .destructive, action: {
@@ -460,7 +564,7 @@ struct SettingsView: View {
                         }
 
                         HStack {
-                            Text("Stamp")
+                            Text("Date & time")
                             Spacer()
                             Text(BuildInfo.stamp)
                                 .foregroundColor(.primary)
@@ -470,6 +574,13 @@ struct SettingsView: View {
                             Text("Built by")
                             Spacer()
                             Text("Ronell Bradley")
+                                .foregroundColor(.primary)
+                        }
+
+                        HStack {
+                            Text("Product of")
+                            Spacer()
+                            Text("Bradley Virtual Solutions, LLC")
                                 .foregroundColor(.primary)
                         }
                         
@@ -504,14 +615,18 @@ struct SettingsView: View {
                     }
                     }
                     .scrollContentBackground(.hidden)
+                    #if os(macOS)
+                    .padding(.horizontal, 24)
+                    .formStyle(.grouped)
+                    #endif
                 }
                 .navigationTitle("Settings")
-                .toolbarBackground(Color(.systemGroupedBackground), for: .navigationBar)
+                #if os(iOS)
+                .toolbarBackground(Color.platformSystemGroupedBackground, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbarColorScheme(.light, for: .navigationBar)
                 .navigationBarTitleDisplayMode(.inline)
                 .onAppear {
-                    // Configure navigation bar to extend behind status bar
                     let appearance = UINavigationBarAppearance()
                     appearance.configureWithOpaqueBackground()
                     appearance.backgroundColor = UIColor.systemGroupedBackground
@@ -519,23 +634,36 @@ struct SettingsView: View {
                     UINavigationBar.appearance().standardAppearance = appearance
                     UINavigationBar.appearance().scrollEdgeAppearance = appearance
                 }
+                #endif
+                #if os(iOS)
                 .fullScreenCover(isPresented: $showAuthLock) {
                     BiometricLockView(isAuthenticated: $isAuthenticated)
                 }
+                #elseif os(macOS)
+                .sheet(isPresented: $showAuthLock) {
+                    BiometricLockView(isAuthenticated: $isAuthenticated)
+                        .macOSSheetFrameCompact()
+                }
+                #endif
                 .sheet(isPresented: $showingProfileEdit) {
                     ProfileEditView(profile: userProfile)
+                        .macOSSheetFrameForm()
                 }
                 .sheet(isPresented: $showingTermsOfService) {
                     TermsOfServiceView()
+                        .macOSSheetFrameLarge()
                 }
                 .sheet(isPresented: $showingPrivacyPolicy) {
                     PrivacyPolicyView()
+                        .macOSSheetFrameLarge()
                 }
                 .sheet(isPresented: $showingContactSupport) {
                     ContactSupportView()
+                        .macOSSheetFrameStandard()
                 }
                 .sheet(isPresented: $showExportSheet) {
                     ShareSheet(activityItems: [exportData])
+                        .macOSSheetFrameCompact()
                 }
                 .alert("Reset All Data", isPresented: $showResetAlert) {
                     Button("Cancel", role: .cancel) { }
@@ -553,6 +681,21 @@ struct SettingsView: View {
                 } message: {
                     Text("Are you sure you want to log out? You will be returned to the login screen.")
                 }
+                .alert("Delete All Test Live Sessions", isPresented: $showDeleteTestSessionsAlert) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        Task { await deleteAllTestLiveSessions() }
+                    }
+                } message: {
+                    Text("This will remove all live sessions labeled with \"test\" (in the title) or from the test host. They will be deleted from this device and from Firebase where you are the host.")
+                }
+                .alert("Firebase Live Sessions", isPresented: $showFirebaseLiveSessionsRemovedAlert) {
+                    Button("OK", role: .cancel) { }
+                } message: {
+                    Text(firebaseLiveSessionsRemovedCount == 0
+                         ? "No live sessions to remove, or you are not signed in."
+                         : "Removed \(firebaseLiveSessionsRemovedCount) live session(s) from Firebase.")
+                }
                 .onAppear {
                     ensureUserProfileExists()
                     updateReminderTime()
@@ -563,6 +706,7 @@ struct SettingsView: View {
                     // Schedule default notifications if they're enabled
                     // This ensures notifications are set up even if user hasn't visited settings yet
                     Task {
+                        await profileManager.refreshFirebaseAppAdminClaim()
                         // Request notification permission first
                         let authorized = await NotificationService.shared.requestAuthorization()
                         if authorized {
@@ -579,10 +723,6 @@ struct SettingsView: View {
                         }
                     }
                 }
-            }
-        } else {
-            Text("Faith Journal requires iOS 17.0 or later")
-        }
     }
     
     // Helper function to format last sync time
@@ -594,7 +734,7 @@ struct SettingsView: View {
     
     // Helper to get color for sync status
     private var syncStatusColor: Color {
-        if FirebaseSyncService.shared.isSyncing {
+        if firebaseSync.isSyncing {
             return .blue
         } else {
             return .green
@@ -603,13 +743,13 @@ struct SettingsView: View {
     
     // Update sync status display
     private func updateSyncStatus() {
-        if FirebaseSyncService.shared.isSyncing {
+        if firebaseSync.isSyncing {
             syncStatusText = "Syncing..."
             syncStatusIconColor = .blue
-        } else if let lastSync = FirebaseSyncService.shared.lastSyncDate {
+        } else if let lastSync = firebaseSync.lastSyncDate {
             syncStatusText = "Synced \(lastSyncTimeString(from: lastSync))"
             syncStatusIconColor = .green
-        } else if FirebaseSyncService.shared.syncError != nil {
+        } else if firebaseSync.syncError != nil {
             syncStatusText = "Error"
             syncStatusIconColor = .red
         } else {
@@ -624,10 +764,10 @@ struct SettingsView: View {
         syncStatusIconColor = .blue
         
         // Restart listener to catch any missed updates
-        FirebaseSyncService.shared.restartListening()
+        firebaseSync.restartListening()
         
         // Sync all data
-        await FirebaseSyncService.shared.syncAllData()
+        await firebaseSync.syncAllData()
         
         // Update status
         await MainActor.run {
@@ -635,19 +775,10 @@ struct SettingsView: View {
         }
     }
     
-    // Get Firebase user ID for debugging
-    private func getFirebaseUserId() -> String? {
-        #if canImport(FirebaseAuth)
-        return Auth.auth().currentUser?.uid
-        #else
-        return nil
-        #endif
-    }
-    
     private func ensureUserProfileExists() {
         if userProfiles.isEmpty {
             // Create default profile if none exists
-            let defaultName = UIDevice.current.name
+            let defaultName = PlatformDevice.name
             let profile = UserProfile(name: defaultName)
             modelContext.insert(profile)
             
@@ -929,8 +1060,66 @@ struct BiometricLockView: View {
             print("Error resetting SwiftData: \(error.localizedDescription)")
         }
     }
+
+    /// Delete all live sessions labeled with "test" (title contains "test") or from the test host.
+    func deleteAllTestLiveSessions() async {
+        await profileManager.refreshFirebaseAppAdminClaim()
+        guard profileManager.isFirebaseAppAdmin else {
+            print("⚠️ [Settings] deleteAllTestLiveSessions denied — not an app admin")
+            return
+        }
+        let testHostId = "simulator-test-user-shared"
+        func isTestSession(_ session: LiveSession) -> Bool {
+            session.hostId == testHostId
+                || session.title.range(of: "test", options: .caseInsensitive) != nil
+        }
+
+        var sessionsToDelete: [LiveSession] = []
+
+        // 1) From Firebase: fetch public sessions and keep those labeled with test
+        let publicSessions = await FirebaseSyncService.shared.fetchPublicSessions()
+        sessionsToDelete.append(contentsOf: publicSessions.filter { isTestSession($0) })
+
+        // 2) From SwiftData: add local sessions labeled with test (avoid duplicates by id)
+        let existingIds = Set(sessionsToDelete.map { $0.id })
+        do {
+            let allLocal = try modelContext.fetch(FetchDescriptor<LiveSession>())
+            for session in allLocal where isTestSession(session) && !existingIds.contains(session.id) {
+                sessionsToDelete.append(session)
+            }
+        } catch {
+            print("Error fetching local sessions: \(error.localizedDescription)")
+        }
+
+        if sessionsToDelete.isEmpty {
+            return
+        }
+
+        // 3) Delete from Firebase where we are allowed (host or test user)
+        for session in sessionsToDelete {
+            await FirebaseSyncService.shared.deleteLiveSession(session)
+        }
+
+        // 4) Delete from SwiftData (local sessions and their participants)
+        do {
+            let idsToRemove = Set(sessionsToDelete.map { $0.id })
+            let allLocal = try modelContext.fetch(FetchDescriptor<LiveSession>())
+            for session in allLocal where isTestSession(session) {
+                modelContext.delete(session)
+            }
+            let allParticipants = try modelContext.fetch(FetchDescriptor<LiveSessionParticipant>())
+            for p in allParticipants where idsToRemove.contains(p.sessionId) {
+                modelContext.delete(p)
+            }
+            try modelContext.save()
+        } catch {
+            print("Error removing test sessions from local storage: \(error.localizedDescription)")
+        }
+    }
 }
 
+#if os(iOS)
+import UIKit
 @available(iOS 17.0, *)
 struct ActivityView: UIViewControllerRepresentable {
     let activityItems: [Any]
@@ -953,3 +1142,13 @@ struct ShareSheet: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#elseif os(macOS)
+struct ActivityView: View {
+    let activityItems: [Any]
+    var body: some View { MacShareSheet(shareItems: activityItems) }
+}
+struct ShareSheet: View {
+    let activityItems: [Any]
+    var body: some View { MacShareSheet(shareItems: activityItems) }
+}
+#endif

@@ -10,9 +10,13 @@ import SwiftUI
 import AVFoundation
 import AVKit
 import SwiftData
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct BroadcastStreamView_HLS: View {
     let session: LiveSession?
     // Use regular property for singleton, not @StateObject
@@ -33,6 +37,8 @@ struct BroadcastStreamView_HLS: View {
     private let highlightsService = StreamHighlightsService.shared
     // Use regular property for singleton, not @StateObject
     private let captionsService = StreamCaptionsService.shared
+    // Use regular property for singleton, not @StateObject
+    private let firebaseSync = FirebaseSyncService.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query var allMessages: [ChatMessage]
@@ -45,11 +51,15 @@ struct BroadcastStreamView_HLS: View {
     @State private var networkQuality: NetworkQuality = .good
     @State private var showingSettings = false
     @State private var isRecording = false
+    /// When false, replay is saved on this device only (no upload = free). When true, uploads to Firebase so everyone can watch.
+    @AppStorage("uploadReplayToCloud") private var uploadReplayToCloud = false
     @State private var showChatOverlay = false
     @State private var chatMessageText = ""
+    @State private var liveChatMessages: [LiveChatMessage] = []
+    @State private var chatListener: Any?
     // CloudKitPublicSyncService removed - use Firebase for sync in the future
     // @State private var syncService: CloudKitPublicSyncService?
-    @State private var publicMessages: [ChatMessage] = []
+    @ObservedObject private var liveStreamChat = LiveStreamChatService.shared
     @State private var showingQuickSettings = false
     @State private var showingReactions = false
     @State private var showingPolls = false
@@ -64,14 +74,13 @@ struct BroadcastStreamView_HLS: View {
     @State private var batterySaverEnabled = false
     @State private var timer: Timer?
     
-    // Hybrid UI mode (YouTube-style for viewers, enhanced host mode)
+    // Hybrid UI mode (overlay for viewers, enhanced host mode)
     @State private var controlsVisible = true
     @State private var theaterMode = false
     @State private var autoHideControlsTimer: Timer?
     @State private var lastInteractionTime = Date()
     
-    // Debug: Track if YouTube-style UI should be visible
-    private var shouldShowYouTubeUI: Bool {
+    private var shouldShowStreamOverlay: Bool {
         !isHost && streamingService.isStreaming && streamingService.streamURL != nil
     }
     
@@ -91,11 +100,13 @@ struct BroadcastStreamView_HLS: View {
     @State private var lastNetworkQualityCheck: Date?
     @State private var qualityAdjustmentTimer: Timer?
     
-    // Picture-in-Picture
+    // Picture-in-Picture (iOS only)
+    #if os(iOS)
     @State private var pipController: AVPictureInPictureController?
     @State private var pipPlayer: AVPlayer?
     @State private var pipPlayerLayer: AVPlayerLayer?
     @State private var pipCoordinator: PiPCoordinator?
+    #endif
     
     enum VideoFilter: String, CaseIterable {
         case none = "None"
@@ -158,12 +169,10 @@ struct BroadcastStreamView_HLS: View {
     var sessionMessages: [ChatMessage] {
         guard let session = session else { return [] }
         var combined = allMessages.filter { $0.sessionId == session.id }
-        // Add public messages that aren't already in local
+        // Firestore real-time (YouTube-style) + local SwiftData
         let localIds = Set(combined.map { $0.id })
-        for publicMessage in publicMessages {
-            if !localIds.contains(publicMessage.id) {
-                combined.append(publicMessage)
-            }
+        for m in liveStreamChat.remoteMessages where m.sessionId == session.id {
+            if !localIds.contains(m.id) { combined.append(m) }
         }
         // Remove duplicates by ID, keeping most recent
         var unique: [ChatMessage] = []
@@ -186,43 +195,46 @@ struct BroadcastStreamView_HLS: View {
     }
 
     var body: some View {
-        if #available(iOS 17.0, *), session != nil {
+        if #available(iOS 17.0, macOS 14.0, *), session != nil {
             NavigationStack {
-                ZStack {
-                    Color.black.ignoresSafeArea()
-                    VStack(spacing: 0) {
-                        // Main video area
-                        ZStack {
-                        if isHost {
-                            // Host sees live camera preview with tap-to-toggle controls
-                            if streamingService.isStreaming {
+                broadcastContent
+            }
+        } else {
+            Text("Broadcasting (HLS) is only available on iOS 17+")
+        }
+    }
+    
+    @ViewBuilder
+    private var hostStreamingView: some View {
+        if let previewLayer = streamingService.getPreviewLayer() ?? HLSStreamingService.shared.getPreviewLayer() {
                                 // Check for preview layer with retry logic
-                                if let previewLayer = streamingService.getPreviewLayer() ?? HLSStreamingService.shared.getPreviewLayer() {
-                                    CameraPreviewView(
+            CameraPreviewView(
                                         previewLayer: previewLayer,
                                         backgroundBlurEnabled: backgroundBlurEnabled,
                                         selectedFilter: selectedFilter
                                     )
                                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                                         .overlay(
-                                            // Show indicator if video is disabled (simulator/audio-only mode)
-                                            !streamingService.isVideoEnabled ?
-                                            VStack {
-                                                Spacer()
-                                                HStack(spacing: 8) {
-                                                    Image(systemName: "video.slash.fill")
-                                                        .font(.title3)
-                                                        .foregroundColor(.white)
-                                                    Text("Audio-only mode")
-                                                        .font(.caption)
-                                                        .foregroundColor(.white)
+                                            Group {
+                                                if !streamingService.isVideoEnabled {
+                                                    VStack {
+                                                        Spacer()
+                                                        HStack(spacing: 8) {
+                                                            Image(systemName: "video.slash.fill")
+                                                                .font(.title3)
+                                                                .foregroundColor(.white)
+                                                            Text("Audio-only mode")
+                                                                .font(.caption)
+                                                                .foregroundColor(.white)
+                                                        }
+                                                        .padding(.horizontal, 16)
+                                                        .padding(.vertical, 8)
+                                                        .background(Color.black.opacity(0.7))
+                                                        .cornerRadius(8)
+                                                        .padding()
+                                                    }
                                                 }
-                                                .padding(.horizontal, 16)
-                                                .padding(.vertical, 8)
-                                                .background(Color.black.opacity(0.7))
-                                                .cornerRadius(8)
-                                                .padding()
-                                            } : nil
+                                            }
                                         )
                                         .contentShape(Rectangle())
                                         .onTapGesture {
@@ -248,128 +260,134 @@ struct BroadcastStreamView_HLS: View {
                                                         }
                                                     }
                                                 }
-                                        )
-                                } else {
-                                    // No preview layer available - show placeholder
-                                    VStack(spacing: 20) {
-                                        Image(systemName: "mic.fill")
-                                            .font(.system(size: 60))
-                                            .foregroundColor(.white.opacity(0.6))
-                                        Text("Audio-only streaming")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                        Text("Camera not available")
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.7))
-                                    }
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                }
-                            } else if isLoading {
-                                LoadingView(message: "Starting camera...")
-                            } else {
-                                VStack(spacing: 24) {
-                                    Image(systemName: "video.fill")
-                                        .font(.system(size: 80))
-                                        .foregroundColor(.white.opacity(0.6))
-                                    
-                                    Text("Tap Start to begin broadcasting")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                    
-                                    Button(action: startBroadcasting) {
-                                        HStack {
-                                            Image(systemName: "play.circle.fill")
-                                            Text("Start Broadcasting")
-                                        }
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 32)
-                                        .padding(.vertical, 16)
-                                        .background(
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [Color.red, Color.orange]),
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                        .cornerRadius(12)
-                                    }
-                                    .disabled(isLoading)
-                                }
-                            }
+            )
+            // No preview layer - show placeholder
+            VStack(spacing: 20) {
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.white.opacity(0.6))
+                Text("Audio-only streaming")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Text("Camera not available")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+    
+    @ViewBuilder
+    private var viewerStreamContent: some View {
+        if let streamURL = streamingService.streamURL {
+            viewerVideoPlayer(streamURL: streamURL)
+        } else {
+            VStack(spacing: 20) {
+                Image(systemName: "person.video.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.white.opacity(0.6))
+                Text("Waiting for broadcast to start...")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+        }
+    }
+    
+    private func viewerVideoPlayer(streamURL: URL) -> some View {
+        #if os(iOS)
+        let player = pipPlayer ?? {
+            let p = AVPlayer(url: streamURL)
+            p.allowsExternalPlayback = true
+            return p
+        }()
+        #else
+        let player = AVPlayer(url: streamURL)
+        player.allowsExternalPlayback = true
+        #endif
+        return ZStack {
+            VideoPlayer(player: player)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        controlsVisible.toggle()
+                    }
+                }
+                .onAppear { player.play() }
+            LiveStreamOverlay(
+                session: session,
+                isHost: isHost,
+                showChatOverlay: $showChatOverlay,
+                showingReactions: $showingReactions,
+                showingPolls: $showingPolls,
+                showingQnA: $showingQnA,
+                controlsVisible: $controlsVisible,
+                theaterMode: $theaterMode,
+                chatMessages: $liveChatMessages,
+                viewerCount: streamingService.viewerCount,
+                onReaction: {
+                    reactionsService.addReaction(.heart, userId: userService.userIdentifier, userName: userService.getProfileDisplayName(userProfile: nil))
+                },
+                onToggleChat: { showChatOverlay.toggle() },
+                onToggleTheater: { withAnimation { theaterMode.toggle() } },
+                onShare: { showingShareSheet = true }
+            )
+            #if os(iOS)
+            if let playerLayer = pipPlayerLayer {
+                PiPPlayerLayerView(playerLayer: playerLayer)
+                    .frame(width: 1, height: 1)
+                    .opacity(0)
+            }
+            #endif
+        }
+    }
+    
+    private var hostPreStreamView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "video.fill")
+                .font(.system(size: 80))
+                .foregroundColor(.white.opacity(0.6))
+            Text("Tap Start to begin broadcasting")
+                .font(.headline)
+                .foregroundColor(.white)
+            Button(action: startBroadcasting) {
+                HStack {
+                    Image(systemName: "play.circle.fill")
+                    Text("Start Broadcasting")
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color.red, Color.orange]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(12)
+            }
+            .disabled(isLoading)
+        }
+    }
+    
+    @ViewBuilder
+    private var broadcastContent: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 0) {
+                ZStack {
+                    if isHost {
+                        if streamingService.isStreaming {
+                            hostStreamingView
+                        } else if isLoading {
+                            LoadingView(message: "Starting camera...")
                         } else {
-                            // Viewers see the video stream
-                            if let streamURL = streamingService.streamURL {
-                                // Use AVPlayer for viewers to enable PiP
-                                let viewerPlayer = pipPlayer ?? {
-                                    let p = AVPlayer(url: streamURL)
-                                    p.allowsExternalPlayback = true
-                                    return p
-                                }()
-                                
-                                ZStack {
-                                    // Main video player (full screen)
-                                    VideoPlayer(player: viewerPlayer)
-                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                        .onTapGesture {
-                                            withAnimation(.easeInOut(duration: 0.2)) {
-                                                controlsVisible.toggle()
-                                            }
-                                        }
-                                        .onAppear {
-                                            viewerPlayer.play()
-                                        }
-                                    
-                                    // YouTube-style overlay for viewers
-                                    YouTubeStyleStreamView(
-                                        session: session,
-                                        isHost: isHost,
-                                        showChatOverlay: $showChatOverlay,
-                                        showingReactions: $showingReactions,
-                                        showingPolls: $showingPolls,
-                                        showingQnA: $showingQnA,
-                                        controlsVisible: $controlsVisible,
-                                        theaterMode: $theaterMode,
-                                        viewerCount: streamingService.viewerCount,
-                                        onReaction: {
-                                            reactionsService.addReaction(
-                                                .heart,
-                                                userId: userService.userIdentifier,
-                                                userName: userService.displayName
-                                            )
-                                        },
-                                        onToggleChat: {
-                                            showChatOverlay.toggle()
-                                        },
-                                        onToggleTheater: {
-                                            withAnimation {
-                                                theaterMode.toggle()
-                                            }
-                                        },
-                                        onShare: {
-                                            showingShareSheet = true
-                                        }
-                                    )
-                                    
-                                    // Hidden player layer for PiP (must be in view hierarchy)
-                                    if let playerLayer = pipPlayerLayer {
-                                        PiPPlayerLayerView(playerLayer: playerLayer)
-                                            .frame(width: 1, height: 1)
-                                            .opacity(0)
-                                    }
-                                }
-                            } else {
-                                VStack(spacing: 20) {
-                                    Image(systemName: "person.video.fill")
-                                        .font(.system(size: 60))
-                                        .foregroundColor(.white.opacity(0.6))
-                                    
-                                    Text("Waiting for broadcast to start...")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                }
-                            }
+                            hostPreStreamView
                         }
+                    } else {
+                        viewerStreamContent
+                }
                         
                         // Tap gesture for host view to toggle controls
                         if isHost {
@@ -437,7 +455,7 @@ struct BroadcastStreamView_HLS: View {
                                             reactionsService.addReaction(
                                                 reaction,
                                                 userId: userService.userIdentifier,
-                                                userName: userService.displayName
+                                                userName: userService.getProfileDisplayName(userProfile: nil)
                                             )
                                         },
                                         onDismiss: { showingReactions = false }
@@ -472,7 +490,7 @@ struct BroadcastStreamView_HLS: View {
                                             _ = pollsService.submitQuestion(
                                                 question: question,
                                                 userId: userService.userIdentifier,
-                                                userName: userService.displayName
+                                                userName: userService.getProfileDisplayName(userProfile: nil)
                                             )
                                         },
                                         onPinQuestion: { questionId in
@@ -495,7 +513,7 @@ struct BroadcastStreamView_HLS: View {
                                 }
                             }
                         } else {
-                            // For viewers, overlays are handled by YouTubeStyleStreamView
+                            // For viewers, overlays are handled by LiveStreamOverlay
                             // Only show closed captions if enabled
                             if closedCaptionsEnabled {
                                 VStack {
@@ -531,7 +549,7 @@ struct BroadcastStreamView_HLS: View {
                         }
                     }
                     // Controls (without bottom action bar - moved to safeAreaInset)
-                    // Only show for hosts (viewers use YouTube-style UI)
+                    // Only show for hosts (viewers use LiveStreamOverlay)
                     if isHost {
                         VStack(spacing: 0) {
                             // Hide/Show button
@@ -669,7 +687,7 @@ struct BroadcastStreamView_HLS: View {
                             showingAnalytics.toggle()
                             resetAutoHideTimer()
                         },
-                        onStop: stopAndDismiss,
+                        onStop: { Task { await stopAndDismiss() } },
                         showingReactions: showingReactions,
                         backgroundBlurEnabled: backgroundBlurEnabled,
                         isVideoEnabled: streamingService.isVideoEnabled,
@@ -702,13 +720,19 @@ struct BroadcastStreamView_HLS: View {
                     )
                 }
             }
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #if os(iOS)
             .toolbarBackground(.black, for: .navigationBar)
+            #endif
+            #if os(iOS)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button(action: {
-                        stopAndDismiss()
+                        Task { await stopAndDismiss() }
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
@@ -718,9 +742,9 @@ struct BroadcastStreamView_HLS: View {
                         .font(.body)
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
-                        stopAndDismiss()
+                        Task { await stopAndDismiss() }
                     }
                     .foregroundColor(.white)
                     .font(.body)
@@ -729,6 +753,10 @@ struct BroadcastStreamView_HLS: View {
             .onAppear {
                 if isHost {
                     Task {
+                        // Apply "Record this session" from Create form so recording starts when stream starts
+                        let shouldRecord = UserDefaults.standard.bool(forKey: "recordNextSession")
+                        UserDefaults.standard.set(false, forKey: "recordNextSession")
+                        await MainActor.run { isRecording = shouldRecord }
                         startBroadcasting()
                         startStreamTimer()
                         startNetworkMonitoring()
@@ -746,6 +774,24 @@ struct BroadcastStreamView_HLS: View {
                 if backgroundAudioEnabled {
                     setupBackgroundAudio()
                 }
+                
+                if let s = session {
+                    liveStreamChat.start(sessionId: s.id)
+                    chatListener = FirebaseSyncService.shared.startListeningToChatMessages(sessionId: s.id) { chatMessage in
+                        Task { @MainActor in
+                            let liveMsg = LiveChatMessage(
+                                username: chatMessage.userName,
+                                text: chatMessage.message,
+                                isSuperChat: false,
+                                superChatAmount: nil
+                            )
+                            withAnimation(.easeIn(duration: 0.18)) {
+                                liveChatMessages.append(liveMsg)
+                                if liveChatMessages.count > 60 { liveChatMessages.removeFirst() }
+                            }
+                        }
+                    }
+                }
             }
             .onChange(of: HLSStreamingService.shared.previewLayer) { _, newValue in
                 // Refresh view when preview layer becomes available
@@ -761,15 +807,12 @@ struct BroadcastStreamView_HLS: View {
                     }
                 }
                 
-                // Setup PiP if enabled
+                // Setup PiP if enabled (iOS only)
+                #if os(iOS)
                 if pipEnabled {
                     setupPictureInPicture()
                 }
-                
-                // CloudKitPublicSyncService removed - use Firebase for sync
-                // Chat initialization removed - implement Firebase chat in the future
-                loadPublicMessages()
-                setupMessageSubscription()
+                #endif
                 
                 // Initialize services
                 reactionsService.setModelContext(modelContext)
@@ -805,6 +848,9 @@ struct BroadcastStreamView_HLS: View {
                 }
             }
             .onDisappear {
+                FirebaseSyncService.shared.removeChatMessageListener(chatListener)
+                chatListener = nil
+                liveStreamChat.stop()
                 stopStreamTimer()
                 stopAutoQualityAdjustment()
                 autoHideControlsTimer?.invalidate()
@@ -820,10 +866,6 @@ struct BroadcastStreamView_HLS: View {
             } message: {
                 Text(errorMessage)
             }
-            }
-        } else {
-            Text("Broadcasting (HLS) is only available on iOS 17+")
-        }
     }
     
     // MARK: - View Components
@@ -871,7 +913,7 @@ struct BroadcastStreamView_HLS: View {
     }
     
     private var streamStatsView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 // Timer
                 HStack(spacing: 4) {
@@ -1127,7 +1169,7 @@ struct BroadcastStreamView_HLS: View {
             .accessibilityLabel("Analytics")
             
             // Stop broadcasting
-            Button(action: stopAndDismiss) {
+            Button(action: { Task { await stopAndDismiss() } }) {
                 Image(systemName: "stop.circle.fill")
                     .font(largerButtons ? .title : .title2)
                     .foregroundColor(.white)
@@ -1192,6 +1234,28 @@ struct BroadcastStreamView_HLS: View {
                 
                 Section(header: Text("Recording")) {
                     Toggle("Record Session", isOn: $isRecording)
+                        .onChange(of: isRecording) { _, enabled in
+                            guard let session = session else { return }
+                            if streamingService.isStreaming {
+                                if enabled {
+                                    Task {
+                                        do {
+                                            try await recordingService.startRecording(sessionId: session.id, title: session.title, quality: .hd)
+                                        } catch {
+                                            print("⚠️ [RECORDING] Failed to start: \(error.localizedDescription)")
+                                        }
+                                    }
+                                } else {
+                                    Task {
+                                        _ = try? await recordingService.stopRecording(sessionId: session.id, title: session.title)
+                                    }
+                                }
+                            }
+                        }
+                    Toggle("Upload replay to cloud", isOn: $uploadReplayToCloud)
+                    Text("Off = replay only on this device (free). On = share with everyone (uses cloud storage).")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 Section(header: Text("Performance")) {
@@ -1220,6 +1284,7 @@ struct BroadcastStreamView_HLS: View {
                             }
                         }
                     
+                    #if os(iOS)
                     Toggle("Picture-in-Picture", isOn: $pipEnabled)
                         .onChange(of: pipEnabled) { _, enabled in
                             if enabled {
@@ -1228,6 +1293,7 @@ struct BroadcastStreamView_HLS: View {
                                 stopPictureInPicture()
                             }
                         }
+                    #endif
                     
                     Toggle("AirPlay", isOn: $airPlayEnabled)
                         .onChange(of: airPlayEnabled) { _, enabled in
@@ -1247,15 +1313,18 @@ struct BroadcastStreamView_HLS: View {
                 }
             }
             .navigationTitle("Broadcast Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { showingSettings = false }
                 }
             }
         }
         .sheet(isPresented: $showingAccessibilitySettings) {
             accessibilitySettingsSheet
+                .macOSSheetFrameStandard()
         }
     }
     
@@ -1294,21 +1363,19 @@ struct BroadcastStreamView_HLS: View {
                 }
             }
             .navigationTitle("Accessibility Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { showingAccessibilitySettings = false }
                 }
             }
         }
     }
     
-    private var quickSettingsSheet: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Background Blur Section
-                    VStack(alignment: .leading, spacing: 12) {
+    private var quickSettingsBlurSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Image(systemName: "camera.filters")
                                 .font(.title3)
@@ -1324,12 +1391,19 @@ struct BroadcastStreamView_HLS: View {
                                 .foregroundColor(.secondary)
                         }
                         .tint(.purple)
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
-                    )
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.platformSystemGray6)
+        )
+    }
+    
+    private var quickSettingsSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    quickSettingsBlurSection
                     
                     // Video Filters Section
                     VStack(alignment: .leading, spacing: 12) {
@@ -1342,14 +1416,14 @@ struct BroadcastStreamView_HLS: View {
                                 .foregroundColor(.primary)
                         }
                         
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 12) {
                                 ForEach(VideoFilter.allCases, id: \.self) { filter in
                                     Button(action: { selectedFilter = filter }) {
                                         VStack(spacing: 8) {
                                             ZStack {
                                                 Circle()
-                                                    .fill(selectedFilter == filter ? Color.purple.opacity(0.2) : Color(.systemGray5))
+                                                    .fill(selectedFilter == filter ? Color.purple.opacity(0.2) : Color.platformSystemGray5)
                                                     .frame(width: 60, height: 60)
                                                 
                                                 Image(systemName: selectedFilter == filter ? "checkmark.circle.fill" : "circle")
@@ -1366,7 +1440,7 @@ struct BroadcastStreamView_HLS: View {
                                         .padding(.horizontal, 12)
                                         .background(
                                             RoundedRectangle(cornerRadius: 12)
-                                                .fill(selectedFilter == filter ? Color.purple.opacity(0.1) : Color(.systemGray6))
+                                                .fill(selectedFilter == filter ? Color.purple.opacity(0.1) : Color.platformSystemGray6)
                                         )
                                     }
                                     .buttonStyle(PlainButtonStyle())
@@ -1378,7 +1452,7 @@ struct BroadcastStreamView_HLS: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
+                            .fill(Color.platformSystemGray6)
                     )
                     
                     // Battery Saver Section
@@ -1407,16 +1481,18 @@ struct BroadcastStreamView_HLS: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
+                            .fill(Color.platformSystemGray6)
                     )
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.platformSystemGroupedBackground)
             .navigationTitle("Quick Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         showingQuickSettings = false
                     }
@@ -1446,9 +1522,11 @@ struct BroadcastStreamView_HLS: View {
         )
             .sheet(isPresented: $showingSettings) {
                 settingsSheet
+                    .macOSSheetFrameStandard()
             }
             .sheet(isPresented: $showingQuickSettings) {
                 quickSettingsSheet
+                    .macOSSheetFrameCompact()
             }
     }
     
@@ -1574,6 +1652,15 @@ struct BroadcastStreamView_HLS: View {
                 // Setup local video view after broadcast starts
                 await setupLocalVideoView()
                 
+                // Start recording if "Record Session" was enabled
+                if isRecording {
+                    do {
+                        try await recordingService.startRecording(sessionId: session.id, title: session.title, quality: .hd)
+                    } catch {
+                        print("⚠️ [RECORDING] Failed to start: \(error.localizedDescription)")
+                    }
+                }
+                
                 // Show info message if running in simulator or camera unavailable
                 #if targetEnvironment(simulator)
                 // In simulator, show a friendly message that audio-only streaming is active
@@ -1658,8 +1745,50 @@ struct BroadcastStreamView_HLS: View {
         }
     }
     
-    private func stopAndDismiss() {
+    private func stopAndDismiss() async {
+        #if os(iOS)
         stopPictureInPicture()
+        #endif
+        guard let session = session else {
+            streamingService.stopBroadcast()
+            stopAutoQualityAdjustment()
+            dismiss()
+            return
+        }
+        // Stop recording if active and capture file for upload
+        var recordingFileURL: URL?
+        if recordingService.isRecording {
+            if let rec = try? await recordingService.stopRecording(sessionId: session.id, title: session.title) {
+                recordingFileURL = rec.fileURL
+            }
+        }
+        // Update session end state (local + sync)
+        session.endTime = Date()
+        session.isActive = false
+        do { try modelContext.save() } catch { print("⚠️ [LIVE SESSION] Failed to save session end state: \(error)") }
+        // Save replay: local-only (free) or upload to cloud (share with everyone)
+        if let fileURL = recordingFileURL {
+            if uploadReplayToCloud {
+                let sessionId = session.id
+                Task.detached(priority: .utility) { [firebaseSync] in
+                    do {
+                        let urlString = try await firebaseSync.uploadRecording(sessionId: sessionId, fileURL: fileURL)
+                        await MainActor.run {
+                            firebaseSync.saveRecordingURL(sessionId: sessionId, urlString: urlString)
+                        }
+                    } catch {
+                        print("⚠️ [RECORDING] Upload failed: \(error.localizedDescription)")
+                    }
+                }
+            } else {
+                // Free: replay only on this device; don't upload
+                session.recordingURL = fileURL.absoluteString
+                do { try modelContext.save() } catch { print("⚠️ [LIVE SESSION] Failed to save recording URL: \(error)") }
+                await firebaseSync.syncLiveSessionPublic(session)
+            }
+        } else {
+            await firebaseSync.syncLiveSessionPublic(session)
+        }
         streamingService.stopBroadcast()
         stopAutoQualityAdjustment()
         dismiss()
@@ -1668,6 +1797,7 @@ struct BroadcastStreamView_HLS: View {
     // MARK: - Accessibility & Technical Features
     
     private func setupBackgroundAudio() {
+        #if os(iOS)
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay, .allowBluetoothA2DP])
@@ -1675,8 +1805,10 @@ struct BroadcastStreamView_HLS: View {
         } catch {
             print("Failed to setup background audio: \(error)")
         }
+        #endif
     }
     
+    #if os(iOS)
     private func setupPictureInPicture() {
         // Check if PiP is supported on this device
         guard AVPictureInPictureController.isPictureInPictureSupported() else {
@@ -1713,6 +1845,7 @@ struct BroadcastStreamView_HLS: View {
     }
     
     private func setupPiPForViewer(streamURL: URL) {
+        #if os(iOS)
         // Create AVPlayer with the stream URL
         let player = AVPlayer(url: streamURL)
         player.allowsExternalPlayback = true
@@ -1782,9 +1915,11 @@ struct BroadcastStreamView_HLS: View {
         }
         
         print("✅ Picture-in-Picture setup complete for viewer")
+        #endif
     }
     
     private func setupPiPForHost() {
+        #if os(iOS)
         // For host, we need to create a player from the preview layer
         // This is more complex and typically requires recording the preview
         // For now, we'll use the stream URL if available
@@ -1796,6 +1931,7 @@ struct BroadcastStreamView_HLS: View {
                 pipEnabled = false
             }
         }
+        #endif
     }
     
     private func stopPictureInPicture() {
@@ -1806,6 +1942,7 @@ struct BroadcastStreamView_HLS: View {
         pipController = nil
         pipCoordinator = nil
     }
+    #endif
     
     // Voice control handler
     private func handleVoiceCommand(_ command: String) {
@@ -1816,7 +1953,7 @@ struct BroadcastStreamView_HLS: View {
         if lowercased.contains("start") && lowercased.contains("stream") {
             startBroadcasting()
         } else if lowercased.contains("stop") && lowercased.contains("stream") {
-            stopAndDismiss()
+            Task { await stopAndDismiss() }
         } else if lowercased.contains("mute") {
             streamingService.toggleAudio()
         } else if lowercased.contains("camera") && lowercased.contains("flip") {
@@ -1847,7 +1984,7 @@ struct BroadcastStreamView_HLS: View {
         guard let session = session, !chatMessageText.isEmpty else { return }
         
         let userId = userService.userIdentifier
-        let userName = userService.displayName
+        let userName = userService.getProfileDisplayName(userProfile: nil)
         
         let message = ChatMessage(
             sessionId: session.id,
@@ -1861,45 +1998,24 @@ struct BroadcastStreamView_HLS: View {
         do {
             try modelContext.save()
             chatMessageText = ""
-            
-            // CloudKitPublicSyncService removed - use Firebase for sync
-            // if userService.isAuthenticated && !session.isPrivate {
-            //     // Sync message to Firebase
-            // }
+            Task {
+                await liveStreamChat.sendMessage(
+                    sessionId: session.id,
+                    userId: userId,
+                    userName: userName,
+                    text: message.message,
+                    message: message
+                )
+            }
         } catch {
             print("Error sending chat message: \(error)")
         }
-    }
-    
-    private func loadPublicMessages() {
-        // CloudKitPublicSyncService removed - use Firebase for sync
-        // guard let session = session, userService.isAuthenticated else { return }
-        // Load messages from Firebase
-        publicMessages = []
-    }
-    
-    private func setupMessageSubscription() {
-        // CloudKitPublicSyncService removed - use Firebase for sync
-        // guard let session = session, userService.isAuthenticated else { return }
-        // Setup Firebase message listener
-        
-        // CloudKitPublicSyncService removed - use Firebase for sync
-        // Task {
-        //     do {
-        //         try await sync.subscribeToMessages(for: session.id)
-        //         // Poll for new messages periodically
-        //         Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
-        //             loadPublicMessages()
-        //         }
-        //     } catch {
-        //         print("Error setting up message subscription: \(error)")
-        //     }
-        // }
     }
 }
 
 // MARK: - Supporting Views
 
+#if os(iOS)
 @available(iOS 17.0, *)
 struct CameraPreviewView: UIViewRepresentable {
     let previewLayer: AVCaptureVideoPreviewLayer
@@ -1981,10 +2097,22 @@ struct CameraPreviewView: UIViewRepresentable {
         }
     }
 }
+#else
+@available(macOS 14.0, *)
+struct CameraPreviewView: View {
+    let previewLayer: AVCaptureVideoPreviewLayer
+    var backgroundBlurEnabled: Bool = false
+    var selectedFilter: BroadcastStreamView_HLS.VideoFilter = .none
+    var body: some View {
+        VideoPreviewLayerView(previewLayer: previewLayer)
+    }
+}
+#endif
 
 // Note: Shared helper views `PlaceholderView`, `LoadingView`, and `StatusPill`
 // are defined in the LiveKit view to avoid duplicate global declarations.
 
+#if os(iOS)
 // MARK: - Custom TextField Component
 
 struct CustomTextField: UIViewRepresentable {
@@ -2041,6 +2169,16 @@ struct CustomTextField: UIViewRepresentable {
         }
     }
 }
+#else
+struct CustomTextField: View {
+    let placeholder: String
+    @Binding var text: String
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .textFieldStyle(.plain)
+    }
+}
+#endif
 
 // MARK: - Chat Overlay Component
 
@@ -2255,6 +2393,7 @@ struct LiveStreamChatOverlay: View {
                 messageText += emoji
                 showingEmojiPicker = false
             }
+            .macOSSheetFrameStandard()
         }
     }
 }
@@ -2295,7 +2434,7 @@ struct EmojiPickerView: View {
                                         Text(emoji)
                                             .font(.system(size: 40))
                                             .frame(width: 50, height: 50)
-                                            .background(Color(.systemGray6))
+                                            .background(Color.platformSystemGray6)
                                             .cornerRadius(12)
                                     }
                                 }
@@ -2308,9 +2447,11 @@ struct EmojiPickerView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Emoji Picker")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }
@@ -2323,6 +2464,16 @@ struct EmojiPickerView: View {
 @available(iOS 17.0, *)
 struct ChatMessageBubble: View {
     let message: ChatMessage
+    private let userService = LocalUserService.shared
+    
+    private var authorDisplayName: String {
+        if message.userId == userService.userIdentifier {
+            return userService.getProfileDisplayName(userProfile: nil)
+        }
+        let name = message.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.isEmpty || name.contains("iPhone") || name.contains("iPad") || name.contains("iPod") { return "Participant" }
+        return message.userName
+    }
     
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -2331,7 +2482,7 @@ struct ChatMessageBubble: View {
                 .fill(Color.purple.opacity(0.3))
                 .frame(width: 32, height: 32)
                 .overlay(
-                    Text(String(message.userName.prefix(1)).uppercased())
+                    Text(String(authorDisplayName.prefix(1)).uppercased())
                         .font(.caption)
                         .font(.body.weight(.semibold))
                         .foregroundColor(.white)
@@ -2339,7 +2490,7 @@ struct ChatMessageBubble: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 // Username
-                Text(message.userName)
+                Text(authorDisplayName)
                     .font(.caption)
                     .font(.body.weight(.semibold))
                     .foregroundColor(.white.opacity(0.9))
@@ -2406,6 +2557,7 @@ struct StreamInfoView: View {
 
 // MARK: - PiP Player Layer View
 
+#if os(iOS)
 @available(iOS 17.0, *)
 struct PiPPlayerLayerView: UIViewRepresentable {
     let playerLayer: AVPlayerLayer
@@ -2424,9 +2576,26 @@ struct PiPPlayerLayerView: UIViewRepresentable {
         }
     }
 }
+#else
+@available(macOS 14.0, *)
+struct PiPPlayerLayerView: NSViewRepresentable {
+    let playerLayer: AVPlayerLayer
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        view.wantsLayer = true
+        playerLayer.frame = view.bounds
+        view.layer?.addSublayer(playerLayer)
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        playerLayer.frame = nsView.bounds
+    }
+}
+#endif
 
 // MARK: - Picture-in-Picture Coordinator
 
+#if os(iOS)
 class PiPCoordinator: NSObject, AVPictureInPictureControllerDelegate {
     let onStart: () -> Void
     let onStop: () -> Void
@@ -2463,12 +2632,14 @@ class PiPCoordinator: NSObject, AVPictureInPictureControllerDelegate {
         completionHandler(true)
     }
 }
+#endif
 
 // MARK: - Preview
 
 
 // MARK: - Horizontal Only ScrollView
 
+#if os(iOS)
 @available(iOS 17.0, *)
 struct HorizontalOnlyScrollView<Content: View>: UIViewRepresentable {
     let content: Content
@@ -2651,9 +2822,22 @@ struct HorizontalOnlyScrollView<Content: View>: UIViewRepresentable {
         }
     }
 }
+#else
+struct HorizontalOnlyScrollView<Content: View>: View {
+    let content: Content
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
+            HStack { content }
+        }
+    }
+}
+#endif
 
 // Preview for iOS 17+
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct BroadcastStreamView_HLS_Previews: PreviewProvider {
     static var previews: some View {
         let session = LiveSession(

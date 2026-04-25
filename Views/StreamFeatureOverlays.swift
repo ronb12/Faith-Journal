@@ -19,7 +19,7 @@ struct ReactionsOverlay: View {
                 Spacer()
                 
                 // Reaction buttons - horizontally scrollable
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         ForEach(StreamReaction.allCases, id: \.self) { reaction in
                             Button(action: { onReactionSelected(reaction) }) {
@@ -123,6 +123,7 @@ struct PollsOverlay: View {
                     pollOptions = ["", ""]
                 }
             )
+            .macOSSheetFrameStandard()
         }
     }
 }
@@ -407,33 +408,34 @@ struct CreatePollSheet: View {
         validOptionsCount <= 6
     }
     
+    private var pollHeaderView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "chart.bar.fill")
+                .font(.system(size: 50))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .padding(.top, 8)
+            Text("Create Poll")
+                .font(.largeTitle)
+                .font(.body.weight(.bold))
+            Text("Engage your audience with interactive polls")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.top, 8)
+    }
+    
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header Section
-                    VStack(spacing: 8) {
-                        Image(systemName: "chart.bar.fill")
-                            .font(.system(size: 50))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.blue, .purple],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .padding(.top, 8)
-                        
-                        Text("Create Poll")
-                            .font(.largeTitle)
-                            .font(.body.weight(.bold))
-                        
-                        Text("Engage your audience with interactive polls")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.top, 8)
+                    pollHeaderView
                     
                     // Question Section
                     VStack(alignment: .leading, spacing: 12) {
@@ -449,7 +451,7 @@ struct CreatePollSheet: View {
                             .padding(16)
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemGray6))
+                                    .fill(Color.platformSystemGray6)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -484,7 +486,7 @@ struct CreatePollSheet: View {
                                 .padding(.vertical, 4)
                                 .background(
                                     Capsule()
-                                        .fill(Color(.systemGray5))
+                                        .fill(Color.platformSystemGray5)
                                 )
                         }
                         
@@ -512,7 +514,7 @@ struct CreatePollSheet: View {
                                     .padding(14)
                                     .background(
                                         RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color(.systemGray6))
+                                            .fill(Color.platformSystemGray6)
                                     )
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 10)
@@ -610,7 +612,7 @@ struct CreatePollSheet: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
+                            .fill(Color.platformSystemGray6)
                     )
                     .padding(.horizontal)
                     
@@ -618,8 +620,10 @@ struct CreatePollSheet: View {
                 }
                 .padding(.vertical)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.platformSystemGroupedBackground)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -793,17 +797,27 @@ struct HighlightsSheet: View {
     }
 }
 
-@available(iOS 17.0, *)
-struct StreamShareSheet: UIViewControllerRepresentable {
+@available(iOS 17.0, macOS 14.0, *)
+struct StreamShareSheet: View {
     let activityItems: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-        return controller
+    var body: some View {
+        #if os(iOS)
+        StreamShareSheet_iOS(activityItems: activityItems)
+        #elseif os(macOS)
+        MacShareSheet(shareItems: activityItems)
+        #endif
     }
-    
+}
+#if os(iOS)
+import UIKit
+struct StreamShareSheet_iOS: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif
 
 extension Color {
     init(hex: String) {

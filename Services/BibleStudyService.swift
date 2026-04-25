@@ -68,6 +68,11 @@ class BibleStudyService: ObservableObject {
         return topicLibrary[index]
     }
     
+    /// Returns 1-365 for the given topic (same order as topic library). Used to sync host's topic to participants.
+    func topicDayOfYear(for topic: BibleStudyTopic) -> Int? {
+        topicLibrary.firstIndex(where: { $0.title == topic.title }).map { $0 + 1 }
+    }
+    
     // Get topics by category
     func getTopics(for category: BibleStudyTopic.TopicCategory) -> [BibleStudyTopic] {
         return getAllTopics().filter { $0.category == category }

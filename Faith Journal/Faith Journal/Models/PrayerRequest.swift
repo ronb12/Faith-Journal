@@ -13,8 +13,24 @@ final class PrayerRequest {
     var answerDate: Date?
     var answerNotes: String?
     var isPrivate: Bool = false
-    var tags: [String] = []
-    var prayerPartners: [String] = []
+    private var tagsJSON: String = "[]"
+    var tags: [String] {
+        get {
+            guard let data = tagsJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set { tagsJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]" }
+    }
+    private var prayerPartnersJSON: String = "[]"
+    var prayerPartners: [String] {
+        get {
+            guard let data = prayerPartnersJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set { prayerPartnersJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]" }
+    }
     var enableReminder: Bool = false
     var reminderTime: Date = Date()
     var reminderFrequency: String = "Daily" // "Daily", "Weekly", "Custom"
@@ -35,7 +51,7 @@ final class PrayerRequest {
         self.status = .active
         self.isAnswered = false
         self.isPrivate = isPrivate
-        self.tags = tags
+        self.tagsJSON = (try? JSONEncoder().encode(tags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         self.createdAt = Date()
         self.updatedAt = Date()
     }

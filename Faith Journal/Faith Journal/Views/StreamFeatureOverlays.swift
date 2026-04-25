@@ -19,7 +19,7 @@ struct ReactionsOverlay: View {
                 Spacer()
                 
                 // Reaction buttons - horizontally scrollable
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         ForEach(StreamReaction.allCases, id: \.self) { reaction in
                             Button(action: { onReactionSelected(reaction) }) {

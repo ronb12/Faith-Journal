@@ -55,6 +55,7 @@ struct StatisticsExportView: View {
                 }
             }
             .navigationTitle("Export Statistics")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -63,9 +64,19 @@ struct StatisticsExportView: View {
                     }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            #endif
             .sheet(isPresented: $showingShareSheet) {
                 if let data = exportData {
                     StatisticsShareSheet(data: data, format: exportFormat)
+                        .macOSSheetFrameCompact()
                 }
             }
         }
@@ -132,19 +143,39 @@ struct StatisticsExportView: View {
     }
 }
 
-@available(iOS 17.0, *)
-struct StatisticsShareSheet: UIViewControllerRepresentable {
+@available(iOS 17.0, macOS 14.0, *)
+struct StatisticsShareSheet: View {
+    let data: Data
+    let format: StatisticsExportView.ExportFormat
+    
+    var body: some View {
+        #if os(iOS)
+        StatisticsShareSheet_iOS(data: data, format: format)
+        #elseif os(macOS)
+        MacShareSheet(shareItems: [exportURL])
+        #endif
+    }
+    
+    private var exportURL: URL {
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("statistics.\(format == .pdf ? "pdf" : format == .csv ? "csv" : "json")")
+        try? data.write(to: tempURL)
+        return tempURL
+    }
+}
+
+#if os(iOS)
+import UIKit
+struct StatisticsShareSheet_iOS: UIViewControllerRepresentable {
     let data: Data
     let format: StatisticsExportView.ExportFormat
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("statistics.\(format == .pdf ? "pdf" : format == .csv ? "csv" : "json")")
         try? data.write(to: tempURL)
-        
-        let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
-        return activityVC
+        return UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif
 

@@ -133,7 +133,7 @@ struct InvitationsView: View {
                 }
                 .navigationTitle("Invitations")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         Button(action: { showingJoinByCode = true }) {
                             Image(systemName: "qrcode")
                         }
@@ -141,9 +141,11 @@ struct InvitationsView: View {
                 }
                 .sheet(item: $selectedInvitation) { invitation in
                     InvitationDetailView(invitation: invitation)
+                        .macOSSheetFrameStandard()
                 }
                 .sheet(isPresented: $showingJoinByCode) {
                     JoinByCodeView()
+                        .macOSSheetFrameCompact()
                 }
                 .onAppear {
                     loadPublicInvitations()
@@ -247,7 +249,7 @@ struct SentInvitationRow: View {
                         .foregroundColor(.purple)
                     
                     Button(action: {
-                        UIPasteboard.general.string = invitation.inviteCode
+                        PlatformPasteboard.setString(invitation.inviteCode)
                     }) {
                         Image(systemName: "doc.on.doc")
                             .font(.caption2)
@@ -355,7 +357,7 @@ struct InvitationDetailView: View {
                             }
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(12)
                     }
                     
@@ -409,7 +411,7 @@ struct InvitationDetailView: View {
                             .foregroundColor(.secondary)
                             .padding()
                             .frame(maxWidth: .infinity)
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(12)
                     }
                     
@@ -428,7 +430,7 @@ struct InvitationDetailView: View {
                             Spacer()
                             
                             Button(action: {
-                                UIPasteboard.general.string = invitation.inviteCode
+                                PlatformPasteboard.setString(invitation.inviteCode)
                             }) {
                                 Image(systemName: "doc.on.doc")
                                     .font(.title3)
@@ -436,16 +438,18 @@ struct InvitationDetailView: View {
                             }
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(8)
                     }
                 }
                 .padding()
             }
             .navigationTitle("Invitation")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -456,13 +460,40 @@ struct InvitationDetailView: View {
         guard let session = session else { return }
         
         isProcessing = true
+        let userId = userService.userIdentifier
+        let sessionId = session.id
+        
+        // Avoid duplicate participant (e.g. already joined from session detail or join-by-code)
+        let existingDescriptor = FetchDescriptor<LiveSessionParticipant>(
+            predicate: #Predicate<LiveSessionParticipant> { p in
+                p.sessionId == sessionId && p.userId == userId
+            }
+        )
+        if (try? modelContext.fetch(existingDescriptor).first) != nil {
+            invitation.status = .accepted
+            invitation.respondedAt = Date()
+            do {
+                try modelContext.save()
+                Task {
+                    await FirebaseSyncService.shared.syncSessionInvitation(invitation)
+                    await MainActor.run {
+                        sendAcceptanceNotification()
+                        isProcessing = false
+                        dismiss()
+                    }
+                }
+            } catch {
+                isProcessing = false
+                print("Error updating invitation: \(error)")
+            }
+            return
+        }
         
         // Update invitation status
         invitation.status = .accepted
         invitation.respondedAt = Date()
         
         // Join the session
-        let userId = userService.userIdentifier
         let userName = userService.displayName
         
         let participant = LiveSessionParticipant(
@@ -600,7 +631,9 @@ struct JoinByCodeView: View {
                         TextField("Enter code", text: $inviteCode)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .font(.title3)
-                            .autocapitalization(.allCharacters)
+                            #if os(iOS)
+                            .textInputAutocapitalization(.characters)
+                            #endif
                             .autocorrectionDisabled()
                         
                         Button(action: { showingQRScanner = true }) {
@@ -628,9 +661,11 @@ struct JoinByCodeView: View {
                 Spacer()
             }
             .navigationTitle("Join by Code")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
             }
@@ -663,6 +698,7 @@ struct JoinByCodeView: View {
             }
             .sheet(isPresented: $showingQRScanner) {
                 QRCodeScannerView(scannedCode: $scannedCode)
+                    .macOSSheetFrameCompact()
             }
             .onChange(of: scannedCode) { oldValue, newValue in
                 if !newValue.isEmpty {
@@ -734,7 +770,7 @@ struct JoinByCodeView: View {
                 }
                 
                 await MainActor.run {
-                    errorMessage = "Invitation code not found (or not accessible). Ask the host to regenerate the code and try again."
+                    errorMessage = "Invitation code not found or no longer valid. If the host just created the session, wait a few seconds and try again. Otherwise ask the host to share the code again or regenerate it."
                     showingError = true
                 }
                 #else
@@ -750,59 +786,86 @@ struct JoinByCodeView: View {
         joinWithInvitation(invitation!)
     }
     
+    /// Session is joinable if it's active or scheduled in the future (host may not have started stream yet).
+    private func isSessionJoinable(_ session: LiveSession) -> Bool {
+        if session.isActive { return true }
+        if let scheduled = session.scheduledStartTime, scheduled > Date() { return true }
+        return false
+    }
+
     private func joinWithInvitation(_ invitation: SessionInvitation) {
-        
-        // Check if session still exists and is active
         let sessionId = invitation.sessionId
         let sessionQuery = FetchDescriptor<LiveSession>(
-            predicate: #Predicate { session in
-                session.id == sessionId && session.isActive == true
-            }
+            predicate: #Predicate<LiveSession> { session in session.id == sessionId }
         )
-        
-        var session = try? modelContext.fetch(sessionQuery).first
-        
-        // If session not found locally, try fetching from CloudKit
-        if session == nil {
-            Task {
-                // CloudKitPublicSyncService removed - use Firebase for sync
-                // let publicSessions = try await syncService.fetchPublicSessions()
-                let publicSessions: [LiveSession] = []
-                if let cloudKitSession = publicSessions.first(where: { $0.id == sessionId && $0.isActive }) {
+        guard let list = try? modelContext.fetch(sessionQuery),
+              let session = list.first,
+              isSessionJoinable(session) else {
+            // Not found locally or not joinable — try Firebase
+            tryJoinViaFirebase(invitation: invitation, sessionId: sessionId)
+            return
+        }
+        joinWithSession(invitation: invitation, session: session)
+    }
+
+    private func tryJoinViaFirebase(invitation: SessionInvitation, sessionId: UUID) {
+
+        Task {
+            #if canImport(FirebaseFirestore)
+            if let remoteSession = await FirebaseSyncService.shared.fetchLiveSessionPublic(sessionId: sessionId) {
+                if isSessionJoinable(remoteSession) {
                     await MainActor.run {
-                        // Save to local database
-                        modelContext.insert(cloudKitSession)
+                        modelContext.insert(remoteSession)
                         do {
                             try modelContext.save()
-                            session = cloudKitSession
-                            joinWithSession(invitation: invitation, session: cloudKitSession)
+                            joinWithSession(invitation: invitation, session: remoteSession)
                         } catch {
                             errorMessage = "Error saving session: \(error.localizedDescription)"
                             showingError = true
                         }
                     }
-                } else {
+                    return
+                }
+                // Session ended but has a replay: add session so user can open it and tap "Watch Recording"
+                if let url = remoteSession.recordingURL, !url.isEmpty, !url.hasPrefix("file://") {
                     await MainActor.run {
-                        errorMessage = "This session is no longer active or has been deleted"
-                        invitation.status = .expired
+                        let sessionQuery = FetchDescriptor<LiveSession>(predicate: #Predicate { s in s.id == sessionId })
+                        let existing = (try? modelContext.fetch(sessionQuery).first) ?? nil
+                        if existing == nil {
+                            modelContext.insert(remoteSession)
+                        }
                         do {
                             try modelContext.save()
-                            
-                            // Sync invitation status to Firebase
-                            Task {
-                                await FirebaseSyncService.shared.syncSessionInvitation(invitation)
+                            errorMessage = "Session has ended. It’s been added to your list — tap it to watch the replay."
+                            showingError = true
+                            // Dismiss after a short delay so user sees the message, then they can tap the session
+                            Task { @MainActor in
+                                try? await Task.sleep(for: .seconds(2.5))
+                                dismiss()
                             }
                         } catch {
-                            print("❌ Error updating invitation status: \(error.localizedDescription)")
+                            errorMessage = "Error saving session: \(error.localizedDescription)"
+                            showingError = true
                         }
-                        showingError = true
                     }
+                    return
                 }
             }
-            return
+            #endif
+            await MainActor.run {
+                errorMessage = "This session is no longer active or has been deleted"
+                invitation.status = .expired
+                do {
+                    try modelContext.save()
+                    Task {
+                        await FirebaseSyncService.shared.syncSessionInvitation(invitation)
+                    }
+                } catch {
+                    print("❌ Error updating invitation status: \(error.localizedDescription)")
+                }
+                showingError = true
+            }
         }
-        
-        joinWithSession(invitation: invitation, session: session!)
     }
     
     private func joinWithSession(invitation: SessionInvitation, session: LiveSession) {
@@ -827,9 +890,9 @@ struct JoinByCodeView: View {
         invitation.status = .accepted
         invitation.respondedAt = Date()
         
-        // Join session - get name from UserProfile if available
+        // Join session - prefer profile name (ProfileManager / UserProfile)
         let userProfile = (try? modelContext.fetch(FetchDescriptor<UserProfile>()).first)
-        let userName = LocalUserService.shared.getDisplayName(userProfile: userProfile)
+        let userName = LocalUserService.shared.getProfileDisplayName(userProfile: userProfile)
         let participant = LiveSessionParticipant(
             sessionId: session.id,
             userId: userId,

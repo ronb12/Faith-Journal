@@ -8,6 +8,8 @@
 import SwiftUI
 import AVFoundation
 
+#if os(iOS)
+import UIKit
 @available(iOS 17.0, *)
 struct QRCodeScannerView: UIViewControllerRepresentable {
     @Binding var scannedCode: String
@@ -42,6 +44,12 @@ struct QRCodeScannerView: UIViewControllerRepresentable {
         func didFailWithError(_ error: Error) {
             print("QR Scanner Error: \(error.localizedDescription)")
         }
+        
+        func scannerRequestDismiss() {
+            DispatchQueue.main.async {
+                self.parent.dismiss()
+            }
+        }
     }
 }
 
@@ -50,6 +58,7 @@ struct QRCodeScannerView: UIViewControllerRepresentable {
 protocol QRCodeScannerDelegate: AnyObject {
     func didScanCode(_ code: String)
     func didFailWithError(_ error: Error)
+    func scannerRequestDismiss()
 }
 
 // Scanner view controller
@@ -96,6 +105,9 @@ class ScannerViewController: UIViewController {
         
         guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
             delegate?.didFailWithError(NSError(domain: "QRScanner", code: 1, userInfo: [NSLocalizedDescriptionKey: "Camera not available"]))
+            DispatchQueue.main.async { [weak self] in
+                self?.showCameraUnavailableAlert()
+            }
             return
         }
         
@@ -279,6 +291,18 @@ class ScannerViewController: UIViewController {
         }
     }
     
+    private func showCameraUnavailableAlert() {
+        let alert = UIAlertController(
+            title: "Camera Not Available",
+            message: "QR scanning requires a physical device with a camera. The simulator does not have a camera. Use an iPhone or iPad to scan QR codes.",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            self?.delegate?.scannerRequestDismiss()
+        })
+        present(alert, animated: true)
+    }
+    
     private func showPermissionAlert() {
         let alert = UIAlertController(
             title: "Camera Permission Required",
@@ -291,7 +315,7 @@ class ScannerViewController: UIViewController {
             }
         })
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { [weak self] _ in
-            self?.dismiss(animated: true)
+            self?.delegate?.scannerRequestDismiss()
         })
         present(alert, animated: true)
     }
@@ -324,16 +348,21 @@ extension ScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         }
     }
     
-    /// Extracts the invitation code from various QR code formats
+    /// Extracts the invitation or friend code from various QR code formats
     private func extractInviteCode(from scannedValue: String) -> String {
-        // Format 1: faithjournal://invite/CODE
+        // Format 1: faithjournal://friend/CODE (friend code, 6 chars)
+        if scannedValue.hasPrefix("faithjournal://friend/") {
+            let code = scannedValue.replacingOccurrences(of: "faithjournal://friend/", with: "")
+            return code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        }
+        // Format 2: faithjournal://invite/CODE
         if scannedValue.hasPrefix("faithjournal://invite/") {
             let code = scannedValue.replacingOccurrences(of: "faithjournal://invite/", with: "")
             return code.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        // Format 2: https://faithjournal.app/invite/CODE
-        else if scannedValue.hasPrefix("https://faithjournal.app/invite/") {
-            let code = scannedValue.replacingOccurrences(of: "https://faithjournal.app/invite/", with: "")
+        // Format 3: https://faith-journal.web.app/invite/CODE
+        else if scannedValue.hasPrefix("https://faith-journal.web.app/invite/") {
+            let code = scannedValue.replacingOccurrences(of: "https://faith-journal.web.app/invite/", with: "")
             return code.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         // Format 3: Just the code itself (e.g., "ABC12345")
@@ -346,8 +375,7 @@ extension ScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
             }
             // If it's a URL that might contain the code, try to extract it
             if let url = URL(string: scannedValue) {
-                // Check if it's our deep link format
-                if url.scheme == "faithjournal" && url.host == "invite" {
+                if url.scheme == "faithjournal" && (url.host == "invite" || url.host == "friend") {
                     let pathComponents = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
                     if let code = pathComponents.first {
                         return code.uppercased()
@@ -359,4 +387,24 @@ extension ScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
         }
     }
 }
+#elseif os(macOS)
+@available(macOS 14.0, *)
+struct QRCodeScannerView: View {
+    @Binding var scannedCode: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "qrcode.viewfinder")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            Text("QR code scanning is available on iPhone and iPad")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Button("Done") { dismiss() }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+#endif
 

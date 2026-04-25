@@ -136,6 +136,9 @@ struct MultiParticipantStreamView: View {
     // Cache for user names fetched from Firebase (to avoid repeated calls)
     @State private var userNameCache: [String: String] = [:]
     
+    /// When the host entered the stream view. Used to avoid ending the session on immediate onDisappear (e.g. SwiftUI re-render or accidental dismiss before stream really started).
+    @State private var streamEnteredAt: Date?
+    
     // Mode indicator properties
     private var modeIndicator: String {
         switch streamMode {
@@ -275,13 +278,14 @@ struct MultiParticipantStreamView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        leaveStream()
+                        leaveStream(shouldEndSessionIfHost: true)
                     }
                 }
             }
 
         let lifecycleLayer = titleLayer
             .onAppear {
+                streamEnteredAt = Date()
                 updateSessionCountdown()
                 Task { @MainActor in
                     if let currentUserParticipant = sessionParticipants.first(where: { $0.userId == userService.userIdentifier }) {
@@ -307,7 +311,9 @@ struct MultiParticipantStreamView: View {
                 }
             }
             .onDisappear {
-                leaveStream()
+                // Only end session if host has been in stream for 5+ seconds (avoids ending when view disappears before stream really started, e.g. SwiftUI re-render or accidental dismiss)
+                let shouldEnd = isHost ? (streamEnteredAt.map { Date().timeIntervalSince($0) >= 5 } ?? false) : false
+                leaveStream(shouldEndSessionIfHost: shouldEnd)
                 #if canImport(FirebaseFirestore)
                 if let listener = chatMessageListener as? ListenerRegistration {
                     listener.remove()
@@ -429,12 +435,13 @@ struct MultiParticipantStreamView: View {
                 if let asset = presentationService.currentAsset {
                     PresentationAssetSheet(
                         asset: asset,
-                        onStop: isHost
-                            ? {
+                        onClose: {
+                            if isHost {
                                 presentationService.clearPresentation()
-                                showingPresentationSheet = false
                             }
-                            : nil
+                            showingPresentationSheet = false
+                        },
+                        onStop: isHost ? { presentationService.clearPresentation(); showingPresentationSheet = false } : nil
                     )
                 } else {
                     Text("Presentation is not available.")
@@ -452,9 +459,7 @@ struct MultiParticipantStreamView: View {
                     }
                 )
             }
-            .onChange(of: presentationService.currentAsset) { _, newAsset in
-                showingPresentationSheet = newAsset != nil
-            }
+            // Do NOT auto-show sheet when currentAsset changes — only show when host shares (shareBibleStudyTopic) or user taps View (eye). Prevents double presentation.
 
         return interactiveLayer
     }
@@ -639,7 +644,7 @@ struct MultiParticipantStreamView: View {
     }
 
     private var controlButtons: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 16) {
                 if agoraService.isBroadcaster || streamMode != .broadcast {
                     controlButton(
@@ -689,6 +694,11 @@ struct MultiParticipantStreamView: View {
                     }
                 } else if streamMode == .broadcast && agoraService.isAudience {
                     VStack(spacing: 6) {
+                        if presentationService.currentAsset != nil {
+                            controlButton(systemName: "eye.circle.fill", background: Color.purple, size: 50) {
+                                showingPresentationSheet = true
+                            }
+                        }
                         Button(action: handleRequestToSpeakTap) {
                             HStack(spacing: 6) {
                                 if requestState == .requesting {
@@ -735,7 +745,7 @@ struct MultiParticipantStreamView: View {
                 }
 
                 controlButton(systemName: "phone.down.fill", background: Color.red, size: 50) {
-                    leaveStream()
+                    leaveStream(shouldEndSessionIfHost: true)
                 }
             }
             .padding(.horizontal)
@@ -1403,12 +1413,12 @@ struct MultiParticipantStreamView: View {
         #endif
     }
     
-    private func leaveStream() {
+    private func leaveStream(shouldEndSessionIfHost: Bool = true) {
         agoraService.leaveChannel()
         isStreaming = false
         
-        // If host is leaving, mark session as inactive
-        if isHost {
+        // If host is leaving, mark session as inactive only when intended (explicit Done tap or after stream was up 5+ sec). Avoids ending session when view disappears before stream started.
+        if isHost && shouldEndSessionIfHost {
             session.isActive = false
             session.endTime = Date()
             
@@ -1425,7 +1435,7 @@ struct MultiParticipantStreamView: View {
             Task {
                 await FirebaseSyncService.shared.syncLiveSession(session)
             }
-        } else {
+        } else if !isHost {
             // For non-hosts, just mark their own participant as inactive
             if let userParticipant = sessionParticipants.first(where: { $0.userId == userService.userIdentifier }) {
                 userParticipant.isActive = false
@@ -1549,7 +1559,10 @@ struct MultiParticipantStreamView: View {
 
 private struct PresentationAssetSheet: View {
     let asset: PresentationService.PresentationAsset
+    let onClose: () -> Void
     let onStop: (() -> Void)?
+
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationView {
@@ -1570,7 +1583,8 @@ private struct PresentationAssetSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        onStop?()
+                        dismiss()
+                        onClose()
                     }
                 }
             }

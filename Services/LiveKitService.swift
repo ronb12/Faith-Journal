@@ -2,336 +2,302 @@
 //  LiveKitService.swift
 //  Faith Journal
 //
-//  LiveKit WebRTC integration for cross-location streaming
-//  Handles both single and multi-presenter modes
+//  LiveKit WebRTC integration for cross-location streaming.
+//  Add the LiveKit Swift SDK via SPM to enable real video:
+//    https://github.com/livekit/client-sdk-swift
+//  Until then, connect/publish calls throw LiveKitError.sdkNotInstalled.
 //
 
 import Foundation
 import AVFoundation
 import Combine
+import CryptoKit
 
-// LiveKit will be added via SPM - for now, we'll create a wrapper
-// that can be integrated once the SDK is available
+#if canImport(LiveKit)
+import LiveKit
+#endif
 
 @available(iOS 17.0, *)
 @MainActor
 class LiveKitService: NSObject, ObservableObject {
     static let shared = LiveKitService()
-    
+
     // MARK: - Published Properties
     @Published var isConnected = false
     @Published var isPublishing = false
     @Published var isSubscribing = false
-    @Published var remoteParticipants: [RemoteParticipant] = []
+    @Published var remoteParticipants: [RemoteParticipantInfo] = []
     @Published var errorMessage: String?
     @Published var connectionState: ConnectionState = .disconnected
     @Published var viewerCount = 0
-    @Published var activePresenters: [RemoteParticipant] = [] // Only video-enabled participants
+    @Published var activePresenters: [RemoteParticipantInfo] = []
     @Published var presentationMode: PresentationMode = .singlePresenter
-    
+
     // MARK: - Private Properties
-    private var room: LiveKitService.LiveKitRoom?
-    private var localParticipant: LiveKitService.LocalParticipant?
+#if canImport(LiveKit)
+    private(set) var room: Room?
+#endif
     private var cancellables = Set<AnyCancellable>()
-    
-    enum ConnectionState {
+
+    // MARK: - Types
+
+    enum ConnectionState: Equatable {
         case disconnected
         case connecting
         case connected
         case error(String)
     }
-    
+
     enum PresentationMode {
-        case singlePresenter  // One main presenter
-        case multiPresenter   // Multiple presenters in grid
+        case singlePresenter
+        case multiPresenter
     }
-    
-    struct RemoteParticipant {
+
+    struct RemoteParticipantInfo: Identifiable {
         let id: String
         let name: String
         let displayName: String
         let isAudioEnabled: Bool
         let isVideoEnabled: Bool
     }
-    
+
     private override init() {
         super.init()
     }
-    
+
     // MARK: - Configuration
-    
-    /// Set presentation mode (single vs multi-presenter)
+
     func setPresentationMode(_ mode: PresentationMode) {
         presentationMode = mode
     }
-    
+
     // MARK: - Connection Management
-    
-    /// Connect to LiveKit server and join room as publisher (host/presenter)
+
+    /// Connect to LiveKit server as host/presenter.
     func connectAsHost(roomName: String, userName: String) async throws {
         connectionState = .connecting
-        
-        let serverURL = "http://localhost:7880"
-        
-        guard !serverURL.isEmpty else {
-            let error = "Invalid server URL: \(serverURL)"
-            errorMessage = error
-            connectionState = .error(error)
+
+        let serverURL = StreamingConfig.getServerURL()
+        guard !serverURL.isEmpty, serverURL.hasPrefix("wss://") || serverURL.hasPrefix("ws://") else {
+            let msg = "Invalid LiveKit server URL: \(serverURL). Check StreamingConfig / LiveKitSecret.plist."
+            errorMessage = msg
+            connectionState = .error(msg)
             throw LiveKitError.invalidServerURL
         }
-        
-        // Initialize room connection
-        // NOTE: LiveKit SDK needs to be added via SPM
-        // GitHub: https://github.com/livekit/client-sdk-swift
-        // Once added, uncomment below:
-        /*
-        let room = try await LiveKit.Room()
-        
-        // Connect to server
-        try await room.connect(
-            url: serverURL,
-            token: generateToken(roomName: roomName, userName: userName, isPublisher: true)
-        )
-        
-        self.room = room
-        self.localParticipant = room.localParticipant
-        
-        // Setup local tracks
-        try await publishLocalTracks()
-        
-        self.isPublishing = true
-        self.isConnected = true
-        self.connectionState = .connected
-        self.errorMessage = nil
-        */
-        
-        // Temporary: Log that we're ready to connect
-        print("🎬 Ready to connect as host to \(serverURL) in room '\(roomName)'")
+
+        let token = try generateToken(roomName: roomName, identity: userName, isPublisher: true)
+
+#if canImport(LiveKit)
+        let lkRoom = Room()
+        try await lkRoom.connect(url: serverURL, token: token)
+        self.room = lkRoom
+
+        try await lkRoom.localParticipant.setCamera(enabled: true)
+        try await lkRoom.localParticipant.setMicrophone(enabled: true)
+
         isPublishing = true
         isConnected = true
         connectionState = .connected
+        errorMessage = nil
+        print("🎬 [LIVEKIT] Connected as host to \(serverURL), room '\(roomName)'")
+#else
+        let msg = "LiveKit SDK not installed. Add https://github.com/livekit/client-sdk-swift via Xcode → File → Add Package Dependencies."
+        errorMessage = msg
+        connectionState = .error(msg)
+        throw LiveKitError.sdkNotInstalled
+#endif
     }
-    
-    /// Connect to LiveKit server as viewer (subscriber only)
+
+    /// Connect to LiveKit server as viewer (subscribe only).
     func connectAsViewer(roomName: String, userName: String) async throws {
         connectionState = .connecting
-        
-        let serverURL = "http://localhost:7880"
-        
-        guard !serverURL.isEmpty else {
-            let error = "Invalid server URL: \(serverURL)"
-            errorMessage = error
-            connectionState = .error(error)
+
+        let serverURL = StreamingConfig.getServerURL()
+        guard !serverURL.isEmpty, serverURL.hasPrefix("wss://") || serverURL.hasPrefix("ws://") else {
+            let msg = "Invalid LiveKit server URL: \(serverURL). Check StreamingConfig / LiveKitSecret.plist."
+            errorMessage = msg
+            connectionState = .error(msg)
             throw LiveKitError.invalidServerURL
         }
-        
-        // Connect as viewer (receive only)
-        // NOTE: LiveKit SDK needs to be added via SPM
-        /*
-        let room = try await LiveKit.Room()
-        
-        try await room.connect(
-            url: serverURL,
-            token: generateToken(roomName: roomName, userName: userName, isPublisher: false)
-        )
-        
-        self.room = room
-        self.isSubscribing = true
-        self.isConnected = true
-        self.connectionState = .connected
-        self.errorMessage = nil
-        
-        // Listen for new participants
-        setupParticipantListeners()
-        */
-        
-        print("👁️ Ready to connect as viewer to \(serverURL) in room '\(roomName)'")
+
+        let token = try generateToken(roomName: roomName, identity: userName, isPublisher: false)
+
+#if canImport(LiveKit)
+        let lkRoom = Room()
+        try await lkRoom.connect(url: serverURL, token: token)
+        self.room = lkRoom
+
         isSubscribing = true
         isConnected = true
         connectionState = .connected
+        errorMessage = nil
+        print("👁️ [LIVEKIT] Connected as viewer to \(serverURL), room '\(roomName)'")
+#else
+        let msg = "LiveKit SDK not installed. Add https://github.com/livekit/client-sdk-swift via Xcode → File → Add Package Dependencies."
+        errorMessage = msg
+        connectionState = .error(msg)
+        throw LiveKitError.sdkNotInstalled
+#endif
     }
-    
-    /// Disconnect from room
+
+    /// Disconnect from the room and reset state.
     func disconnect() async {
-        if room != nil {
-            // try await room?.disconnect()
-            self.room = nil
-        }
+#if canImport(LiveKit)
+        await room?.disconnect()
+        room = nil
+#endif
         isConnected = false
         isPublishing = false
         isSubscribing = false
         connectionState = .disconnected
         remoteParticipants = []
+        activePresenters = []
         viewerCount = 0
         errorMessage = nil
     }
-    
-    // MARK: - Publishing (Host)
-    
-    /// Publish local camera and microphone tracks
-    private func publishLocalTracks() async throws {
-        // Request permissions
-        let cameraGranted = await requestCameraPermission()
-        let micGranted = await requestMicrophonePermission()
-        
-        guard cameraGranted else {
-            throw LiveKitError.permissionDenied("Camera")
-        }
-        
-        guard micGranted else {
-            throw LiveKitError.permissionDenied("Microphone")
-        }
-        
-        // NOTE: Once LiveKit SDK is added:
-        /*
-        if let localParticipant = localParticipant {
-            // Publish camera
-            let videoTrack = try await LocalVideoTrack.createCameraTrack(
-                options: VideoCodecOptions(maxBitrate: 2500000) // 2.5 Mbps for 720p
-            )
-            try await localParticipant.publishVideoTrack(videoTrack)
-            
-            // Publish microphone
-            let audioTrack = try await LocalAudioTrack.createMicrophoneTrack()
-            try await localParticipant.publishAudioTrack(audioTrack)
-        }
-        */
-    }
-    
-    /// Stop publishing camera track
+
+    // MARK: - Publishing
+
     func stopPublishingCamera() async {
-        // try await localParticipant?.unpublishVideoTracks()
+#if canImport(LiveKit)
+        _ = try? await room?.localParticipant.setCamera(enabled: false)
+#endif
         isPublishing = false
     }
-    
-    /// Stop publishing microphone track
+
     func stopPublishingAudio() async {
-        // try await localParticipant?.unpublishAudioTracks()
+#if canImport(LiveKit)
+        _ = try? await room?.localParticipant.setMicrophone(enabled: false)
+#endif
     }
-    
-    // MARK: - Subscription (Viewer)
-    
-    /// Setup listeners for remote participant changes
-    private func setupParticipantListeners() {
-        // Listen for participant joined/left events
-        // room?.participantJoined
-        //    .sink { [weak self] participant in
-        //        self?.handleRemoteParticipantJoined(participant)
-        //    }
-        //    .store(in: &cancellables)
-    }
-    
-    private func handleRemoteParticipantJoined(_ participant: RemoteParticipant) {
-        // Add participant to list and update counts
+
+    // MARK: - Participant helpers
+
+    private func handleRemoteParticipantJoined(_ participant: RemoteParticipantInfo) {
+        remoteParticipants.append(participant)
         viewerCount += 1
-        
-        // Update presenter list if they have video enabled
         if participant.isVideoEnabled {
             activePresenters.append(participant)
         }
     }
-    
-    private func handleRemoteParticipantLeft(_ participant: RemoteParticipant) {
-        // Remove participant from list and update counts
+
+    private func handleRemoteParticipantLeft(id: String) {
+        remoteParticipants.removeAll { $0.id == id }
+        activePresenters.removeAll { $0.id == id }
         viewerCount = max(0, viewerCount - 1)
-        activePresenters.removeAll { $0.id == participant.id }
     }
-    
-    // MARK: - Multi-Presenter Support
-    
-    /// Get grid layout dimensions for multi-presenter view
+
+    // MARK: - Grid layout
+
     func getGridLayout() -> (cols: Int, rows: Int) {
-        let count = activePresenters.count
-        
-        switch count {
+        switch activePresenters.count {
         case 0, 1: return (1, 1)
-        case 2: return (2, 1)
+        case 2:    return (2, 1)
         case 3, 4: return (2, 2)
         case 5, 6: return (3, 2)
-        case 7, 8, 9: return (3, 3)
-        default: return (4, 3)
+        case 7...9: return (3, 3)
+        default:   return (4, 3)
         }
     }
-    
-    /// Get visible presenters based on presentation mode
-    func getVisiblePresenters() -> [RemoteParticipant] {
+
+    func getVisiblePresenters() -> [RemoteParticipantInfo] {
         switch presentationMode {
-        case .singlePresenter:
-            return activePresenters.prefix(1).map { $0 }
-        case .multiPresenter:
-            return activePresenters
+        case .singlePresenter: return Array(activePresenters.prefix(1))
+        case .multiPresenter:  return activePresenters
         }
     }
-    
-    // MARK: - Permissions
-    
-    private func requestCameraPermission() async -> Bool {
-        return await withCheckedContinuation { continuation in
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                continuation.resume(returning: granted)
-            }
-        }
-    }
-    
-    private func requestMicrophonePermission() async -> Bool {
-        return await withCheckedContinuation { continuation in
-            AVAudioApplication.requestRecordPermission { granted in
-                continuation.resume(returning: granted)
-            }
-        }
-    }
-    
-    // MARK: - Token Generation
-    
-    /// Generate JWT token for LiveKit room access
-    private func generateToken(roomName: String, userName: String, isPublisher: Bool) -> String {
-        // NOTE: In production, get this from your backend server
-        return "your-jwt-token-here"
-    }
-    
-    // MARK: - Utility
-    
+
+    // MARK: - Status
+
     func getConnectionStatus() -> String {
         switch connectionState {
-        case .disconnected:
-            return "Disconnected"
-        case .connecting:
-            return "Connecting..."
-        case .connected:
-            return "Connected"
-        case .error(let msg):
-            return "Error: \(msg)"
+        case .disconnected:    return "Disconnected"
+        case .connecting:      return "Connecting…"
+        case .connected:       return "Connected"
+        case .error(let msg):  return "Error: \(msg)"
+        }
+    }
+
+    // MARK: - Token Generation (LiveKit JWT, signed client-side with CryptoKit)
+    // In production prefer a server-side token endpoint so the API secret stays off the device.
+
+    private func generateToken(roomName: String, identity: String, isPublisher: Bool) throws -> String {
+        let config = StreamingConfig.shared
+        let apiKey = config.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let apiSecret = config.apiSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !apiKey.isEmpty else { throw LiveKitError.tokenGenerationFailed }
+        guard !apiSecret.isEmpty, apiSecret != "devsecret" else { throw LiveKitError.tokenGenerationFailed }
+
+        let now = Int(Date().timeIntervalSince1970)
+        let exp = now + 3600
+
+        let header  = #"{"alg":"HS256","typ":"JWT"}"#
+        let grants  = isPublisher
+            ? #"{"room":"\#(roomName)","roomJoin":true,"canPublish":true,"canSubscribe":true}"#
+            : #"{"room":"\#(roomName)","roomJoin":true,"canPublish":false,"canSubscribe":true}"#
+        let payload = """
+        {"sub":"\(identity)","iss":"\(apiKey)","exp":\(exp),"nbf":\(now),"jti":"\(UUID().uuidString)","video":\(grants)}
+        """
+
+        let headerB64  = Data(header.utf8).base64URLEncoded()
+        let payloadB64 = Data(payload.utf8).base64URLEncoded()
+        let message    = "\(headerB64).\(payloadB64)"
+
+        let key       = SymmetricKey(data: Data(apiSecret.utf8))
+        let sig       = HMAC<SHA256>.authenticationCode(for: Data(message.utf8), using: key)
+        let sigB64    = Data(sig).base64URLEncoded()
+
+        return "\(message).\(sigB64)"
+    }
+
+    // MARK: - Permissions
+
+    private func requestCameraPermission() async -> Bool {
+        await withCheckedContinuation { cont in
+            AVCaptureDevice.requestAccess(for: .video) { cont.resume(returning: $0) }
+        }
+    }
+
+    private func requestMicrophonePermission() async -> Bool {
+        await withCheckedContinuation { cont in
+            AVAudioApplication.requestRecordPermission { cont.resume(returning: $0) }
         }
     }
 }
 
-// MARK: - Error Types
+// MARK: - Data + base64url
+
+private extension Data {
+    func base64URLEncoded() -> String {
+        base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+// MARK: - Errors
 
 enum LiveKitError: LocalizedError {
+    case sdkNotInstalled
     case invalidServerURL
     case permissionDenied(String)
     case connectionFailed(String)
     case tokenGenerationFailed
-    
+
     var errorDescription: String? {
         switch self {
+        case .sdkNotInstalled:
+            return "LiveKit SDK not installed. In Xcode: File → Add Package Dependencies → https://github.com/livekit/client-sdk-swift"
         case .invalidServerURL:
-            return "Invalid LiveKit server URL format"
+            return "Invalid LiveKit server URL. Check LiveKitSecret.plist."
         case .permissionDenied(let resource):
-            return "Permission denied for \(resource)"
+            return "Permission denied for \(resource)."
         case .connectionFailed(let reason):
             return "Connection failed: \(reason)"
         case .tokenGenerationFailed:
-            return "Failed to generate room access token"
+            return "Token generation failed. Check LIVEKIT_API_KEY / LIVEKIT_API_SECRET in LiveKitSecret.plist."
         }
     }
-}
-
-// MARK: - Placeholder Types (to be replaced by LiveKit SDK)
-// These are namespaced within LiveKitService to avoid conflicts with any imported LiveKit SDK
-
-extension LiveKitService {
-    struct LiveKitRoom {}
-    struct LocalParticipant {}
-    struct RemoteParticipantInfo {}
 }

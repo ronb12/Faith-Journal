@@ -62,7 +62,7 @@ struct PrayerView: View {
                         .cornerRadius(10)
                         
                         HStack {
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 8) {
                                     FilterChip(title: "All", isSelected: selectedFilter == .all) {
                                         selectedFilter = .all
@@ -280,7 +280,7 @@ struct PrayerRequestRow: View {
             }
             
             if !request.tags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 4) {
                         ForEach(request.tags.prefix(3), id: \.self) { tag in
                             Text(tag)
@@ -502,6 +502,7 @@ struct NewPrayerRequestView: View {
         }
         .sheet(isPresented: $showingBibleVersePicker) {
             BibleVersePickerView(selectedVerse: $relatedBibleVerse)
+                .macOSSheetFrameStandard()
         }
         .sheet(isPresented: $showingJournalEntryPicker) {
             JournalEntryPickerView(selectedEntryId: $linkedJournalEntryId)
@@ -798,8 +799,18 @@ struct NewPrayerRequestView: View {
                     .foregroundColor(.primary)
             }
             
-            // Visual Category Picker
-            ScrollView(.horizontal, showsIndicators: false) {
+            #if os(macOS)
+            // Dropdown on macOS — horizontal scroll unreliable
+            Picker("Category", selection: $selectedCategory) {
+                ForEach(categories) { category in
+                    Label(category.name, systemImage: category.icon)
+                        .tag(category.name)
+                }
+            }
+            .pickerStyle(.menu)
+            #else
+            // Visual Category Picker on iOS
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(categories) { category in
                         Button(action: {
@@ -825,6 +836,7 @@ struct NewPrayerRequestView: View {
                 }
                 .padding(.horizontal, 4)
             }
+            #endif
         }
         .padding()
         .background(Color(.systemBackground))
@@ -842,7 +854,17 @@ struct NewPrayerRequestView: View {
                     .foregroundColor(.primary)
             }
             
-            // Priority Picker
+            #if os(macOS)
+            // Dropdown on macOS — horizontal scroll unreliable
+            Picker("Priority", selection: $priority) {
+                ForEach(PrayerPriority.allCases, id: \.self) { priorityLevel in
+                    Label(priorityLevel.rawValue, systemImage: priorityLevel.icon)
+                        .tag(priorityLevel)
+                }
+            }
+            .pickerStyle(.menu)
+            #else
+            // Priority Picker on iOS
             HStack(spacing: 12) {
                 ForEach(PrayerPriority.allCases, id: \.self) { priorityLevel in
                     Button(action: {
@@ -863,6 +885,7 @@ struct NewPrayerRequestView: View {
                     }
                 }
             }
+            #endif
         }
         .padding()
         .background(Color(.systemBackground))
@@ -882,7 +905,7 @@ struct NewPrayerRequestView: View {
             
             // Tag Chips
             if !requestTags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 8) {
                         ForEach(requestTags, id: \.self) { tag in
                             HStack(spacing: 6) {
@@ -923,8 +946,27 @@ struct NewPrayerRequestView: View {
             .background(Color(.systemGray6))
             .cornerRadius(12)
             
-            // Quick Tag Buttons - Scrollable
-            ScrollView(.horizontal, showsIndicators: false) {
+            // Quick Tag Buttons
+            #if os(macOS)
+            // Dropdown on macOS — add tag from preset list
+            HStack {
+                Text("Quick add:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Menu {
+                    ForEach(prayerQuickTags, id: \.self) { quickTag in
+                        Button(quickTag) {
+                            if !requestTags.contains(quickTag) {
+                                requestTags.append(quickTag)
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Add tag", systemImage: "plus.circle")
+                }
+            }
+            #else
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 8) {
                     ForEach(prayerQuickTags, id: \.self) { quickTag in
                         Button(action: {
@@ -949,6 +991,7 @@ struct NewPrayerRequestView: View {
                 }
                 .padding(.horizontal, 4)
             }
+            #endif
         }
         .padding()
         .background(Color(.systemBackground))
@@ -1054,7 +1097,7 @@ struct NewPrayerRequestView: View {
                 
                 // Partner Chips
                 if !prayerPartners.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(prayerPartners, id: \.self) { partner in
                                 HStack(spacing: 6) {
@@ -1117,7 +1160,7 @@ struct NewPrayerRequestView: View {
                         Text("Suggestions")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(suggestedPartners.prefix(5), id: \.self) { partner in
                                     Button(action: {
@@ -1716,7 +1759,7 @@ struct PrayerRequestDetailView: View {
                         Text("Tags")
                             .font(.headline)
                             .foregroundColor(.primary)
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(request.tags, id: \.self) { tag in
                                     Text(tag)
@@ -1742,7 +1785,7 @@ struct PrayerRequestDetailView: View {
                                 .font(.headline)
                                 .foregroundColor(.primary)
                         }
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(request.prayerPartners, id: \.self) { partner in
                                     HStack(spacing: 6) {

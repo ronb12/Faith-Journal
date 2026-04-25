@@ -1,6 +1,6 @@
 import SwiftUI
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct DevotionalsView: View {
     let devotionalManager: Any
     @ObservedObject private var themeManager = ThemeManager.shared
@@ -16,14 +16,15 @@ struct DevotionalsView: View {
     }
 }
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 private struct DevotionalsContentView: View {
     @ObservedObject var manager: DevotionalManager
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Binding var selectedDevotional: Devotional?
     
-    // Detect if running on iPad
+    // Detect if running on iPad or Mac (wider layout)
     private var isIPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
+        PlatformDevice.isPadOrMac
     }
     
     var body: some View {
@@ -32,14 +33,18 @@ private struct DevotionalsContentView: View {
                 // Background gradient
                 LinearGradient(
                     colors: [
-                        Color.purple.opacity(0.1),
-                        Color.blue.opacity(0.05),
-                        Color(.systemGroupedBackground)
+                        themeManager.colors.primary.opacity(0.1),
+                        themeManager.colors.secondary.opacity(0.05),
+                        Color.platformSystemGroupedBackground
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
+                #if os(macOS)
+                .ignoresSafeArea(.all, edges: [.bottom, .leading, .trailing])
+                #else
                 .ignoresSafeArea()
+                #endif
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -58,13 +63,20 @@ private struct DevotionalsContentView: View {
                 }
             }
             .navigationTitle("Devotionals")
-            .navigationBarTitleDisplayMode(isIPad ? .large : .large)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            #if os(iOS)
+            .toolbarBackground(Color.platformSystemGroupedBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            #endif
             .onAppear {
                 // Start loading devotionals immediately when view appears
                 manager.loadDevotionals()
             }
             .sheet(item: $selectedDevotional) { devotional in
                 DevotionalDetailView(devotional: devotional, manager: manager)
+                    .macOSSheetFrameLarge()
             }
         }
     }
@@ -77,7 +89,7 @@ private struct DevotionalsContentView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color.purple, Color.blue],
+                                colors: [themeManager.colors.primary, themeManager.colors.secondary],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -119,11 +131,11 @@ private struct DevotionalsContentView: View {
             
             HStack {
                 Image(systemName: "book.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                     .font(.caption)
                 Text(devotional.scripture)
                     .font(.subheadline)
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                     .font(.body.weight(.medium))
                     .italic()
             }
@@ -151,7 +163,7 @@ private struct DevotionalsContentView: View {
                 .padding()
                 .background(
                     LinearGradient(
-                        colors: [Color.purple, Color.blue],
+                        colors: [themeManager.colors.primary, themeManager.colors.secondary],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -162,7 +174,7 @@ private struct DevotionalsContentView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
     }
@@ -174,7 +186,21 @@ private struct DevotionalsContentView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
             
-            ScrollView(.horizontal, showsIndicators: false) {
+            #if os(macOS)
+            HStack {
+                Picker("Category", selection: Binding(
+                    get: { manager.selectedCategory },
+                    set: { manager.selectedCategory = $0 }
+                )) {
+                    ForEach(manager.categories, id: \.self) { category in
+                        Text(category).tag(category)
+                    }
+                }
+                .pickerStyle(.menu)
+                Spacer()
+            }
+            #else
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(manager.categories, id: \.self) { category in
                         Button(action: {
@@ -188,14 +214,15 @@ private struct DevotionalsContentView: View {
                                 .padding(.vertical, 8)
                                 .background(
                                     manager.selectedCategory == category ?
-                                    LinearGradient(colors: [Color.purple, Color.blue], startPoint: .leading, endPoint: .trailing) :
-                                    LinearGradient(colors: [Color(.systemGray5)], startPoint: .leading, endPoint: .trailing)
+                                    LinearGradient(colors: [themeManager.colors.primary, themeManager.colors.secondary], startPoint: .leading, endPoint: .trailing) :
+                                    LinearGradient(colors: [Color.platformSystemGray5], startPoint: .leading, endPoint: .trailing)
                                 )
                                 .cornerRadius(20)
                         }
                     }
                 }
             }
+            #endif
         }
     }
     
@@ -259,6 +286,7 @@ private struct DevotionalsContentView: View {
 }
 
 struct DevotionalRow: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     let devotional: Devotional
     let action: () -> Void
     
@@ -269,7 +297,7 @@ struct DevotionalRow: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(
                         LinearGradient(
-                            colors: [Color.purple.opacity(0.8), Color.blue.opacity(0.6)],
+                            colors: [themeManager.colors.primary.opacity(0.8), themeManager.colors.secondary.opacity(0.6)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -292,11 +320,11 @@ struct DevotionalRow: View {
                     
                     HStack(spacing: 8) {
                         Image(systemName: "book.fill")
-                            .foregroundColor(.purple)
+                            .foregroundColor(themeManager.colors.primary)
                             .font(.caption2)
                         Text(devotional.scripture)
                             .font(.subheadline)
-                            .foregroundColor(.purple)
+                            .foregroundColor(themeManager.colors.primary)
                             .font(.body.weight(.medium))
                             .italic()
                     }
@@ -333,7 +361,7 @@ struct DevotionalRow: View {
                             .padding(.vertical, 4)
                             .background(
                                 LinearGradient(
-                                    colors: [Color.purple.opacity(0.7), Color.blue.opacity(0.7)],
+                                    colors: [themeManager.colors.primary.opacity(0.7), themeManager.colors.secondary.opacity(0.7)],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
@@ -349,7 +377,7 @@ struct DevotionalRow: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
             )
         }
@@ -357,8 +385,9 @@ struct DevotionalRow: View {
     }
 }
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct DevotionalDetailView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     let devotional: Devotional
     @ObservedObject var manager: DevotionalManager
     @Environment(\.dismiss) private var dismiss
@@ -369,7 +398,7 @@ struct DevotionalDetailView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(devotional.title)
@@ -379,7 +408,7 @@ struct DevotionalDetailView: View {
                     
                     Text(devotional.scripture)
                         .font(.title3)
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                         .italic()
                     
                     Text(devotional.content)
@@ -399,15 +428,42 @@ struct DevotionalDetailView: View {
                     
                     Text(devotional.category)
                         .font(.caption)
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.purple.opacity(0.1))
+                        .background(themeManager.colors.primary.opacity(0.1))
                         .cornerRadius(8)
+                    
+                    // Instructions to mark as read (iOS and macOS)
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle")
+                            .foregroundColor(themeManager.colors.primary)
+                            .font(.body)
+                        #if os(macOS)
+                        Text("When you've finished reading, tap \"Mark as Read\" below to mark this devotional as done.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        #else
+                        Text("When you've finished reading, tap \"Mark as Read\" in the toolbar above to mark this devotional as done.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        #endif
+                    }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(themeManager.colors.primary.opacity(0.08))
+                    .cornerRadius(12)
+                    .padding(.top, 8)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("Devotional")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -419,7 +475,7 @@ struct DevotionalDetailView: View {
                             Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                             Text(isCompleted ? "Mark as Unread" : "Mark as Read")
                         }
-                        .foregroundColor((currentDevotional?.isCompleted ?? devotional.isCompleted) ? .green : .blue)
+                        .foregroundColor((currentDevotional?.isCompleted ?? devotional.isCompleted) ? .green : themeManager.colors.secondary)
                     }
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
@@ -430,14 +486,46 @@ struct DevotionalDetailView: View {
                         }) {
                             let isFavorite = currentDevotional?.isFavorite ?? devotional.isFavorite
                             Image(systemName: isFavorite ? "bookmark.fill" : "bookmark")
-                                .foregroundColor(isFavorite ? .purple : .blue)
+                                .foregroundColor(isFavorite ? themeManager.colors.primary : themeManager.colors.secondary)
                         }
                     }
+                    Button("Done") {
+                        RewardedInterstitialManager.shared.tryShowAd { dismiss() }
+                    }
+                }
+            }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button(action: {
+                        manager.markAsCompleted(devotional)
+                    }) {
+                        HStack {
+                            let isCompleted = currentDevotional?.isCompleted ?? devotional.isCompleted
+                            Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                            Text(isCompleted ? "Mark as Unread" : "Mark as Read")
+                        }
+                        .foregroundColor((currentDevotional?.isCompleted ?? devotional.isCompleted) ? .green : themeManager.colors.secondary)
+                    }
+                }
+                if (currentDevotional?.isCompleted ?? devotional.isCompleted) {
+                    ToolbarItem(placement: .automatic) {
+                        Button(action: {
+                            manager.toggleFavorite(devotional)
+                        }) {
+                            let isFavorite = currentDevotional?.isFavorite ?? devotional.isFavorite
+                            Image(systemName: isFavorite ? "bookmark.fill" : "bookmark")
+                                .foregroundColor(isFavorite ? themeManager.colors.primary : themeManager.colors.secondary)
+                        }
+                    }
+                }
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }
                 }
             }
+            #endif
         }
     }
 }

@@ -82,13 +82,10 @@ struct StatisticsView_Old: View {
         ]
     }
     
-    var body: some View {
-        if #available(iOS 17.0, *) {
-            NavigationStack {
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Summary Cards
-                        VStack(spacing: 16) {
+    private var statisticsContent: some View {
+        VStack(spacing: 24) {
+            // Summary Cards
+            VStack(spacing: 16) {
                             HStack(spacing: 16) {
                                 StatCard(
                                     title: "Journal Entries",
@@ -155,7 +152,7 @@ struct StatisticsView_Old: View {
                                 .padding()
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color(.systemBackground))
+                                        .fill(Color.platformSystemBackground)
                                         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
                                 )
                                 .padding(.horizontal)
@@ -188,7 +185,7 @@ struct StatisticsView_Old: View {
                                 .padding()
                                 .background(
                                     RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color(.systemBackground))
+                                        .fill(Color.platformSystemBackground)
                                         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
                                 )
                                 .padding(.horizontal)
@@ -260,18 +257,25 @@ struct StatisticsView_Old: View {
                                         .padding()
                                         .background(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .fill(Color(.systemGray6))
+                                                .fill(Color.platformSystemGray6)
                                         )
                                     }
                                 }
                                 .padding(.horizontal)
                             }
                         }
-                    }
-                    .padding(.vertical)
+        }
+        .padding(.vertical)
+    }
+    
+    var body: some View {
+        if #available(iOS 17.0, macOS 14.0, *) {
+            NavigationStack {
+                ScrollView {
+                    statisticsContent
                 }
                 .navigationTitle("Statistics")
-                .background(Color(.systemGroupedBackground))
+                .background(Color.platformSystemGroupedBackground)
                 .sheet(isPresented: $showingMoodAnalytics) {
                     MoodAnalyticsView()
                 }
@@ -311,7 +315,7 @@ struct StatRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         )
     }

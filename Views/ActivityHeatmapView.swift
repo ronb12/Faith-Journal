@@ -52,7 +52,7 @@ struct ActivityHeatmapView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemBackground))
+                            .fill(Color.platformSystemBackground)
                     )
                     
                     // Heatmap
@@ -78,6 +78,7 @@ struct ActivityHeatmapView: View {
                 .padding()
             }
             .navigationTitle("Activity Heatmap")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -86,6 +87,15 @@ struct ActivityHeatmapView: View {
                     }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            #endif
         }
     }
     
@@ -191,7 +201,7 @@ struct ActivityHeatmapGrid: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
         } else {

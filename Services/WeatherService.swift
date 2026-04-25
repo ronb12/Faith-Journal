@@ -13,6 +13,27 @@ class WeatherService {
     
     private init() {}
     
+    /// Produces a short, human line like "Clear 72°F" or nil if the payload looks like HTML/a terminal page.
+    private static func sanitizeWeatherResponse(_ raw: String) -> String? {
+        // Take the first line only; HTML and ascii-art are usually multi-line.
+        let firstLine = raw
+            .split(whereSeparator: \.isNewline)
+            .map { String($0) }
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let t = firstLine
+        if t.isEmpty { return nil }
+        let lower = t.lowercased()
+        if lower.hasPrefix("<!") || lower.contains("<html") || lower.contains("doctype") { return nil }
+        if t.hasPrefix("{") && t.hasSuffix("}") { return nil }
+        if t.contains("/") && t.contains("<") { return nil }
+        if t.count > 160 { return String(t.prefix(160)) }
+        // Clean up: wttr.in with ?format= often returns "Clear +72°F"
+        return t
+            .replacingOccurrences(of: "+", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
     /// Fetches current weather for a given location
     /// Uses wttr.in - a free weather API that doesn't require an API key
     func fetchWeather(for location: CLLocation, completion: @escaping (Result<String, Error>) -> Void) {
@@ -42,18 +63,21 @@ class WeatherService {
             }
             
             guard let data = data,
-                  let weatherString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !weatherString.isEmpty else {
+                  let raw = String(data: data, encoding: .utf8),
+                  !raw.isEmpty else {
                 DispatchQueue.main.async {
                     completion(.failure(WeatherError.noData))
                 }
                 return
             }
             
-            // Clean up the response - wttr.in returns something like "Clear +72°F"
-            let cleanedWeather = weatherString
-                .replacingOccurrences(of: "+", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            // API can return HTML, terminal art, or errors when rate-limited/blocked; never show that in the journal UI.
+            guard let cleanedWeather = Self.sanitizeWeatherResponse(raw) else {
+                DispatchQueue.main.async {
+                    completion(.failure(WeatherError.noData))
+                }
+                return
+            }
             
             DispatchQueue.main.async {
                 completion(.success(cleanedWeather))

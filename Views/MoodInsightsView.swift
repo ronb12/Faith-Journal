@@ -52,7 +52,9 @@ struct MoodInsightsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Mood Insights")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
     }
 }
@@ -104,7 +106,7 @@ struct MoodInsightCard: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(8)
             }
             
@@ -125,7 +127,7 @@ struct MoodInsightCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
         )
     }

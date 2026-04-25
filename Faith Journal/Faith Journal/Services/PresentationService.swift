@@ -1,7 +1,11 @@
 import Foundation
 import UniformTypeIdentifiers
 import SwiftUI
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 @MainActor
 final class PresentationService: ObservableObject {
@@ -58,15 +62,29 @@ final class PresentationService: ObservableObject {
             throw PresentationError.missingDirectory
         }
 
-        let resourceValues = try url.resourceValues(forKeys: [.contentTypeKey])
-        guard let contentType = resourceValues.contentType else {
-            throw PresentationError.unsupportedType
+        // Access security-scoped resource first (required for fileImporter URLs from Files/iCloud)
+        let needsStop = url.startAccessingSecurityScopedResource()
+        defer {
+            if needsStop {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let contentType: UTType?
+        if let resourceValues = try? url.resourceValues(forKeys: [.contentTypeKey]) {
+            contentType = resourceValues.contentType
+        } else {
+            contentType = nil
         }
 
         let assetType: PresentationAsset.AssetType
-        if contentType.conforms(to: .pdf) {
+        if let ct = contentType, ct.conforms(to: .pdf) {
             assetType = .pdf
-        } else if contentType.conforms(to: .image) {
+        } else if let ct = contentType, ct.conforms(to: .image) {
+            assetType = .image
+        } else if url.pathExtension.lowercased() == "pdf" {
+            assetType = .pdf
+        } else if ["jpg", "jpeg", "png", "heic", "gif"].contains(url.pathExtension.lowercased()) {
             assetType = .image
         } else {
             throw PresentationError.unsupportedType
@@ -74,13 +92,6 @@ final class PresentationService: ObservableObject {
         let destination = directory.appendingPathComponent("\(UUID().uuidString)-\(url.lastPathComponent)")
         if FileManager.default.fileExists(atPath: destination.path) {
             try? FileManager.default.removeItem(at: destination)
-        }
-
-        let needsStop = url.startAccessingSecurityScopedResource()
-        defer {
-            if needsStop {
-                url.stopAccessingSecurityScopedResource()
-            }
         }
 
         try FileManager.default.copyItem(at: url, to: destination)
@@ -93,6 +104,20 @@ final class PresentationService: ObservableObject {
         )
 
         currentAsset = asset
+    }
+
+    /// Load presentation from a remote URL (e.g. for participants when host shares).
+    func presentFromRemoteURL(_ urlString: String, title: String) async throws {
+        guard let directory = presentationsDirectory else {
+            throw PresentationError.missingDirectory
+        }
+        guard let url = URL(string: urlString) else { return }
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let ext = url.pathExtension.isEmpty ? (urlString.lowercased().contains("pdf") ? "pdf" : "jpg") : url.pathExtension
+        let destination = directory.appendingPathComponent("\(UUID().uuidString).\(ext)")
+        try data.write(to: destination)
+        let assetType: PresentationAsset.AssetType = (ext == "pdf") ? .pdf : .image
+        currentAsset = PresentationAsset(id: UUID(), title: title, fileURL: destination, type: assetType)
     }
 
     func presentBibleStudy(topic: BibleStudyTopic) async throws {
@@ -120,8 +145,9 @@ final class PresentationService: ObservableObject {
         }
 
         let pageBounds = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
 
+        #if os(iOS)
+        let renderer = UIGraphicsPDFRenderer(bounds: pageBounds)
         try renderer.writePDF(to: url, withActions: { context in
             var currentY: CGFloat = 20
             let margin: CGFloat = 36
@@ -159,13 +185,13 @@ final class PresentationService: ObservableObject {
             }
 
             let titleAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 24, weight: .bold)
+                .font: UIFont.boldSystemFont(ofSize: 24)
             ]
             let headingAttributes: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 16, weight: .semibold)
             ]
             let bodyAttributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 14, weight: .regular)
+                .font: UIFont.systemFont(ofSize: 14)
             ]
 
             drawText(topic.title, attributes: titleAttributes)
@@ -188,6 +214,35 @@ final class PresentationService: ObservableObject {
                 }
             }
         })
+        #elseif os(macOS)
+        var mediaBox = pageBounds
+        guard let pdfContext = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {
+            throw NSError(domain: "PresentationService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create PDF context"])
+        }
+        pdfContext.beginPDFPage(nil)
+        let titleAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.boldSystemFont(ofSize: 24)]
+        let headingAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 16, weight: .semibold)]
+        let bodyAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 14)]
+        var y: CGFloat = pageBounds.height - 40
+        let margin: CGFloat = 36
+        let textWidth = pageBounds.width - margin * 2
+        func drawMacText(_ text: String, attrs: [NSAttributedString.Key: Any]) {
+            let str = NSAttributedString(string: text, attributes: attrs)
+            str.draw(at: CGPoint(x: margin, y: y))
+            y -= 24
+        }
+        drawMacText(topic.title, attrs: titleAttrs)
+        drawMacText("Category: \(topic.category.rawValue)", attrs: headingAttrs)
+        drawMacText("Summary:", attrs: headingAttrs)
+        drawMacText(topic.topicDescription, attrs: bodyAttrs)
+        for verse in topic.keyVerses { drawMacText("• \(verse)", attrs: bodyAttrs) }
+        for line in topic.verseTexts { drawMacText("• \(line)", attrs: bodyAttrs) }
+        for q in topic.studyQuestions { drawMacText("• \(q)", attrs: bodyAttrs) }
+        for p in topic.discussionPrompts { drawMacText("• \(p)", attrs: bodyAttrs) }
+        for a in topic.applicationPoints { drawMacText("• \(a)", attrs: bodyAttrs) }
+        pdfContext.endPDFPage()
+        pdfContext.closePDF()
+        #endif
     }
 
     func clearPresentation() {

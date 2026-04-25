@@ -28,7 +28,7 @@ struct WaitingRoomView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemBackground).ignoresSafeArea()
+                Color.platformSystemBackground.ignoresSafeArea()
                 
                 VStack(spacing: 24) {
                     // Header
@@ -54,7 +54,7 @@ struct WaitingRoomView: View {
                                 CountdownTimerView(timeUntil: scheduledTime.timeIntervalSince(Date()))
                             }
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(12)
                         }
                     }
@@ -118,7 +118,7 @@ struct WaitingRoomView: View {
                                             }
                                         }
                                         .padding()
-                                        .background(Color(.systemGray6))
+                                        .background(Color.platformSystemGray6)
                                         .cornerRadius(12)
                                     }
                                 }
@@ -185,12 +185,20 @@ struct WaitingRoomView: View {
                 .padding()
             }
             .navigationTitle("Waiting Room")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Close") { dismiss() }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Close") { dismiss() }
+                }
+            }
+            #endif
         }
     }
 }

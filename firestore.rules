@@ -1,4 +1,5 @@
 rules_version = '2';
+// Deploy: firebase deploy --only firestore:rules (from project root)
 service cloud.firestore {
   match /databases/{database}/documents {
     
@@ -17,6 +18,25 @@ service cloud.firestore {
       return userId == 'simulator-test-user-shared';
     }
     
+    // Same doc ID as app code: sorted UIDs joined with underscore (see FirebaseSyncService.friendDocId)
+    function friendPairId(uid1, uid2) {
+      return uid1 < uid2 ? uid1 + '_' + uid2 : uid2 + '_' + uid1;
+    }
+    
+    // True if both UIDs have an accepted friendship document in /friends/{pairId}
+    function areAcceptedFriends(readerUid, ownerUid) {
+      let pairId = friendPairId(readerUid, ownerUid);
+      return exists(/databases/$(database)/documents/friends/$(pairId))
+        && get(/databases/$(database)/documents/friends/$(pairId)).data.status == 'accepted';
+    }
+    
+    // Friend may read another user's reading plan only when the plan is marked shared
+    function canFriendReadSharedReadingPlan(readerUid, ownerUid) {
+      return isAuthenticated()
+        && readerUid == request.auth.uid
+        && areAcceptedFriends(readerUid, ownerUid);
+    }
+    
     // Allow test collection for testing/debugging (top-level)
     // This allows creating test documents without authentication for development
     match /testConnection/{document=**} {
@@ -25,8 +45,9 @@ service cloud.firestore {
     
     // Users collection - users can read/write their own data
     match /users/{userId} {
-      // Allow users to read/write their own user document OR if it's the test user (for simulator testing)
-      allow read, write: if isOwner(userId) || isTestUser(userId);
+      // Read: any authenticated user (for Faith Friends search); Write: own doc or test user
+      allow read: if isAuthenticated() || isTestUser(userId);
+      allow write: if isOwner(userId) || isTestUser(userId);
       
       // User's journal entries
       match /journalEntries/{entryId} {
@@ -58,9 +79,12 @@ service cloud.firestore {
         allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
-      // User's reading plans
+      // User's reading plans: owner (and test id) read/write; accepted friends may read if sharedWithFriends
       match /readingPlans/{planId} {
-        allow read, write: if isOwner(userId) || isTestUser(userId);
+        allow read: if isOwner(userId) || isTestUser(userId)
+          || (canFriendReadSharedReadingPlan(request.auth.uid, userId)
+              && resource.data.sharedWithFriends == true);
+        allow create, update, delete: if isOwner(userId) || isTestUser(userId);
       }
       
       // User's session invitations (personal collection)
@@ -90,6 +114,16 @@ service cloud.firestore {
       }
     }
     
+    // Invite code index (document id = invite code) - for join-by-code lookup
+    // Read: public for join-by-code. Write: same pattern as /liveSessions — signed-in host OR simulator dev id (no auth token in simulator).
+    match /sessionInviteCodes/{inviteCode} {
+      allow read: if true;
+      allow create: if (isAuthenticated() && request.resource.data.hostId == request.auth.uid)
+                    || request.resource.data.hostId == 'simulator-test-user-shared';
+      allow update, delete: if (isAuthenticated() && resource.data.hostId == request.auth.uid)
+                    || resource.data.hostId == 'simulator-test-user-shared';
+    }
+
     // Public session invitations collection (for joining by code)
     // Anyone can read (to join by code), but only authenticated users can write
     // Users can only write invitations where they are the host
@@ -111,7 +145,18 @@ service cloud.firestore {
                       resource.data.hostId == request.auth.uid;
     }
     
-    // Public sessions collection (for cross-user session lookups)
+    // Live sessions collection (for public discovery and join-by-code)
+    // Host can create/delete; host and participants can update (e.g. participant count when leaving)
+    match /liveSessions/{sessionId} {
+      allow read: if true;
+      allow create: if (isAuthenticated() && request.resource.data.hostId == request.auth.uid)
+                    || request.resource.data.hostId == 'simulator-test-user-shared';
+      allow update: if isAuthenticated();
+      allow delete: if (isAuthenticated() && resource.data.hostId == request.auth.uid)
+                    || resource.data.hostId == 'simulator-test-user-shared';
+    }
+    
+    // Public sessions collection (for cross-user session lookups - legacy)
     match /publicSessions/{sessionId} {
       // Allow anyone to read (for joining sessions)
       allow read: if true;
@@ -143,53 +188,117 @@ service cloud.firestore {
         // Allow anyone in the session to read messages
         allow read: if true;
         
-        // Allow authenticated users to create messages
+        // Allow authenticated users to create messages (userId must be self)
         allow create: if isAuthenticated() && 
                         request.resource.data.userId == request.auth.uid;
         
-        // Allow users to update their own messages (for reactions, edits)
-        allow update: if isAuthenticated() && 
-                        (resource.data.userId == request.auth.uid ||
-                         request.resource.data.userId == request.auth.uid);
+        // Allow any authenticated user to update (so anyone can add reactions to any message)
+        allow update: if isAuthenticated();
         
         // Allow users to delete their own messages
         allow delete: if isAuthenticated() && 
                         resource.data.userId == request.auth.uid;
       }
       
-      // Participants subcollection
+      // Participants subcollection (presence, mute state for live stream)
       match /participants/{participantId} {
-        // Allow anyone to read participants (to see who's in the session)
+        // Allow anyone to read participants (to see who's in the session; participants listen for host mute)
         allow read: if true;
         
         // Allow authenticated users to create their own participant entry
-        // participantId can be userId or Firebase Auth UID
         allow create: if isAuthenticated() && 
                         request.resource.data.userId == request.auth.uid;
         
-        // Allow users to update their own participant entry
-        // Check userId field matches auth.uid (document ID can be different)
-        allow update: if isAuthenticated() && 
-                        (resource.data.userId == request.auth.uid ||
-                         request.resource.data.userId == request.auth.uid);
+        // Update: own entry (participant) OR session host (writes isMuted for remote mute)
+        allow update: if isAuthenticated() && (
+                        resource.data.userId == request.auth.uid ||
+                        get(/databases/$(database)/documents/sessions/$(sessionId)).data.hostId == request.auth.uid
+                      );
         
         // Allow users to delete their own participant entry
         allow delete: if isAuthenticated() && 
                         resource.data.userId == request.auth.uid;
       }
+      
+      // Presentation state (Bible study / shared content) - host writes, everyone reads
+      match /presentation/{docId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+      
+      // Live session UI controls (e.g. broadcast "open floor" for co-presenting).
+      // App path: sessions/{sessionId}/liveControls/state — fields: broadcastOpenFloor (bool), updatedAt (timestamp).
+      match /liveControls/{docId} {
+        allow read: if true;
+        allow create, update: if isAuthenticated() &&
+          get(/databases/$(database)/documents/sessions/$(sessionId)).data.hostId == request.auth.uid;
+        allow delete: if isAuthenticated() &&
+          get(/databases/$(database)/documents/sessions/$(sessionId)).data.hostId == request.auth.uid;
+      }
     }
     
     // User channels
     match /users/{userId}/channel/info {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isOwner(userId) || isTestUser(userId);
     }
     
+    // User search profiles - for Faith Friends in-app search (prefix search by name)
+    // Read allowed for all (including simulator/macOS demo) - display names are for discovery
+    match /userSearchProfiles/{userId} {
+      allow read: if true;
+      allow create, update, delete: if isOwner(userId) || isTestUser(userId);
+    }
+
+    // Friend codes - lookup by code to send friend request (like invite codes)
+    match /friendCodes/{code} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Friends / friend requests
+    // Read: allow if doc doesn't exist (app does getDocument before create) or user is userA/userB
+    // Create: allow if authenticated and requester is one of userA or userB (Firebase Auth UIDs)
+    match /friends/{friendId} {
+      allow read: if isAuthenticated() && (
+          !exists(/databases/$(database)/documents/friends/$(friendId)) ||
+          resource.data.userA == request.auth.uid ||
+          resource.data.userB == request.auth.uid ||
+          resource.data.userA == 'simulator-test-user-shared' ||
+          resource.data.userB == 'simulator-test-user-shared'
+      );
+      allow create: if isAuthenticated() &&
+          (request.resource.data.userA == request.auth.uid || request.resource.data.userB == request.auth.uid);
+      allow update, delete: if isAuthenticated() &&
+          (resource.data.userA == request.auth.uid || resource.data.userB == request.auth.uid);
+    }
+
+    // Friend session alerts - when a friend creates a live session (for notifications)
+    match /users/{userId}/friendSessionAlerts/{alertId} {
+      allow read, delete: if isOwner(userId);
+      allow create: if isAuthenticated();
+    }
+
     // Public channels collection (for discovery)
     match /channels/{channelId} {
-      // Anyone can read public channels
       allow read: if true;
-      // Only channel owner can write
-      allow write: if isAuthenticated() && channelId == request.auth.uid;
+      allow write: if (isAuthenticated() && channelId == request.auth.uid) || isTestUser(channelId);
+    }
+    
+    // HLS / broadcast live chat (LiveStreamChatService) — path: liveStreamChats/{sessionId}/messages
+    match /liveStreamChats/{sessionId}/messages/{messageId} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasAll([
+          'sessionId', 'userId', 'userName', 'text', 'messageUUID', 'createdAt'
+        ]) &&
+        request.resource.data.sessionId is string &&
+        request.resource.data.sessionId == sessionId &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() < 2000;
+      allow update, delete: if false;
     }
     
     // Default deny all other access

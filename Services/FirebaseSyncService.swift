@@ -8,23 +8,35 @@
 import Foundation
 import SwiftData
 import Combine
+#if os(iOS)
 import UIKit
+#endif
 
 #if canImport(FirebaseFirestore)
 import FirebaseFirestore
 import FirebaseAuth
+#endif
+#if canImport(FirebaseStorage)
+import FirebaseStorage
 #endif
 
 @MainActor
 @available(iOS 17.0, *)
 class FirebaseSyncService: ObservableObject {
     static let shared = FirebaseSyncService()
+
+    /// One-time log: participant count is skipped when `Auth` has no user (Firestore rules require `request.auth` for `liveSessions` updates).
+    private static var didLogParticipantCountRequiresSignIn = false
+    private static var didLogInviteCodeIndexSkippedNoAuth = false
     
     #if canImport(FirebaseFirestore)
     private var _db: Firestore?
     private var listener: ListenerRegistration?
     private var prayerRequestListener: ListenerRegistration?
     private var invitationListener: ListenerRegistration?
+    private var friendSessionAlertsListener: ListenerRegistration?
+    /// Skip scheduling notifications for the first snapshot (existing alerts); only notify for new alerts.
+    private var hasReceivedInitialFriendAlertsSnapshot = false
 
     #if canImport(FirebaseAuth)
     private var authStateListenerHandle: AuthStateDidChangeListenerHandle?
@@ -52,10 +64,27 @@ class FirebaseSyncService: ObservableObject {
     #else
     private let db: Any? = nil
     #endif
+
+    #if canImport(FirebaseStorage)
+    private var storage: Storage? {
+        guard FirebaseInitializer.shared.isConfigured else { return nil }
+        return Storage.storage()
+    }
+    #endif
     
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncError: String?
+    /// Pending incoming friend request count; refresh via refreshPendingFriendRequestCount() (e.g. on app active / More tab).
+    @Published var pendingFriendRequestCount: Int = 0
+    @Published var latestFriendSessionAlert: FriendSessionAlert? = nil
+
+    struct FriendSessionAlert: Identifiable {
+        let id = UUID()
+        let hostName: String
+        let sessionTitle: String
+        let sessionId: String
+    }
     
     private var cancellables = Set<AnyCancellable>()
     private var modelContext: ModelContext?
@@ -76,6 +105,11 @@ class FirebaseSyncService: ObservableObject {
     func configure(modelContext: ModelContext) {
         self.modelContext = modelContext
 
+        guard FirebaseInitializer.shared.isConfigured else {
+            print("⚠️ [FIREBASE] Sync not configured yet - Firebase not initialized (check GoogleService-Info.plist)")
+            return
+        }
+
         // Ensure sync starts immediately after sign-in (if configure() ran before login).
         #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
         installAuthStateListenerIfNeeded()
@@ -94,6 +128,10 @@ class FirebaseSyncService: ObservableObject {
                 await testFirebaseConnection()
             }
             startListening()
+            Task {
+                await ensureCurrentUserInSearchProfiles()
+                await ensureFriendCodeOnSignIn()
+            }
             return
         }
         #endif
@@ -101,13 +139,26 @@ class FirebaseSyncService: ObservableObject {
         // Check if user is authenticated before starting listener
         if let userId = getCurrentUserId() {
             print("✅ [FIREBASE] User authenticated: \(userId), starting listener")
-            // Test Firebase connectivity first
             Task {
                 await testFirebaseConnection()
+                await ensureCurrentUserInSearchProfiles()
+                await ensureFriendCodeOnSignIn()
             }
             startListening()
         } else {
             print("⚠️ [FIREBASE] User not authenticated yet, listener will start after sign-in")
+            // Delayed retry: Auth may restore asynchronously shortly after app launch
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_500_000_000) // 2.5 seconds
+                if self.modelContext != nil, getCurrentUserId() != nil {
+                    print("✅ [FIREBASE] Auth restored late - starting listener now")
+                    self.syncError = nil
+                    startListening()
+                    await syncAllData()
+                    await ensureCurrentUserInSearchProfiles()
+                    await ensureFriendCodeOnSignIn()
+                }
+            }
         }
     }
 
@@ -120,7 +171,7 @@ class FirebaseSyncService: ObservableObject {
             Task { @MainActor in
                 if let user {
                     print("✅ [FIREBASE] Auth state changed: signed in (\(user.uid))")
-                    
+                    self.syncError = nil
                     guard self.modelContext != nil else {
                         print("⚠️ [FIREBASE] ModelContext not set yet; will start listening after configure(modelContext:)")
                         return
@@ -132,9 +183,14 @@ class FirebaseSyncService: ObservableObject {
                     
                     // Refresh profile after sign-in.
                     await ProfileManager.shared.loadProfile()
+                    // Ensure user is in Faith Friends search index (uses users/ or local UserProfile)
+                    await self.ensureCurrentUserInSearchProfiles()
+                    // Create friend code immediately so it's ready before user opens Faith Friends
+                    await self.ensureFriendCodeOnSignIn()
                 } else {
                     print("⚠️ [FIREBASE] Auth state changed: signed out")
                     self.stopListeningInternal()
+                    await ProfileManager.shared.refreshFirebaseAppAdminClaim()
                 }
             }
         }
@@ -151,6 +207,9 @@ class FirebaseSyncService: ObservableObject {
         prayerRequestListener = nil
         invitationListener?.remove()
         invitationListener = nil
+        friendSessionAlertsListener?.remove()
+        friendSessionAlertsListener = nil
+        hasReceivedInitialFriendAlertsSnapshot = false
         #endif
     }
     
@@ -192,7 +251,11 @@ class FirebaseSyncService: ObservableObject {
         print("🧪 [FIREBASE TEST] ========================================")
         print("🧪 [FIREBASE TEST] Testing Firebase connection...")
         print("🧪 [FIREBASE TEST] User ID: \(userId)")
+        #if os(iOS)
         print("🧪 [FIREBASE TEST] Device: \(UIDevice.current.name)")
+        #else
+        print("🧪 [FIREBASE TEST] Device: \(ProcessInfo.processInfo.hostName)")
+        #endif
         print("🧪 [FIREBASE TEST] ========================================")
         
         // Check Firebase Auth status
@@ -213,9 +276,16 @@ class FirebaseSyncService: ObservableObject {
             let userTestRef = db.collection("users").document(userId)
                 .collection("testConnection").document("test")
             
+            let deviceName: String = {
+                #if os(iOS)
+                return UIDevice.current.name
+                #else
+                return ProcessInfo.processInfo.hostName
+                #endif
+            }()
             let testData: [String: Any] = [
                 "timestamp": Timestamp(date: Date()),
-                "device": UIDevice.current.name,
+                "device": deviceName,
                 "test": true,
                 "message": "This is a test document to verify Firebase connectivity",
                 "userId": userId,
@@ -246,7 +316,7 @@ class FirebaseSyncService: ObservableObject {
             let topLevelTestRef = db.collection("testConnection").document("initial-test")
             let topLevelData: [String: Any] = [
                 "timestamp": Timestamp(date: Date()),
-                "device": UIDevice.current.name,
+                "device": deviceName,
                 "test": true,
                 "message": "Initial test collection - Firebase is working!",
                 "userId": userId,
@@ -370,8 +440,9 @@ class FirebaseSyncService: ObservableObject {
     
     // MARK: - Journal Entries Sync
     
-    /// Sync a journal entry to Firebase
-    func syncJournalEntry(_ entry: JournalEntry) async {
+    /// Sync a journal entry to Firebase.
+    /// - Parameter updateSyncState: If true (default), updates isSyncing for UI. Set to false when called from syncAllData so the full-sync indicator stays active.
+    func syncJournalEntry(_ entry: JournalEntry, updateSyncState: Bool = true) async {
         #if canImport(FirebaseFirestore)
         guard let db = db else {
             print("❌ [FIREBASE] Cannot sync - Firebase Firestore not available")
@@ -379,21 +450,29 @@ class FirebaseSyncService: ObservableObject {
             return
         }
         
-        guard let userId = getCurrentUserId() else {
+        var userId = getCurrentUserId()
+        if userId == nil {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            userId = getCurrentUserId()
+        }
+        guard let userId = userId else {
             print("❌ [FIREBASE] Cannot sync - user not authenticated")
             print("❌ [FIREBASE] User must sign in with Apple for sync to work")
             syncError = "User not authenticated. Please sign in with Apple."
             return
         }
         
-        isSyncing = true
+        if updateSyncState {
+            isSyncing = true
+        }
         syncError = nil
+        defer { if updateSyncState { isSyncing = false } }
         
         do {
             let entryRef = db.collection("users").document(userId)
                 .collection("journalEntries").document(entry.id.uuidString)
             
-            let data: [String: Any] = [
+            var data: [String: Any] = [
                 "id": entry.id.uuidString,
                 "title": entry.title,
                 "content": entry.content,
@@ -406,6 +485,21 @@ class FirebaseSyncService: ObservableObject {
                 "updatedAt": Timestamp(date: entry.updatedAt),
                 "lastSyncedAt": Timestamp(date: Date())
             ]
+            if let pid = entry.linkedPrayerRequestId {
+                data["linkedPrayerRequestId"] = pid.uuidString
+            } else {
+                data["linkedPrayerRequestId"] = NSNull()
+            }
+            if let rid = entry.linkedReadingPlanId {
+                data["linkedReadingPlanId"] = rid.uuidString
+            } else {
+                data["linkedReadingPlanId"] = NSNull()
+            }
+            if let rd = entry.linkedReadingDay {
+                data["linkedReadingDay"] = rd
+            } else {
+                data["linkedReadingDay"] = NSNull()
+            }
             
             try await entryRef.setData(data, merge: true)
             lastSyncDate = Date()
@@ -453,10 +547,54 @@ class FirebaseSyncService: ObservableObject {
                 }
             }
         }
-        
-        isSyncing = false
         #else
         print("⚠️ [FIREBASE] Firebase not available - cannot sync")
+        #endif
+    }
+    
+    // MARK: - Devotional Completions Sync
+    
+    /// Sync a devotional completion status to Firebase
+    func syncDevotionalCompletion(_ completion: DevotionalCompletion) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else {
+            print("❌ [FIREBASE] Cannot sync devotional completion - Firebase Firestore not available")
+            return
+        }
+        
+        guard let userId = getCurrentUserId() else {
+            print("❌ [FIREBASE] Cannot sync devotional completion - user not authenticated")
+            return
+        }
+        
+        print("🔄 [FIREBASE] Syncing devotional completion for user: \(userId)")
+        
+        do {
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
+            let dateString = dateFormatter.string(from: completion.devotionalDate)
+            
+            let completionRef = db.collection("users").document(userId)
+                .collection("devotionalCompletions").document(dateString)
+            
+            let data: [String: Any] = [
+                "id": completion.id.uuidString,
+                "devotionalId": completion.devotionalId.uuidString,
+                "devotionalDate": Timestamp(date: completion.devotionalDate),
+                "isCompleted": completion.isCompleted,
+                "completedAt": completion.completedAt != nil ? Timestamp(date: completion.completedAt!) : NSNull(),
+                "createdAt": Timestamp(date: completion.createdAt),
+                "updatedAt": Timestamp(date: completion.updatedAt),
+                "lastSyncedAt": Timestamp(date: Date())
+            ]
+            
+            try await completionRef.setData(data, merge: true)
+            print("✅ [FIREBASE] Synced devotional completion for date: \(dateString), isCompleted: \(completion.isCompleted)")
+        } catch {
+            print("❌ [FIREBASE] Failed to sync devotional completion: \(error.localizedDescription)")
+        }
+        #else
+        print("⚠️ [FIREBASE] Firebase not available - cannot sync devotional completion")
         #endif
     }
     
@@ -586,6 +724,41 @@ class FirebaseSyncService: ObservableObject {
                 Task { @MainActor in
                     for documentChange in snapshot.documentChanges {
                         self.handleInvitationChange(documentChange)
+                    }
+                }
+            }
+        
+        // Listen for friend session alerts (when a friend starts a live session)
+        friendSessionAlertsListener = db.collection("users").document(userId)
+            .collection("friendSessionAlerts")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                if let error = error {
+                    print("❌ [FIREBASE] Friend session alerts listen error: \(error.localizedDescription)")
+                    return
+                }
+                guard let snapshot = snapshot else { return }
+                // Firestore delivers existing documents as .added on the first snapshot; skip to avoid multiple/stale notifications.
+                if !self.hasReceivedInitialFriendAlertsSnapshot {
+                    self.hasReceivedInitialFriendAlertsSnapshot = true
+                    return
+                }
+                for change in snapshot.documentChanges where change.type == .added {
+                    let data = change.document.data()
+                    let sessionId = change.document.documentID
+                    let hostName = data["hostName"] as? String ?? "A friend"
+                    let sessionTitle = data["sessionTitle"] as? String ?? "Live Session"
+                    Task { @MainActor in
+                        NotificationService.shared.scheduleFriendSessionNotification(
+                            hostName: hostName,
+                            sessionTitle: sessionTitle,
+                            sessionId: sessionId
+                        )
+                        self.latestFriendSessionAlert = FriendSessionAlert(
+                            hostName: hostName,
+                            sessionTitle: sessionTitle,
+                            sessionId: sessionId
+                        )
                     }
                 }
             }
@@ -786,6 +959,19 @@ class FirebaseSyncService: ObservableObject {
         entry.mood = data["mood"] as? String
         entry.location = data["location"] as? String
         entry.isPrivate = data["isPrivate"] as? Bool ?? false
+        if let s = data["linkedPrayerRequestId"] as? String, let u = UUID(uuidString: s) {
+            entry.linkedPrayerRequestId = u
+        }
+        if let s = data["linkedReadingPlanId"] as? String, let u = UUID(uuidString: s) {
+            entry.linkedReadingPlanId = u
+        } else if data["linkedReadingPlanId"] is NSNull {
+            entry.linkedReadingPlanId = nil
+        }
+        if let d = data["linkedReadingDay"] as? Int {
+            entry.linkedReadingDay = d
+        } else if data["linkedReadingDay"] is NSNull {
+            entry.linkedReadingDay = nil
+        }
         
         if let timestamp = data["updatedAt"] as? Timestamp {
             entry.updatedAt = timestamp.dateValue()
@@ -823,6 +1009,15 @@ class FirebaseSyncService: ObservableObject {
         
         if let timestamp = data["updatedAt"] as? Timestamp {
             entry.updatedAt = timestamp.dateValue()
+        }
+        if let s = data["linkedPrayerRequestId"] as? String, let u = UUID(uuidString: s) {
+            entry.linkedPrayerRequestId = u
+        }
+        if let s = data["linkedReadingPlanId"] as? String, let u = UUID(uuidString: s) {
+            entry.linkedReadingPlanId = u
+        }
+        if let d = data["linkedReadingDay"] as? Int {
+            entry.linkedReadingDay = d
         }
         
         modelContext.insert(entry)
@@ -877,6 +1072,24 @@ class FirebaseSyncService: ObservableObject {
     private func publishInviteCode(_ invitation: SessionInvitation, db: Firestore) async {
         let code = invitation.inviteCode.uppercased()
         guard !code.isEmpty else { return }
+        // sessionInviteCodes: hostId must be request.auth.uid, or the simulator test id (see firestore.rules).
+        #if canImport(FirebaseAuth)
+        let indexHostId: String? = {
+            if let u = Auth.auth().currentUser { return u.uid }
+            if getCurrentUserId() == "simulator-test-user-shared" { return "simulator-test-user-shared" }
+            // Signed-out real device: hostId could not match rules; skip to avoid permission spam.
+            return nil
+        }()
+        guard let hostId = indexHostId else {
+            if !Self.didLogInviteCodeIndexSkippedNoAuth {
+                Self.didLogInviteCodeIndexSkippedNoAuth = true
+                print("ℹ️ [INVITE CODE] Skipping public invite index (sign in to Firebase to publish; simulator uses test host id).")
+            }
+            return
+        }
+        #else
+        let hostId = getCurrentUserId() ?? invitation.hostId
+        #endif
 
         // A public-ish index for join-by-code. The Firestore rules should restrict what fields are readable.
         // Document id is the invite code for quick lookup.
@@ -886,7 +1099,7 @@ class FirebaseSyncService: ObservableObject {
             "invitationId": invitation.id.uuidString,
             "sessionId": invitation.sessionId.uuidString,
             "sessionTitle": invitation.sessionTitle,
-            "hostId": invitation.hostId,
+            "hostId": hostId,
             "hostName": invitation.hostName,
             "createdAt": Timestamp(date: invitation.createdAt),
             "expiresAt": invitation.expiresAt.map { Timestamp(date: $0) } ?? NSNull(),
@@ -902,17 +1115,62 @@ class FirebaseSyncService: ObservableObject {
     }
 
     /// Resolve an invite code via Firestore (cross-device join by code).
+    /// Tries sessionInviteCodes first, then sessionInvitations (fallback for different sync paths).
     func fetchInviteCodeRecord(code: String) async -> [String: Any]? {
+        // Try primary collection (sessionInviteCodes) first
+        if let record = await fetchInviteCodeRecordFromSessionInviteCodes(code: code) {
+            return record
+        }
+        // Fallback: some code paths publish to sessionInvitations with document id = code
+        return await fetchInviteCodeRecordFromSessionInvitations(code: code)
+    }
+
+    /// Fetch invite code record from sessionInviteCodes collection.
+    private func fetchInviteCodeRecordFromSessionInviteCodes(code: String) async -> [String: Any]? {
         guard let db = db else { return nil }
         let normalized = code.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.isEmpty else { return nil }
 
         do {
             let snap = try await db.collection("sessionInviteCodes").document(normalized).getDocument()
-            guard snap.exists else { return nil }
-            return snap.data()
+            guard snap.exists, let data = snap.data() else { return nil }
+            if let expiresAt = data["expiresAt"] as? Timestamp, expiresAt.dateValue() <= Date() {
+                print("⚠️ [INVITE CODE] sessionInviteCodes invite expired")
+                return nil
+            }
+            return data
         } catch {
-            print("⚠️ [INVITE CODE] Failed to fetch invite code record: \(error.localizedDescription)")
+            print("⚠️ [INVITE CODE] Failed to fetch from sessionInviteCodes: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Fallback: fetch invite code record from sessionInvitations (document id = code).
+    /// Returns same shape as sessionInviteCodes so join flow can use it.
+    private func fetchInviteCodeRecordFromSessionInvitations(code: String) async -> [String: Any]? {
+        guard let db = db else { return nil }
+        let normalized = code.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+
+        do {
+            let snap = try await db.collection("sessionInvitations").document(normalized).getDocument()
+            guard snap.exists, let data = snap.data() else { return nil }
+            // Check status and expiration (same semantics as sessionInvitations rules)
+            let status = data["status"] as? String ?? ""
+            if status != "pending" {
+                print("⚠️ [INVITE CODE] sessionInvitations invite not pending: \(status)")
+                return nil
+            }
+            if let expiresAt = data["expiresAt"] as? Timestamp {
+                if expiresAt.dateValue() <= Date() {
+                    print("⚠️ [INVITE CODE] sessionInvitations invite expired")
+                    return nil
+                }
+            }
+            // Return shape expected by join flow (sessionId, sessionTitle, hostId, hostName, expiresAt)
+            return data
+        } catch {
+            print("⚠️ [INVITE CODE] Failed to fetch from sessionInvitations: \(error.localizedDescription)")
             return nil
         }
     }
@@ -920,13 +1178,21 @@ class FirebaseSyncService: ObservableObject {
     /// Publish a live session for discovery/join-by-code.
     func syncLiveSessionPublic(_ session: LiveSession) async {
         guard let db = db else { return }
+        // Firestore rules: hostId must equal request.auth.uid (signed-in user) or 'simulator-test-user-shared'.
+        let firebaseUid = getCurrentUserId()
+        let effectiveHostId = firebaseUid ?? session.hostId
+        let isTestUser = (effectiveHostId == "simulator-test-user-shared")
+        guard firebaseUid != nil || isTestUser else {
+            print("⚠️ [LIVE SESSION] Cannot sync to Firebase - sign in required. Public sessions only appear for other accounts when the host is signed in (e.g. Sign in with Apple).")
+            return
+        }
 
         let ref = db.collection("liveSessions").document(session.id.uuidString)
-        let data: [String: Any] = [
+        var data: [String: Any] = [
             "id": session.id.uuidString,
             "title": session.title,
             "details": session.details,
-            "hostId": session.hostId,
+            "hostId": effectiveHostId,
             "hostName": session.hostName,
             "hostBio": session.hostBio,
             "category": session.category,
@@ -935,21 +1201,137 @@ class FirebaseSyncService: ObservableObject {
             "isActive": session.isActive,
             "maxParticipants": session.maxParticipants,
             "currentParticipants": session.currentParticipants,
+            "currentBroadcasters": session.currentBroadcasters,
             "streamMode": session.streamMode,
             "durationLimitMinutes": session.durationLimitMinutes,
+            "hasWaitingRoom": session.hasWaitingRoom,
+            "waitingRoomEnabled": session.waitingRoomEnabled,
             "startTime": Timestamp(date: session.startTime),
             "scheduledStartTime": session.scheduledStartTime.map { Timestamp(date: $0) } ?? NSNull(),
             "endTime": session.endTime.map { Timestamp(date: $0) } ?? NSNull(),
             "createdAt": Timestamp(date: session.createdAt),
             "lastSyncedAt": Timestamp(date: Date())
         ]
+        // Only include thumbnailURL when set and is a cloud URL (https). Omit when nil so we don't overwrite an existing thumbnail; omit file:// so other devices don't get a useless local path.
+        if let url = session.thumbnailURL, !url.isEmpty, url.hasPrefix("https") {
+            data["thumbnailURL"] = url
+        }
+        // Only include recordingURL when we have a cloud URL; don't overwrite with null.
+        if let rec = session.recordingURL, !rec.hasPrefix("file://") {
+            data["recordingURL"] = rec
+        }
 
         do {
             try await ref.setData(data, merge: true)
             print("✅ [LIVE SESSION] Synced public live session: \(session.id.uuidString)")
+            // Do NOT notify friends here — notify only when host actually starts the stream
+            // (see startLiveStream() in LiveSessionsView), to avoid notifying for sessions
+            // that were just created or updated but not yet live.
         } catch {
             print("⚠️ [LIVE SESSION] Failed to sync public live session: \(error.localizedDescription)")
         }
+    }
+
+    /// Delete a live session from Firebase (host only - removes from liveSessions collection).
+    func deleteLiveSession(_ session: LiveSession) async {
+        await deleteLiveSession(sessionId: session.id, hostId: session.hostId)
+    }
+
+    /// Delete by id (use after session is removed from context to avoid accessing deleted object).
+    /// Only attempts Firebase delete when the current user is the host (by app logic). Firestore allows delete when authenticated.
+    func deleteLiveSession(sessionId: UUID, hostId: String) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        // Only the host (by app logic) should trigger cloud delete; must be signed in for Firestore to allow it
+        guard getCurrentUserId() != nil else {
+            print("⚠️ [FIREBASE] Cannot delete session from cloud - sign in required")
+            return
+        }
+        let isAppHost = (hostId == (getCurrentUserId() ?? "")) || (hostId == "simulator-test-user-shared")
+        guard isAppHost else {
+            print("⚠️ [FIREBASE] Only the host can delete a session from Firebase")
+            return
+        }
+        do {
+            let ref = db.collection("liveSessions").document(sessionId.uuidString)
+            try await ref.delete()
+            print("✅ [FIREBASE] Deleted live session from Firebase: \(sessionId.uuidString)")
+        } catch {
+            print("❌ [FIREBASE] Failed to delete live session: \(error.localizedDescription)")
+        }
+        #endif
+    }
+
+    /// Delete all live sessions in Firebase where the current user is the host (e.g. to remove test sessions).
+    func deleteAllMyLiveSessionsFromFirebase() async -> Int {
+        #if canImport(FirebaseFirestore)
+        await ProfileManager.shared.refreshFirebaseAppAdminClaim()
+        guard ProfileManager.shared.isFirebaseAppAdmin else {
+            print("⚠️ [FIREBASE] deleteAllMyLiveSessionsFromFirebase denied — not an app admin (ID token custom claims)")
+            return 0
+        }
+        guard let db = db else { return 0 }
+        guard let hostId = getCurrentUserId() else {
+            print("⚠️ [FIREBASE] Cannot delete live sessions - sign in required")
+            return 0
+        }
+        do {
+            let snapshot = try await db.collection("liveSessions")
+                .whereField("hostId", isEqualTo: hostId)
+                .getDocuments()
+            var deleted = 0
+            for document in snapshot.documents {
+                try await document.reference.delete()
+                deleted += 1
+                print("✅ [FIREBASE] Deleted live session: \(document.documentID)")
+            }
+            if deleted > 0 {
+                print("✅ [FIREBASE] Deleted \(deleted) live session(s) from Firebase (host: \(hostId))")
+            }
+            return deleted
+        } catch {
+            print("❌ [FIREBASE] Failed to delete live sessions: \(error.localizedDescription)")
+            return 0
+        }
+        #else
+        return 0
+        #endif
+    }
+
+    /// Update live session participant count in Firebase so all clients see the correct count.
+    /// Firestore rules: `match /liveSessions/{sessionId}` allows `update` only when `isAuthenticated()`.
+    /// If the user is not signed in to Firebase (no ID token), the write is skipped so you do not get `PERMISSION_DENIED` spam; local SwiftData is still correct.
+    func updateSessionParticipantCount(_ sessionId: UUID, count: Int) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        #if canImport(FirebaseAuth)
+        guard let user = Auth.auth().currentUser else {
+            if !Self.didLogParticipantCountRequiresSignIn {
+                Self.didLogParticipantCountRequiresSignIn = true
+                print("ℹ️ [FIREBASE] liveSessions participant count is not synced to the cloud without Firebase sign-in. Local count still updates. Use Sign in with Apple (or your production auth flow) to sync across devices.")
+            }
+            return
+        }
+        do {
+            _ = try await user.getIDTokenResult(forcingRefresh: false)
+        } catch {
+            // Token refresh failure is rare; still attempt the write.
+        }
+        #endif
+        do {
+            let ref = db.collection("liveSessions").document(sessionId.uuidString)
+            try await ref.updateData(["currentParticipants": count])
+        } catch {
+            let ns = error as NSError
+            let isPermission = ns.domain == FirestoreErrorDomain
+                && ns.code == FirestoreErrorCode.permissionDenied.rawValue
+            if isPermission {
+                print("❌ [FIREBASE] Failed to update participant count: missing permissions. Ensure you are signed in, `firestore.rules` for `liveSessions` are deployed, and the session document exists in `liveSessions` (host has synced a public session).")
+            } else {
+                print("❌ [FIREBASE] Failed to update participant count: \(error.localizedDescription)")
+            }
+        }
+        #endif
     }
 
     /// Fetch a live session from the public collection.
@@ -971,7 +1353,7 @@ class FirebaseSyncService: ObservableObject {
             session.id = sessionId
             session.hostName = data["hostName"] as? String ?? session.hostName
             session.hostBio = data["hostBio"] as? String ?? session.hostBio
-            session.isPrivate = data["isPrivate"] as? Bool ?? session.isPrivate
+            session.isPrivate = (data["isPrivate"] as? Bool) ?? false
             session.isActive = data["isActive"] as? Bool ?? session.isActive
             session.currentParticipants = data["currentParticipants"] as? Int ?? session.currentParticipants
             session.streamMode = data["streamMode"] as? String ?? session.streamMode
@@ -981,6 +1363,8 @@ class FirebaseSyncService: ObservableObject {
             if let ts = data["scheduledStartTime"] as? Timestamp { session.scheduledStartTime = ts.dateValue() }
             if let ts = data["endTime"] as? Timestamp { session.endTime = ts.dateValue() }
             if let ts = data["createdAt"] as? Timestamp { session.createdAt = ts.dateValue() }
+            session.thumbnailURL = data["thumbnailURL"] as? String
+            session.recordingURL = data["recordingURL"] as? String
 
             return session
         } catch {
@@ -988,8 +1372,478 @@ class FirebaseSyncService: ObservableObject {
             return nil
         }
     }
+
+    /// Fetch all public (non-private) live sessions for discovery.
+    func fetchPublicSessions() async -> [LiveSession] {
+        guard let db = db else {
+            print("⚠️ [LIVE SESSION] Cannot fetch public sessions - Firestore not available")
+            return []
+        }
+
+        do {
+            let query = db.collection("liveSessions")
+                .whereField("isPrivate", isEqualTo: false)
+                .order(by: "startTime", descending: true)
+                .limit(to: 50)
+
+            let snapshot = try await query.getDocuments()
+            var sessions: [LiveSession] = []
+
+            for document in snapshot.documents {
+                let data = document.data()
+                guard let sessionId = UUID(uuidString: document.documentID) else { continue }
+
+                let title = data["title"] as? String ?? ""
+                let details = data["details"] as? String ?? ""
+                let hostId = data["hostId"] as? String ?? ""
+                let category = data["category"] as? String ?? ""
+                let maxParticipants = data["maxParticipants"] as? Int ?? 10
+                let tags = data["tags"] as? [String] ?? []
+
+                let session = LiveSession(title: title, description: details, hostId: hostId, category: category, maxParticipants: maxParticipants, tags: tags)
+                session.id = sessionId
+                session.hostName = data["hostName"] as? String ?? session.hostName
+                session.hostBio = data["hostBio"] as? String ?? session.hostBio
+                session.isPrivate = (data["isPrivate"] as? Bool) ?? false
+                session.isActive = data["isActive"] as? Bool ?? session.isActive
+                session.currentParticipants = data["currentParticipants"] as? Int ?? session.currentParticipants
+                session.currentBroadcasters = data["currentBroadcasters"] as? Int ?? session.currentBroadcasters
+                session.streamMode = data["streamMode"] as? String ?? session.streamMode
+                session.durationLimitMinutes = data["durationLimitMinutes"] as? Int ?? session.durationLimitMinutes
+                session.hasWaitingRoom = data["hasWaitingRoom"] as? Bool ?? session.hasWaitingRoom
+                session.waitingRoomEnabled = data["waitingRoomEnabled"] as? Bool ?? session.waitingRoomEnabled
+
+                if let ts = data["startTime"] as? Timestamp { session.startTime = ts.dateValue() }
+                if let ts = data["scheduledStartTime"] as? Timestamp { session.scheduledStartTime = ts.dateValue() }
+                if let ts = data["endTime"] as? Timestamp { session.endTime = ts.dateValue() }
+                if let ts = data["createdAt"] as? Timestamp { session.createdAt = ts.dateValue() }
+                session.thumbnailURL = data["thumbnailURL"] as? String
+                session.recordingURL = data["recordingURL"] as? String
+
+                sessions.append(session)
+            }
+
+            print("✅ [LIVE SESSION] Fetched \(sessions.count) public sessions from Firebase")
+            return sessions
+        } catch {
+            print("⚠️ [LIVE SESSION] Failed to fetch public sessions: \(error.localizedDescription). If you see an index error, add the composite index in Firebase Console (link in error).")
+            return []
+        }
+    }
+
+    // MARK: - Chat Messages Sync
+
+    /// Sync a chat message to Firebase so other participants see it in real time.
+    func syncChatMessage(_ message: ChatMessage) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else {
+            print("⚠️ [FIREBASE] Cannot sync message - Firebase not configured")
+            return
+        }
+        guard let firebaseUserId = getCurrentUserId() else {
+            print("⚠️ [FIREBASE] Cannot sync message - user not authenticated with Firebase")
+            return
+        }
+        do {
+            let messageRef = db.collection("sessions").document(message.sessionId.uuidString)
+                .collection("messages").document(message.id.uuidString)
+            let data: [String: Any] = [
+                "id": message.id.uuidString,
+                "sessionId": message.sessionId.uuidString,
+                "userId": firebaseUserId,
+                "userName": message.userName,
+                "userAvatarURL": message.userAvatarURL ?? NSNull(),
+                "message": message.message,
+                "timestamp": Timestamp(date: message.timestamp),
+                "messageType": message.messageType.rawValue,
+                "reactions": message.reactions,
+                "mentionedUserIds": message.mentionedUserIds,
+                "attachedFileURL": message.attachedFileURL ?? NSNull(),
+                "attachedImageURL": message.attachedImageURL ?? NSNull(),
+                "voiceMessageURL": message.voiceMessageURL ?? NSNull(),
+                "bibleVerseReference": message.bibleVerseReference ?? NSNull(),
+                "lastSyncedAt": Timestamp(date: Date())
+            ]
+            do {
+                try await messageRef.setData(data, merge: true)
+                print("✅ [FIREBASE] Synced chat message: \(message.id.uuidString) for session: \(message.sessionId)")
+            } catch let err {
+                print("❌ [FIREBASE] Failed to sync chat message: \(err.localizedDescription)")
+            }
+        }
+        #endif
+    }
+
+    /// Start listening for chat messages in a session; call the callback on each new/updated message (call from MainActor; callback is invoked on arbitrary queue).
+    func startListeningToChatMessages(sessionId: UUID, onMessageReceived: @escaping (ChatMessage) -> Void) -> ListenerRegistration? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else {
+            print("⚠️ [FIREBASE] Cannot listen to messages - Firebase not configured")
+            return nil
+        }
+        let messagesRef = db.collection("sessions").document(sessionId.uuidString)
+            .collection("messages")
+            .order(by: "timestamp", descending: false)
+            .limit(toLast: 100)
+        let listener = messagesRef.addSnapshotListener { snapshot, error in
+            guard let snapshot = snapshot else {
+                if let error = error { print("❌ [FIREBASE] Chat listen error: \(error.localizedDescription)") }
+                return
+            }
+            for change in snapshot.documentChanges where change.type == .added || change.type == .modified {
+                if let message = self.createChatMessage(from: change.document.data(), id: change.document.documentID) {
+                    onMessageReceived(message)
+                }
+            }
+        }
+        print("✅ [FIREBASE] Started listening to chat messages for session: \(sessionId)")
+        return listener
+        #else
+        return nil
+        #endif
+    }
+
+    /// Call from view onDisappear to stop receiving chat updates.
+    func removeChatMessageListener(_ listener: Any?) {
+        #if canImport(FirebaseFirestore)
+        (listener as? ListenerRegistration)?.remove()
+        #endif
+    }
+
+    // MARK: - Session presentation (Bible study / shared content) sync
+
+    /// Cloud Storage rules require a valid `request.auth` token. Firestore *can* allow writes with `simulator-test-user-shared` without a signed-in user, but Storage will reject uploads.
+    #if canImport(FirebaseAuth) && canImport(FirebaseStorage)
+    private func ensureFirebaseUserForStorageUpload() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw NSError(
+                domain: "FirebaseSyncService",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "Not signed in to Firebase. Sign in (e.g. with Apple) to upload to Cloud Storage. Your cover is still saved locally. Simulator: Firestore may work without sign-in, but Storage always requires a signed-in user."]
+            )
+        }
+        do {
+            _ = try await user.getIDTokenResult(forcingRefresh: true)
+        } catch {
+            throw NSError(
+                domain: "FirebaseSyncService",
+                code: 401,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Could not refresh Firebase sign-in. Try signing out and back in, then try again. \(error.localizedDescription)"
+                ]
+            )
+        }
+    }
     #endif
-    
+
+    #if canImport(FirebaseStorage)
+    /// Extra detail for generic `StorageError error 1` in the console (often 403/HTTP body from GCS, billing, or rules).
+    nonisolated static func formatFirebaseStorageError(_ error: Error) -> String {
+        let ns = error as NSError
+        var parts = ["domain=\(ns.domain)", "code=\(ns.code)"]
+        if let body = ns.userInfo["ResponseBody"] as? String, !body.isEmpty { parts.append("ResponseBody=\(String(body.prefix(500)))") }
+        if let http = ns.userInfo["ResponseErrorCode"] { parts.append("http=\(http)") }
+        if let under = ns.userInfo[NSUnderlyingErrorKey] as? NSError { parts.append("underlying=\(under.domain)(\(under.code))") }
+        return "\(ns.localizedDescription) — " + parts.joined(separator: " | ")
+    }
+    #endif
+
+    /// Upload a presentation file (PDF or image) to Storage and return its download URL. Path: sessions/{sessionId}/presentation/{uuid}.{ext}
+    func uploadPresentationFile(sessionId: UUID, fileURL: URL, contentType: String) async throws -> String {
+        #if canImport(FirebaseStorage)
+        let data = try Data(contentsOf: fileURL)
+        let ext = fileURL.pathExtension.isEmpty ? (contentType.contains("pdf") ? "pdf" : "jpg") : fileURL.pathExtension
+        return try await uploadPresentationData(sessionId: sessionId, data: data, contentType: contentType, fileExtension: ext)
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase Storage not available"])
+        #endif
+    }
+
+    /// Upload presentation image data (e.g. from PhotosPicker) and return download URL.
+    func uploadPresentationData(sessionId: UUID, data: Data, contentType: String, fileExtension: String) async throws -> String {
+        #if canImport(FirebaseStorage)
+        #if canImport(FirebaseAuth)
+        try await ensureFirebaseUserForStorageUpload()
+        #endif
+        guard let storage = storage else { throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Storage not available"]) }
+        let path = "sessions/\(sessionId.uuidString)/presentation/\(UUID().uuidString).\(fileExtension)"
+        let ref = storage.reference(withPath: path)
+        let metadata = StorageMetadata()
+        metadata.contentType = contentType
+        _ = try await ref.putDataAsync(data, metadata: metadata)
+        let downloadURL = try await ref.downloadURL()
+        return downloadURL.absoluteString
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase Storage not available"])
+        #endif
+    }
+
+    /// Upload live session thumbnail (cover image). Returns download URL.
+    func uploadLiveSessionThumbnail(sessionId: UUID, imageData: Data) async throws -> String {
+        #if canImport(FirebaseStorage)
+        #if canImport(FirebaseAuth)
+        try await ensureFirebaseUserForStorageUpload()
+        #endif
+        guard let storage = storage else { throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Storage not available"]) }
+        let path = "liveSessionThumbnails/\(sessionId.uuidString).jpg"
+        let ref = storage.reference(withPath: path)
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+        _ = try await ref.putDataAsync(imageData, metadata: metadata)
+        let downloadURL = try await ref.downloadURL()
+        return downloadURL.absoluteString
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase Storage not available"])
+        #endif
+    }
+
+    /// Save thumbnail URL to a live session (uses configured ModelContext). Call after upload succeeds.
+    func saveThumbnailURL(sessionId: UUID, urlString: String) {
+        guard let modelContext = modelContext else {
+            print("⚠️ [LIVE SESSION] No modelContext configured, cannot save thumbnail URL")
+            return
+        }
+        do {
+            var descriptor = FetchDescriptor<LiveSession>()
+            descriptor.predicate = #Predicate<LiveSession> { $0.id == sessionId }
+            if let session = try modelContext.fetch(descriptor).first {
+                session.thumbnailURL = urlString
+                try modelContext.save()
+                print("✅ [LIVE SESSION] Thumbnail URL saved: \(urlString.prefix(60))...")
+                Task { await syncLiveSessionPublic(session) }
+            } else {
+                print("⚠️ [LIVE SESSION] Session not found for id \(sessionId), cannot save thumbnail URL")
+            }
+        } catch {
+            print("⚠️ [LIVE SESSION] Failed to save thumbnail URL: \(error.localizedDescription)")
+        }
+    }
+
+    /// Upload a session recording (MP4) to Storage. Use for replay. Path: sessionRecordings/{sessionId}.mp4
+    /// Uses putFile for large files to avoid loading into memory.
+    func uploadRecording(sessionId: UUID, fileURL: URL) async throws -> String {
+        #if canImport(FirebaseStorage)
+        #if canImport(FirebaseAuth)
+        try await ensureFirebaseUserForStorageUpload()
+        #endif
+        guard let storage = storage else { throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Storage not available"]) }
+        let path = "sessionRecordings/\(sessionId.uuidString).mp4"
+        let ref = storage.reference(withPath: path)
+        let metadata = StorageMetadata()
+        metadata.contentType = "video/mp4"
+        _ = try await ref.putFileAsync(from: fileURL, metadata: metadata)
+        let downloadURL = try await ref.downloadURL()
+        return downloadURL.absoluteString
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase Storage not available"])
+        #endif
+    }
+
+    /// Save recording URL to a live session (local SwiftData + sync to Firestore). Call after upload succeeds.
+    func saveRecordingURL(sessionId: UUID, urlString: String) {
+        guard let modelContext = modelContext else {
+            print("⚠️ [LIVE SESSION] No modelContext configured, cannot save recording URL")
+            return
+        }
+        do {
+            var descriptor = FetchDescriptor<LiveSession>()
+            descriptor.predicate = #Predicate<LiveSession> { $0.id == sessionId }
+            if let session = try modelContext.fetch(descriptor).first {
+                session.recordingURL = urlString
+                try modelContext.save()
+                print("✅ [LIVE SESSION] Recording URL saved for replay")
+                Task { await syncLiveSessionPublic(session) }
+            } else {
+                print("⚠️ [LIVE SESSION] Session not found for id \(sessionId), cannot save recording URL")
+            }
+        } catch {
+            print("⚠️ [LIVE SESSION] Failed to save recording URL: \(error.localizedDescription)")
+        }
+    }
+
+    /// Set what the host is presenting so participants can see it. type: "bibleStudy", "pdf", "image", or "none". bibleStudyDayOfYear: 1-365 for which topic to show.
+    func setSessionPresentation(sessionId: UUID, type: String, pdfURL: String? = nil, imageURL: String? = nil, bibleStudyDayOfYear: Int? = nil) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, getCurrentUserId() != nil else { return }
+        let ref = db.collection("sessions").document(sessionId.uuidString).collection("presentation").document("current")
+        do {
+            var data: [String: Any] = ["type": type, "updatedAt": Timestamp(date: Date())]
+            if let u = pdfURL { data["pdfURL"] = u }
+            if let u = imageURL { data["imageURL"] = u }
+            if let day = bibleStudyDayOfYear { data["bibleStudyDayOfYear"] = day }
+            try await ref.setData(data, merge: true)
+        } catch {
+            print("❌ [FIREBASE] setSessionPresentation failed: \(error.localizedDescription)")
+        }
+        #endif
+    }
+
+    /// One-time fetch of current presentation (for participants so they see host's presentation even if listener hasn't fired yet).
+    func fetchCurrentSessionPresentation(sessionId: UUID) async -> (type: String?, pdfURL: String?, imageURL: String?, bibleStudyDayOfYear: Int?) {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return (nil, nil, nil, nil) }
+        let ref = db.collection("sessions").document(sessionId.uuidString).collection("presentation").document("current")
+        do {
+            let snapshot = try await ref.getDocument()
+            guard snapshot.exists, let data = snapshot.data() else { return (nil, nil, nil, nil) }
+            let type = data["type"] as? String
+            let pdfURL = data["pdfURL"] as? String
+            let imageURL = data["imageURL"] as? String
+            let bibleStudyDayOfYear = data["bibleStudyDayOfYear"] as? Int
+            return (type, pdfURL, imageURL, bibleStudyDayOfYear)
+        } catch {
+            print("⚠️ [FIREBASE] fetchCurrentSessionPresentation failed: \(error.localizedDescription)")
+            return (nil, nil, nil, nil)
+        }
+        #else
+        return (nil, nil, nil, nil)
+        #endif
+    }
+
+    /// Listen for host's presentation changes. Callback: (type, pdfURL, imageURL, bibleStudyDayOfYear 1-365?).
+    func startListeningToSessionPresentation(sessionId: UUID, onUpdate: @escaping (String?, String?, String?, Int?) -> Void) -> Any? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return nil }
+        let ref = db.collection("sessions").document(sessionId.uuidString).collection("presentation").document("current")
+        let listener = ref.addSnapshotListener { snapshot, error in
+            if let e = error {
+                print("⚠️ [FIREBASE] Presentation listener error: \(e.localizedDescription)")
+            }
+            let type: String?
+            let pdfURL: String?
+            let imageURL: String?
+            let bibleStudyDayOfYear: Int?
+            if let data = snapshot?.data(), snapshot?.exists == true {
+                type = data["type"] as? String
+                pdfURL = data["pdfURL"] as? String
+                imageURL = data["imageURL"] as? String
+                bibleStudyDayOfYear = data["bibleStudyDayOfYear"] as? Int
+            } else {
+                type = nil
+                pdfURL = nil
+                imageURL = nil
+                bibleStudyDayOfYear = nil
+            }
+            DispatchQueue.main.async { onUpdate(type, pdfURL, imageURL, bibleStudyDayOfYear) }
+        }
+        return listener
+        #else
+        return nil
+        #endif
+    }
+
+    func removePresentationListener(_ listener: Any?) {
+        #if canImport(FirebaseFirestore)
+        (listener as? ListenerRegistration)?.remove()
+        #endif
+    }
+
+    /// Broadcast host: when `true`, audience clients may call `promoteToPresenter()` to go on camera.
+    func setBroadcastOpenFloor(sessionId: UUID, open: Bool) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, getCurrentUserId() != nil else { return }
+        let ref = db.collection("sessions").document(sessionId.uuidString).collection("liveControls").document("state")
+        do {
+            try await ref.setData([
+                "broadcastOpenFloor": open,
+                "updatedAt": Timestamp(date: Date()),
+            ], merge: true)
+        } catch {
+            print("❌ [FIREBASE] setBroadcastOpenFloor failed: \(error.localizedDescription)")
+        }
+        #endif
+    }
+
+    /// Listen for host toggling “open floor” (broadcast mode co-presenting).
+    func startListeningBroadcastOpenFloor(sessionId: UUID, onUpdate: @escaping (Bool) -> Void) -> Any? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return nil }
+        let ref = db.collection("sessions").document(sessionId.uuidString).collection("liveControls").document("state")
+        let listener = ref.addSnapshotListener { snapshot, error in
+            if let e = error {
+                print("⚠️ [FIREBASE] broadcastOpenFloor listener: \(e.localizedDescription)")
+            }
+            let open = (snapshot?.data()?["broadcastOpenFloor"] as? Bool) ?? false
+            DispatchQueue.main.async { onUpdate(open) }
+        }
+        return listener
+        #else
+        return nil
+        #endif
+    }
+
+    // MARK: - Host mute participant (sync so participant's app can mute their mic)
+
+    /// Write participant mute state so the participant's client can apply it. Path: sessions/{sessionId}/participants/{userId}
+    func updateParticipantMuteState(sessionId: UUID, userId: String, isMuted: Bool) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        let ref = db.collection("sessions").document(sessionId.uuidString).collection("participants").document(userId)
+        do {
+            try await ref.setData(["isMuted": isMuted, "updatedAt": Timestamp(date: Date())], merge: true)
+        } catch {
+            print("❌ [FIREBASE] updateParticipantMuteState failed: \(error.localizedDescription)")
+        }
+        #endif
+    }
+
+    /// Listen for host muting me. Call onMuteChanged with true when host mutes, false when unmuted. Remove listener when leaving stream.
+    func startListeningToMyMuteState(sessionId: UUID, myUserId: String, onMuteChanged: @escaping (Bool) -> Void) -> Any? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return nil }
+        let ref = db.collection("sessions").document(sessionId.uuidString).collection("participants").document(myUserId)
+        let listener = ref.addSnapshotListener { snapshot, _ in
+            let isMuted = (snapshot?.data()?["isMuted"] as? Bool) ?? true
+            DispatchQueue.main.async { onMuteChanged(isMuted) }
+        }
+        return listener
+        #else
+        return nil
+        #endif
+    }
+
+    func removeMuteStateListener(_ listener: Any?) {
+        #if canImport(FirebaseFirestore)
+        (listener as? ListenerRegistration)?.remove()
+        #endif
+    }
+
+    #if canImport(FirebaseFirestore)
+    private func createChatMessage(from data: [String: Any], id docId: String) -> ChatMessage? {
+        Self.createChatMessageFromFirestorePayload(data, documentId: docId, timestampFromTimestamp: { (data["timestamp"] as? Timestamp)?.dateValue() })
+    }
+
+    /// Testable: build ChatMessage from Firestore-shaped payload. timestampFromTimestamp can be nil (uses Date()).
+    internal static func createChatMessageFromFirestorePayload(
+        _ data: [String: Any],
+        documentId: String,
+        timestampFromTimestamp: (() -> Date?)?
+    ) -> ChatMessage? {
+        guard let sessionIdString = data["sessionId"] as? String,
+              let sessionId = UUID(uuidString: sessionIdString),
+              let messageId = UUID(uuidString: documentId) else { return nil }
+        let message = ChatMessage(
+            sessionId: sessionId,
+            userId: data["userId"] as? String ?? "",
+            userName: data["userName"] as? String ?? "",
+            message: data["message"] as? String ?? "",
+            messageType: ChatMessage.MessageType(rawValue: data["messageType"] as? String ?? "Text") ?? .text
+        )
+        message.id = messageId
+        message.userAvatarURL = data["userAvatarURL"] as? String
+        message.reactions = data["reactions"] as? [String] ?? []
+        message.mentionedUserIds = data["mentionedUserIds"] as? [String] ?? []
+        message.attachedFileURL = data["attachedFileURL"] as? String
+        message.attachedImageURL = data["attachedImageURL"] as? String
+        message.voiceMessageURL = data["voiceMessageURL"] as? String
+        message.bibleVerseReference = data["bibleVerseReference"] as? String
+        if let date = timestampFromTimestamp?() {
+            message.timestamp = date
+        }
+        return message
+    }
+    #endif
+
     /// Delete a session invitation from Firebase
     func deleteSessionInvitation(_ invitation: SessionInvitation) async {
         #if canImport(FirebaseFirestore)
@@ -1363,11 +2217,23 @@ class FirebaseSyncService: ObservableObject {
                 "enableReminder": request.enableReminder,
                 "reminderTime": Timestamp(date: request.reminderTime),
                 "reminderFrequency": request.reminderFrequency,
+                "isSharedWithFriends": request.isSharedWithFriends,
+                "intercessorIds": request.intercessorIds,
                 "createdAt": Timestamp(date: request.createdAt),
                 "updatedAt": Timestamp(date: request.updatedAt)
             ]
-            
+
             try await requestRef.setData(data, merge: true)
+
+            // Mirror to sharedPrayers so friends can read it; delete if un-shared or private
+            let sharedRef = db.collection("users").document(userId)
+                .collection("sharedPrayers").document(request.id.uuidString)
+            if request.isSharedWithFriends && !request.isPrivate {
+                try await sharedRef.setData(data, merge: true)
+            } else {
+                try? await sharedRef.delete()
+            }
+
             print("✅ [FIREBASE] Synced prayer request: \(request.id.uuidString)")
         } catch {
             print("❌ [FIREBASE] Failed to sync prayer request: \(error.localizedDescription)")
@@ -1685,6 +2551,11 @@ class FirebaseSyncService: ObservableObject {
     
     // MARK: - Full Sync
     
+    /// Call if sync status is stuck on "Syncing..." so the UI can show "Ready" again. Safe to call anytime.
+    func clearStuckSyncState() {
+        isSyncing = false
+    }
+    
     /// Sync all local data to Firebase
     func syncAllData() async {
         #if canImport(FirebaseFirestore)
@@ -1693,15 +2564,41 @@ class FirebaseSyncService: ObservableObject {
             return
         }
         
-        guard let userId = getCurrentUserId() else {
+        var userId = getCurrentUserId()
+        if userId == nil {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            userId = getCurrentUserId()
+        }
+        guard let userId = userId else {
             print("❌ [FIREBASE] Cannot sync - user not authenticated")
             print("❌ [FIREBASE] User must sign in with Apple for sync to work")
             syncError = "User not authenticated. Please sign in with Apple."
             return
         }
         
+        // Skip if a full sync is already in progress (avoids multiple overlapping syncs and repeated timeouts)
+        guard !isSyncing else {
+            print("ℹ️ [FIREBASE] Full sync already in progress - skipping")
+            return
+        }
+        
         isSyncing = true
         syncError = nil
+        defer { isSyncing = false }
+        
+        // Safety: if sync hangs (e.g. network), clear isSyncing so UI doesn't stay stuck on "Syncing..."
+        let timeoutSeconds: UInt64 = 90
+        let timeoutTask = Task {
+            try? await Task.sleep(nanoseconds: timeoutSeconds * 1_000_000_000)
+            if !Task.isCancelled {
+                await MainActor.run {
+                    isSyncing = false
+                    syncError = "Sync timed out - try again or check Wi‑Fi"
+                }
+                print("⚠️ [FIREBASE] Sync timed out after \(timeoutSeconds)s - check network")
+            }
+        }
+        defer { timeoutTask.cancel() }
         
         print("🔄 [FIREBASE] Starting full sync for user: \(userId)")
         
@@ -1713,7 +2610,7 @@ class FirebaseSyncService: ObservableObject {
         if let entries = try? modelContext.fetch(journalDescriptor) {
             print("📝 [FIREBASE] Syncing \(entries.count) journal entries...")
             for entry in entries {
-                await syncJournalEntry(entry)
+                await syncJournalEntry(entry, updateSyncState: false)
                 if syncError == nil {
                     syncedCount += 1
                 } else {
@@ -1796,7 +2693,7 @@ class FirebaseSyncService: ObservableObject {
         }
         
         lastSyncDate = Date()
-        isSyncing = false
+        syncError = nil  // Clear so Settings shows "Synced" not a previous error
         
         if errorCount > 0 {
             print("⚠️ [FIREBASE] Full sync completed with \(errorCount) errors")
@@ -1808,8 +2705,872 @@ class FirebaseSyncService: ObservableObject {
         #endif
     }
     
-    // MARK: - Helper Methods
+    // MARK: - Faith Friends
     
+    /// Internal: awaitable upsert + friend code creation.
+    private func performUpsertAndEnsureFriendCode(userId: String, displayName: String, email: String? = nil, avatarURL: String? = nil) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let nameLower = name.lowercased()
+        let tokens = nameLower.split(separator: " ").map(String.init).filter { !$0.isEmpty }
+        let emailTrimmed = email?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let hasEmail = emailTrimmed.map { !$0.isEmpty } ?? false
+        do {
+            let ref = db.collection("userSearchProfiles").document(userId)
+            var data: [String: Any] = [
+                "userId": userId,
+                "displayName": name,
+                "displayNameLower": nameLower,
+                "avatarURL": avatarURL ?? NSNull(),
+                "updatedAt": Timestamp(date: Date())
+            ]
+            if !tokens.isEmpty { data["searchTokens"] = tokens }
+            if hasEmail, let em = emailTrimmed { data["emailLower"] = em }
+            try await ref.setData(data, merge: true)
+            await ensureFriendCode(userId: userId, displayName: name)
+            print("✅ [FAITH FRIENDS] Upserted user search profile for \(userId)")
+        } catch {
+            print("⚠️ [FAITH FRIENDS] Failed to upsert search profile: \(error.localizedDescription)")
+        }
+        #endif
+    }
+    
+    /// Upsert user search profile for in-app search (called when user saves profile).
+    func upsertUserSearchProfile(userId: String, displayName: String, email: String? = nil, avatarURL: String? = nil) {
+        Task { await performUpsertAndEnsureFriendCode(userId: userId, displayName: displayName, email: email, avatarURL: avatarURL) }
+    }
+    
+    /// Call from Faith Friends screen to ensure current user is in search index.
+    func refreshMySearchProfile() {
+        Task { await ensureCurrentUserInSearchProfiles() }
+    }
+    
+    /// Ensure current user is in userSearchProfiles. Tries users/ doc first, then local UserProfile.
+    /// Many users have Firebase data but users/{userId} has no "name" (created implicitly by subcollections).
+    private func ensureCurrentUserInSearchProfiles() async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let userId = getCurrentUserId() else { return }
+        var name: String?
+        var email: String?
+        var avatarURL: String?
+        // 1. Try users/ document
+        do {
+            let doc = try await db.collection("users").document(userId).getDocument()
+            if let data = doc.data() {
+                name = data["name"] as? String
+                email = data["email"] as? String
+                avatarURL = data["profileImageURL"] as? String
+            }
+        } catch { /* users/ doc may not exist */ }
+        // 2. Fallback: local UserProfile (SwiftData) - users often have name locally but never saved to Firestore
+        if (name == nil || name!.isEmpty), let ctx = modelContext {
+            let descriptor = FetchDescriptor<UserProfile>()
+            if let profile = try? ctx.fetch(descriptor).first, !profile.name.isEmpty {
+                name = profile.name
+                if email == nil { email = profile.email }
+                if avatarURL == nil { avatarURL = profile.avatarPhotoURL }
+                // Persist to users/ so future loads have it
+                let nameLower = profile.name.lowercased()
+                var data: [String: Any] = [
+                    "name": profile.name,
+                    "nameLower": nameLower,
+                    "updatedAt": Timestamp(date: Date())
+                ]
+                if let e = profile.email, !e.isEmpty {
+                    data["email"] = e
+                    data["emailLower"] = e.lowercased()
+                }
+                try? await db.collection("users").document(userId).setData(data, merge: true)
+                print("✅ [FAITH FRIENDS] Synced local UserProfile to Firestore and search index for \(userId)")
+            }
+        }
+        // 3. Auth fallbacks for email and name
+        #if canImport(FirebaseAuth)
+        if let authUser = Auth.auth().currentUser {
+            if email == nil || email!.isEmpty { email = authUser.email }
+            if (name == nil || name!.isEmpty), let authName = authUser.displayName, !authName.isEmpty {
+                name = authName
+            }
+        }
+        #endif
+        let displayName: String
+        if let n = name, !n.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            displayName = n.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            displayName = "Friend"
+            print("⚠️ [FAITH FRIENDS] No name for user \(userId) - using fallback for friend code. Set name in Profile to update.")
+        }
+        await performUpsertAndEnsureFriendCode(userId: userId, displayName: displayName, email: email, avatarURL: avatarURL)
+        print("✅ [FAITH FRIENDS] Added user to search index: \(displayName)")
+        #endif
+    }
+    
+    /// Search users by display name (prefix + any word in name).
+    /// Prefix finds "John" when typing "jo"; searchTokens finds "John Smith" when typing "smith".
+    func searchUsers(query: String, limit: Int = 20) async -> [[String: Any]] {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return [] }
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard q.count >= 2 else { return [] }
+        
+        do {
+            var seenIds = Set<String>()
+            var results: [[String: Any]] = []
+            
+            // 1. Prefix search (displayNameLower starts with query)
+            let start = q
+            let end = q + "\u{f8ff}"
+            var prefixCount = 0
+            let snap = try await db.collection("userSearchProfiles")
+                .whereField("displayNameLower", isGreaterThanOrEqualTo: start)
+                .whereField("displayNameLower", isLessThanOrEqualTo: end)
+                .limit(to: limit)
+                .getDocuments()
+            prefixCount = snap.documents.count
+            for doc in snap.documents {
+                guard !seenIds.contains(doc.documentID) else { continue }
+                seenIds.insert(doc.documentID)
+                var data = doc.data()
+                data["userId"] = doc.documentID
+                results.append(data)
+            }
+            
+            // 2. Token search (any word in name matches) - finds "John Smith" when typing "smith"
+            var tokenCount = 0
+            if results.count < limit {
+                let tokenSnap = try await db.collection("userSearchProfiles")
+                    .whereField("searchTokens", arrayContains: q)
+                    .limit(to: limit)
+                    .getDocuments()
+                tokenCount = tokenSnap.documents.count
+                for doc in tokenSnap.documents {
+                    guard !seenIds.contains(doc.documentID) else { continue }
+                    seenIds.insert(doc.documentID)
+                    var data = doc.data()
+                    data["userId"] = doc.documentID
+                    results.append(data)
+                    if results.count >= limit { break }
+                }
+            }
+            
+            // 3. Email prefix search - finds users when typing email (e.g. "john@")
+            var emailPrefixCount = 0
+            if results.count < limit {
+                let emailStart = q
+                let emailEnd = q + "\u{f8ff}"
+                let emailSnap = try await db.collection("userSearchProfiles")
+                    .whereField("emailLower", isGreaterThanOrEqualTo: emailStart)
+                    .whereField("emailLower", isLessThanOrEqualTo: emailEnd)
+                    .limit(to: limit)
+                    .getDocuments()
+                emailPrefixCount = emailSnap.documents.count
+                for doc in emailSnap.documents {
+                    guard !seenIds.contains(doc.documentID) else { continue }
+                    seenIds.insert(doc.documentID)
+                    var data = doc.data()
+                    data["userId"] = doc.documentID
+                    results.append(data)
+                    if results.count >= limit { break }
+                }
+            }
+            
+            // 4. Users collection - find users who have nameLower/email in Firebase but may not be in userSearchProfiles
+            var usersNameCount = 0
+            var usersEmailCount = 0
+            if results.count < limit {
+                let usersNameSnap = try? await db.collection("users")
+                    .whereField("nameLower", isGreaterThanOrEqualTo: start)
+                    .whereField("nameLower", isLessThanOrEqualTo: end)
+                    .limit(to: limit)
+                    .getDocuments()
+                usersNameCount = usersNameSnap?.documents.count ?? 0
+                for doc in usersNameSnap?.documents ?? [] {
+                    guard !seenIds.contains(doc.documentID) else { continue }
+                    let data = doc.data()
+                    guard let name = data["name"] as? String, !name.isEmpty else { continue }
+                    seenIds.insert(doc.documentID)
+                    var out: [String: Any] = [
+                        "userId": doc.documentID,
+                        "displayName": name,
+                        "displayNameLower": (data["nameLower"] as? String) ?? name.lowercased()
+                    ]
+                    if let email = data["email"] as? String { out["emailLower"] = email.lowercased() }
+                    if let avatar = data["profileImageURL"] as? String { out["avatarURL"] = avatar }
+                    results.append(out)
+                    if results.count >= limit { break }
+                }
+            }
+            if results.count < limit {
+                let usersEmailSnap = try? await db.collection("users")
+                    .whereField("emailLower", isGreaterThanOrEqualTo: start)
+                    .whereField("emailLower", isLessThanOrEqualTo: end)
+                    .limit(to: limit)
+                    .getDocuments()
+                usersEmailCount = usersEmailSnap?.documents.count ?? 0
+                for doc in usersEmailSnap?.documents ?? [] {
+                    guard !seenIds.contains(doc.documentID) else { continue }
+                    let data = doc.data()
+                    guard let name = data["name"] as? String, !name.isEmpty else { continue }
+                    seenIds.insert(doc.documentID)
+                    var out: [String: Any] = [
+                        "userId": doc.documentID,
+                        "displayName": name,
+                        "displayNameLower": (data["nameLower"] as? String) ?? name.lowercased()
+                    ]
+                    if let email = data["email"] as? String { out["emailLower"] = email.lowercased() }
+                    if let avatar = data["profileImageURL"] as? String { out["avatarURL"] = avatar }
+                    results.append(out)
+                    if results.count >= limit { break }
+                }
+            }
+            
+            var final = Array(results.prefix(limit))
+
+            // 5. Fallback: fetch recent profiles and filter client-side (helps when indexes/builds are stale or collection is small)
+            if final.isEmpty {
+                let fallbackSnap = try? await db.collection("userSearchProfiles").limit(to: 50).getDocuments()
+                for doc in fallbackSnap?.documents ?? [] {
+                    guard !seenIds.contains(doc.documentID) else { continue }
+                    let data = doc.data()
+                    let displayNameLower = (data["displayNameLower"] as? String) ?? ""
+                    let tokens = data["searchTokens"] as? [String] ?? []
+                    let emailLower = data["emailLower"] as? String ?? ""
+                    // Match: name contains query, token starts-with/contains query, or email contains query.
+                    // Avoid q.contains($0) - would match self when typing "ronell@work.com" (query contains name "ronell")
+                    let matches = displayNameLower.contains(q) ||
+                        tokens.contains { $0.contains(q) } ||
+                        emailLower.contains(q)
+                    if matches, let name = data["displayName"] as? String, !name.isEmpty {
+                        seenIds.insert(doc.documentID)
+                        var out = data
+                        out["userId"] = doc.documentID
+                        final.append(out)
+                        if final.count >= limit { break }
+                    }
+                }
+                if !final.isEmpty {
+                    print("ℹ️ [FAITH FRIENDS] Fallback client-side filter found \(final.count) users")
+                }
+            }
+
+            print("ℹ️ [FAITH FRIENDS] Search \"\(q)\": prefix=\(prefixCount) token=\(tokenCount) email=\(emailPrefixCount) usersName=\(usersNameCount) usersEmail=\(usersEmailCount) fallback=\(final.count) → total=\(final.count)")
+            if final.isEmpty {
+                print("ℹ️ [FAITH FRIENDS] No users found. Have others: 1) Opened the app, 2) Saved their name in Profile (More → Profile → Edit)?")
+            }
+            return final
+        } catch {
+            print("⚠️ [FAITH FRIENDS] Search failed: \(error.localizedDescription)")
+            print("⚠️ [FAITH FRIENDS] Query was: \(q). Error: \((error as NSError).localizedDescription)")
+            return []
+        }
+        #else
+        return []
+        #endif
+    }
+    
+    /// Create unique friend document ID (sorted for consistency).
+    private func friendDocId(_ a: String, _ b: String) -> String {
+        if a < b { return "\(a)_\(b)" }
+        return "\(b)_\(a)"
+    }
+    
+    // MARK: - Friend Codes (share code to receive friend requests, like invites)
+    
+    private static let friendCodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    
+    private func generateFriendCode() -> String {
+        let chars = Self.friendCodeChars
+        return String((0..<6).map { _ in chars.randomElement()! })
+    }
+    
+    /// Ensures the user has a friend code in friendCodes/ and userSearchProfiles. Called from upsertUserSearchProfile.
+    private func ensureFriendCode(userId: String, displayName: String) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        do {
+            let profileRef = db.collection("userSearchProfiles").document(userId)
+            let snap = try await profileRef.getDocument()
+            let existing = snap.data()?["friendCode"] as? String
+            if let code = existing, !code.isEmpty {
+                let codeRef = db.collection("friendCodes").document(code)
+                let codeSnap = try await codeRef.getDocument()
+                if codeSnap.exists, (codeSnap.data()?["userId"] as? String) == userId { return }
+            }
+            var code = generateFriendCode()
+            for _ in 0..<5 {
+                let codeRef = db.collection("friendCodes").document(code)
+                let codeSnap = try await codeRef.getDocument()
+                if !codeSnap.exists {
+                    try await codeRef.setData([
+                        "userId": userId,
+                        "displayName": displayName,
+                        "createdAt": Timestamp(date: Date())
+                    ])
+                    try await profileRef.setData(["friendCode": code], merge: true)
+                    print("✅ [FAITH FRIENDS] Created friend code \(code) for \(userId)")
+                    return
+                }
+                if (codeSnap.data()?["userId"] as? String) == userId {
+                    try await profileRef.setData(["friendCode": code], merge: true)
+                    return
+                }
+                code = generateFriendCode()
+            }
+            print("⚠️ [FAITH FRIENDS] Could not create friend code for \(userId) (collisions)")
+        } catch {
+            print("⚠️ [FAITH FRIENDS] ensureFriendCode failed: \(error.localizedDescription)")
+        }
+        #endif
+    }
+    
+    /// Called on sign-in to create friend code immediately so it's ready before user opens Faith Friends.
+    func ensureFriendCodeOnSignIn() async {
+        if await getMyFriendCode() != nil { return }
+        await createMinimalFriendCodeIfNeeded()
+    }
+    
+    /// Ensures profile + friend code exist, then returns the code. Use this from Faith Friends so the code is ready before display.
+    func ensureAndGetMyFriendCode() async -> String? {
+        if let existing = await getMyFriendCode() { return existing }
+        await createMinimalFriendCodeIfNeeded()
+        if let code = await getMyFriendCode() { return code }
+        await ensureCurrentUserInSearchProfiles()
+        return await getMyFriendCode()
+    }
+    
+    /// Fallback: create friend code with minimal data (no profile/name required). Used when ensure flow fails.
+    private func createMinimalFriendCodeIfNeeded() async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let userId = getCurrentUserId() else { return }
+        do {
+            let profileRef = db.collection("userSearchProfiles").document(userId)
+            let snap = try await profileRef.getDocument()
+            if let existing = snap.data()?["friendCode"] as? String, !existing.isEmpty { return }
+            var code = generateFriendCode()
+            for _ in 0..<5 {
+                let codeRef = db.collection("friendCodes").document(code)
+                let codeSnap = try await codeRef.getDocument()
+                if !codeSnap.exists {
+                    try await codeRef.setData([
+                        "userId": userId,
+                        "displayName": "Friend",
+                        "createdAt": Timestamp(date: Date())
+                    ])
+                    try await profileRef.setData([
+                        "userId": userId,
+                        "displayName": "Friend",
+                        "displayNameLower": "friend",
+                        "friendCode": code,
+                        "updatedAt": Timestamp(date: Date())
+                    ], merge: true)
+                    print("✅ [FAITH FRIENDS] Created minimal friend code \(code) for \(userId)")
+                    return
+                }
+                if (codeSnap.data()?["userId"] as? String) == userId {
+                    try await profileRef.setData(["friendCode": code], merge: true)
+                    return
+                }
+                code = generateFriendCode()
+            }
+        } catch {
+            print("⚠️ [FAITH FRIENDS] createMinimalFriendCode failed: \(error.localizedDescription)")
+        }
+        #endif
+    }
+    
+    /// Returns current user's friend code, or nil if not yet created.
+    func getMyFriendCode() async -> String? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let userId = getCurrentUserId() else { return nil }
+        do {
+            let snap = try await db.collection("userSearchProfiles").document(userId).getDocument()
+            return snap.data()?["friendCode"] as? String
+        } catch { return nil }
+        #else
+        return nil
+        #endif
+    }
+    
+    /// Lookup user by friend code. Returns (userId, displayName) or nil.
+    func lookupUserByFriendCode(_ code: String) async -> (userId: String, displayName: String)? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return nil }
+        let c = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard c.count == 6 else { return nil }
+        do {
+            let snap = try await db.collection("friendCodes").document(c).getDocument()
+            guard snap.exists, let data = snap.data(),
+                  let uid = data["userId"] as? String,
+                  let name = data["displayName"] as? String, !name.isEmpty else { return nil }
+            return (uid, name)
+        } catch { return nil }
+        #else
+        return nil
+        #endif
+    }
+    
+    /// Send a friend request by friend code (looks up user, then sends request).
+    func sendFriendRequestByCode(_ code: String) async throws {
+        guard let (userId, displayName) = await lookupUserByFriendCode(code) else {
+            throw NSError(domain: "FirebaseSyncService", code: -7, userInfo: [NSLocalizedDescriptionKey: "Invalid or expired friend code"])
+        }
+        try await sendFriendRequest(toUserId: userId, toDisplayName: displayName)
+    }
+    
+    /// Send a friend request to another user.
+    func sendFriendRequest(toUserId: String, toDisplayName: String) async throws {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else {
+            throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not authenticated"])
+        }
+        guard toUserId != myId else {
+            throw NSError(domain: "FirebaseSyncService", code: -2, userInfo: [NSLocalizedDescriptionKey: "Cannot add yourself"])
+        }
+        
+        let docId = friendDocId(myId, toUserId)
+        let ref = db.collection("friends").document(docId)
+        let snap = try await ref.getDocument()
+        if snap.exists, let status = (snap.data()?["status"] as? String), status == "accepted" {
+            throw NSError(domain: "FirebaseSyncService", code: -3, userInfo: [NSLocalizedDescriptionKey: "Already friends"])
+        }
+        if snap.exists, let status = (snap.data()?["status"] as? String), status == "pending" {
+            throw NSError(domain: "FirebaseSyncService", code: -4, userInfo: [NSLocalizedDescriptionKey: "Friend request already sent"])
+        }
+        
+        let (userA, userB) = myId < toUserId ? (myId, toUserId) : (toUserId, myId)
+        try await ref.setData([
+            "userA": userA,
+            "userB": userB,
+            "status": "pending",
+            "requestedBy": myId,
+            "createdAt": Timestamp(date: Date()),
+            "updatedAt": Timestamp(date: Date())
+        ])
+        print("✅ [FAITH FRIENDS] Sent friend request to \(toUserId)")
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase not available"])
+        #endif
+    }
+    
+    /// Accept a friend request.
+    func acceptFriendRequest(fromUserId: String) async throws {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else {
+            throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not authenticated"])
+        }
+        let docId = friendDocId(myId, fromUserId)
+        let ref = db.collection("friends").document(docId)
+        let snap = try await ref.getDocument()
+        guard snap.exists, let data = snap.data() else {
+            throw NSError(domain: "FirebaseSyncService", code: -5, userInfo: [NSLocalizedDescriptionKey: "Request not found"])
+        }
+        guard (data["status"] as? String) == "pending", (data["requestedBy"] as? String) == fromUserId else {
+            throw NSError(domain: "FirebaseSyncService", code: -6, userInfo: [NSLocalizedDescriptionKey: "Invalid request"])
+        }
+        try await ref.updateData([
+            "status": "accepted",
+            "updatedAt": Timestamp(date: Date())
+        ])
+        print("✅ [FAITH FRIENDS] Accepted friend request from \(fromUserId)")
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase not available"])
+        #endif
+    }
+    
+    /// Decline a friend request.
+    func declineFriendRequest(fromUserId: String) async throws {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else {
+            throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not authenticated"])
+        }
+        let docId = friendDocId(myId, fromUserId)
+        let ref = db.collection("friends").document(docId)
+        let snap = try await ref.getDocument()
+        guard snap.exists, let data = snap.data() else {
+            throw NSError(domain: "FirebaseSyncService", code: -5, userInfo: [NSLocalizedDescriptionKey: "Request not found"])
+        }
+        guard (data["status"] as? String) == "pending", (data["requestedBy"] as? String) == fromUserId else {
+            return // Already accepted or declined elsewhere
+        }
+        try await ref.updateData([
+            "status": "declined",
+            "updatedAt": Timestamp(date: Date())
+        ])
+        print("✅ [FAITH FRIENDS] Declined friend request from \(fromUserId)")
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase not available"])
+        #endif
+    }
+    
+    /// Remove a friend (deletes the friendship document so both users are no longer friends).
+    func removeFriend(friendUserId: String) async throws {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else {
+            throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not authenticated"])
+        }
+        let docId = friendDocId(myId, friendUserId)
+        let ref = db.collection("friends").document(docId)
+        let snap = try await ref.getDocument()
+        guard snap.exists else {
+            throw NSError(domain: "FirebaseSyncService", code: -5, userInfo: [NSLocalizedDescriptionKey: "Friend not found"])
+        }
+        try await ref.delete()
+        print("✅ [FAITH FRIENDS] Removed friend \(friendUserId)")
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase not available"])
+        #endif
+    }
+    
+    /// Fetch friends, pending incoming, and pending outgoing (sent) requests from Firestore.
+    func fetchFriendsFromFirebase() async -> (friends: [[String: Any]], pendingIncoming: [[String: Any]], pendingOutgoing: [[String: Any]]) {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else { return ([], [], []) }
+        
+        do {
+            let snap = try await db.collection("friends")
+                .whereField("userA", isEqualTo: myId)
+                .getDocuments()
+            let snap2 = try await db.collection("friends")
+                .whereField("userB", isEqualTo: myId)
+                .getDocuments()
+            
+            var friends: [[String: Any]] = []
+            var pendingIncoming: [[String: Any]] = []
+            var pendingOutgoing: [[String: Any]] = []
+            
+            for doc in snap.documents + snap2.documents {
+                var data = doc.data()
+                data["id"] = doc.documentID
+                let userA = data["userA"] as? String ?? ""
+                let userB = data["userB"] as? String ?? ""
+                let status = data["status"] as? String ?? ""
+                let requestedBy = data["requestedBy"] as? String ?? ""
+                let otherId = userA == myId ? userB : userA
+                data["friendUserId"] = otherId
+                
+                if status == "accepted" {
+                    let (otherName, avatarURL) = await fetchUserDisplayNameAndAvatar(userId: otherId)
+                    data["friendDisplayName"] = otherName ?? otherId
+                    if let url = avatarURL { data["friendAvatarURL"] = url }
+                    friends.append(data)
+                } else if status == "pending" && requestedBy != myId {
+                    let (requesterName, avatarURL) = await fetchUserDisplayNameAndAvatar(userId: requestedBy)
+                    data["displayName"] = requesterName ?? requestedBy
+                    if let url = avatarURL { data["avatarURL"] = url }
+                    pendingIncoming.append(data)
+                } else if status == "pending" && requestedBy == myId {
+                    let (otherName, avatarURL) = await fetchUserDisplayNameAndAvatar(userId: otherId)
+                    data["displayName"] = otherName ?? otherId
+                    data["status"] = "pending"
+                    if let url = avatarURL { data["avatarURL"] = url }
+                    pendingOutgoing.append(data)
+                }
+            }
+            return (friends, pendingIncoming, pendingOutgoing)
+        } catch {
+            print("⚠️ [FAITH FRIENDS] Failed to fetch friends: \(error.localizedDescription)")
+            return ([], [], [])
+        }
+        #else
+        return ([], [], [])
+        #endif
+    }
+
+    /// Refresh pending incoming friend request count (e.g. on app become active or when More tab appears). Updates pendingFriendRequestCount.
+    func refreshPendingFriendRequestCount() async {
+        let (_, pending, _) = await fetchFriendsFromFirebase()
+        pendingFriendRequestCount = pending.count
+    }
+    
+    /// Fetch display name for a user ID (from userSearchProfiles or users).
+    func fetchUserDisplayName(userId: String) async -> String? {
+        let (name, _) = await fetchUserDisplayNameAndAvatar(userId: userId)
+        return name
+    }
+    
+    /// Fetch display name and avatar URL for a user (for Faith Friends rows).
+    func fetchUserDisplayNameAndAvatar(userId: String) async -> (displayName: String?, avatarURL: String?) {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return (nil, nil) }
+        do {
+            let snap = try await db.collection("userSearchProfiles").document(userId).getDocument()
+            let data = snap.data()
+            let name = data?["displayName"] as? String
+            var avatar = data?["avatarURL"] as? String
+            if (name == nil || name!.isEmpty) || avatar == nil {
+                let userSnap = try await db.collection("users").document(userId).getDocument()
+                let userData = userSnap.data()
+                let userName = name ?? userData?["name"] as? String
+                if avatar == nil { avatar = userData?["profileImageURL"] as? String }
+                return (userName, avatar)
+            }
+            return (name, avatar)
+        } catch { return (nil, nil) }
+        #else
+        return (nil, nil)
+        #endif
+    }
+    
+    /// Notify friends when current user creates/activates a live session.
+    // MARK: - Shared Prayer Wall
+
+    /// Reading plans a friend has marked as shared (for group progress in Faith Friends).
+    func fetchSharedReadingPlansForFriend(friendUserId: String) async -> [[String: Any]] {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return [] }
+        do {
+            let snap = try await db.collection("users").document(friendUserId)
+                .collection("readingPlans")
+                .whereField("sharedWithFriends", isEqualTo: true)
+                .limit(to: 20)
+                .getDocuments()
+            return snap.documents.map { doc in
+                var d = doc.data()
+                d["planDocumentId"] = doc.documentID
+                return d
+            }
+        } catch {
+            print("⚠️ [FAITH FRIENDS] fetchSharedReadingPlansForFriend: \(error.localizedDescription)")
+            return []
+        }
+        #else
+        return []
+        #endif
+    }
+    
+    /// Fetches shared reading plans for every friend (for the group progress list).
+    func fetchFriendsSharedReadingPlans() async -> [[String: Any]] {
+        #if canImport(FirebaseFirestore)
+        guard let myId = getCurrentUserId(), db != nil else { return [] }
+        let (friends, _, _) = await fetchFriendsFromFirebase()
+        var results: [[String: Any]] = []
+        await withTaskGroup(of: [[String: Any]].self) { group in
+            for f in friends {
+                guard let friendId = f["friendUserId"] as? String, friendId != myId else { continue }
+                let friendName = f["friendDisplayName"] as? String ?? "Friend"
+                group.addTask {
+                    let plans = await self.fetchSharedReadingPlansForFriend(friendUserId: friendId)
+                    return plans.map { var d = $0; d["ownerId"] = friendId; d["ownerName"] = friendName; return d }
+                }
+            }
+            for await batch in group { results.append(contentsOf: batch) }
+        }
+        return results
+        #else
+        return []
+        #endif
+    }
+
+    func fetchFriendsSharedPrayers() async -> [[String: Any]] {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else { return [] }
+        let (friends, _, _) = await fetchFriendsFromFirebase()
+        var results: [[String: Any]] = []
+        await withTaskGroup(of: [[String: Any]].self) { group in
+            for f in friends {
+                guard let friendId = f["friendUserId"] as? String, friendId != myId else { continue }
+                let friendName = f["friendDisplayName"] as? String ?? "Friend"
+                group.addTask {
+                    do {
+                        let snap = try await db.collection("users").document(friendId)
+                            .collection("sharedPrayers")
+                            .order(by: "updatedAt", descending: true)
+                            .limit(to: 10)
+                            .getDocuments()
+                        return snap.documents.map { doc -> [String: Any] in
+                            var d = doc.data()
+                            d["ownerId"] = friendId
+                            d["ownerName"] = friendName
+                            d["ownerAvatarURL"] = f["friendAvatarURL"] as? String ?? ""
+                            return d
+                        }
+                    } catch { return [] }
+                }
+            }
+            for await batch in group { results.append(contentsOf: batch) }
+        }
+        return results.sorted {
+            let a = ($0["updatedAt"] as? Timestamp)?.dateValue() ?? .distantPast
+            let b = ($1["updatedAt"] as? Timestamp)?.dateValue() ?? .distantPast
+            return a > b
+        }
+        #else
+        return []
+        #endif
+    }
+
+    func prayForFriend(ownerId: String, prayerId: String) async throws {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else { return }
+        let ref = db.collection("users").document(ownerId)
+            .collection("sharedPrayers").document(prayerId)
+        try await ref.updateData(["intercessorIds": FieldValue.arrayUnion([myId])])
+        // Notify the owner
+        let alertRef = db.collection("users").document(ownerId)
+            .collection("prayerIntercessorAlerts").document("\(prayerId)-\(myId)")
+        let myName = await fetchUserDisplayName(userId: myId) ?? "A friend"
+        try await alertRef.setData([
+            "prayerId": prayerId,
+            "intercessorId": myId,
+            "intercessorName": myName,
+            "createdAt": Timestamp(date: Date())
+        ])
+        #endif
+    }
+
+    // MARK: - Accountability Partner
+
+    func setAccountabilityPartner(friendUserId: String, friendDisplayName: String) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else { return }
+        do {
+            try await db.collection("users").document(myId).setData([
+                "accountabilityPartnerId": friendUserId,
+                "accountabilityPartnerName": friendDisplayName
+            ], merge: true)
+        } catch {
+            print("⚠️ [FAITH FRIENDS] Failed to set accountability partner: \(error.localizedDescription)")
+        }
+        #endif
+    }
+
+    func removeAccountabilityPartner() async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else { return }
+        do {
+            try await db.collection("users").document(myId).updateData([
+                "accountabilityPartnerId": FieldValue.delete(),
+                "accountabilityPartnerName": FieldValue.delete()
+            ])
+        } catch {
+            print("⚠️ [FAITH FRIENDS] Failed to remove accountability partner: \(error.localizedDescription)")
+        }
+        #endif
+    }
+
+    func fetchAccountabilityPartner() async -> (userId: String, name: String)? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else { return nil }
+        do {
+            let doc = try await db.collection("users").document(myId).getDocument()
+            guard let data = doc.data(),
+                  let partnerId = data["accountabilityPartnerId"] as? String,
+                  let partnerName = data["accountabilityPartnerName"] as? String else { return nil }
+            return (partnerId, partnerName)
+        } catch { return nil }
+        #else
+        return nil
+        #endif
+    }
+
+    func notifyFriendsOfNewSession(session: LiveSession) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let myId = getCurrentUserId() else { return }
+        let (friends, _, _) = await fetchFriendsFromFirebase()
+        for f in friends {
+            guard let friendId = f["friendUserId"] as? String else { continue }
+            do {
+                let alertRef = db.collection("users").document(friendId).collection("friendSessionAlerts").document(session.id.uuidString)
+                try await alertRef.setData([
+                    "sessionId": session.id.uuidString,
+                    "sessionTitle": session.title,
+                    "hostId": myId,
+                    "hostName": session.hostName,
+                    "createdAt": Timestamp(date: Date())
+                ])
+            } catch {
+                print("⚠️ [FAITH FRIENDS] Failed to notify friend \(friendId): \(error.localizedDescription)")
+            }
+        }
+        #endif
+    }
+    
+    // MARK: - Prayer Wall (Feature 1)
+
+    func submitPrayerWallRequest(sessionId: UUID, text: String, authorName: String) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        let ref = db.collection("sessions").document(sessionId.uuidString)
+            .collection("prayerWall").document()
+        try? await ref.setData([
+            "id": ref.documentID,
+            "text": text,
+            "authorName": authorName,
+            "isPinned": false,
+            "createdAt": FieldValue.serverTimestamp()
+        ])
+        #endif
+    }
+
+    func setPrayerWallPinned(sessionId: UUID, requestId: String, pinned: Bool) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        let ref = db.collection("sessions").document(sessionId.uuidString)
+            .collection("prayerWall").document(requestId)
+        try? await ref.updateData(["isPinned": pinned])
+        #endif
+    }
+
+    func listenForPrayerWall(sessionId: UUID, onChange: @escaping ([[String: Any]]) -> Void) -> Any? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return nil }
+        return db.collection("sessions").document(sessionId.uuidString)
+            .collection("prayerWall")
+            .order(by: "createdAt", descending: false)
+            .addSnapshotListener { snap, _ in
+                onChange(snap?.documents.map { ["id": $0.documentID] .merging($0.data()) { _, new in new } } ?? [])
+            }
+        #else
+        return nil
+        #endif
+    }
+
+    // MARK: - Scripture Overlay (Feature 2)
+
+    func pushScriptureOverlay(sessionId: UUID, reference: String, text: String) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        let ref = db.collection("sessions").document(sessionId.uuidString)
+            .collection("overlays").document("scripture")
+        try? await ref.setData([
+            "reference": reference,
+            "text": text,
+            "activeAt": FieldValue.serverTimestamp()
+        ])
+        #endif
+    }
+
+    func dismissScriptureOverlay(sessionId: UUID) async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return }
+        try? await db.collection("sessions").document(sessionId.uuidString)
+            .collection("overlays").document("scripture").delete()
+        #endif
+    }
+
+    func listenForScriptureOverlay(sessionId: UUID, onChange: @escaping ([String: Any]?) -> Void) -> Any? {
+        #if canImport(FirebaseFirestore)
+        guard let db = db else { return nil }
+        return db.collection("sessions").document(sessionId.uuidString)
+            .collection("overlays").document("scripture")
+            .addSnapshotListener { snap, _ in
+                onChange(snap?.exists == true ? snap?.data() : nil)
+            }
+        #else
+        return nil
+        #endif
+    }
+
+    func removeListener(_ listener: Any?) {
+        #if canImport(FirebaseFirestore)
+        (listener as? ListenerRegistration)?.remove()
+        #endif
+    }
+
+    // MARK: - Helper Methods
+
     private func getCurrentUserId() -> String? {
         #if canImport(FirebaseAuth)
         if let user = Auth.auth().currentUser {
@@ -1822,15 +3583,17 @@ class FirebaseSyncService: ObservableObject {
             print("🔑 [FIREBASE] This user ID must match on all devices for sync to work")
             return userId
         } else {
-            #if targetEnvironment(simulator)
-            // For simulator testing, use a shared test user ID so both simulators can sync
-            // IMPORTANT: This requires Firestore security rules to allow this test user
-            // For production, users must sign in with Apple to get a real Firebase Auth user
+            #if targetEnvironment(simulator) || os(macOS)
+            // For simulator/macOS demo mode, use a shared test user ID so sync works without Sign in with Apple
+            // IMPORTANT: Firestore rules allow this test user (isTestUser). On iOS real devices, Sign in with Apple required.
             let testUserId = "simulator-test-user-shared"
-            print("⚠️ [FIREBASE] No Firebase Auth user in simulator")
-            print("⚠️ [FIREBASE] Using shared test user ID for cross-device sync testing: \(testUserId)")
-            print("⚠️ [FIREBASE] Both simulators will use this same ID to test sync")
-            print("⚠️ [FIREBASE] On real devices, users must sign in with Apple for sync to work")
+            #if targetEnvironment(simulator)
+            print("⚠️ [FIREBASE] No Firebase Auth user in simulator - using test user ID for demo sync")
+            #else
+            print("⚠️ [FIREBASE] No Firebase Auth user on macOS - using test user ID for demo sync")
+            #endif
+            print("⚠️ [FIREBASE] Using shared test user ID: \(testUserId)")
+            print("⚠️ [FIREBASE] On iOS real devices, users must sign in with Apple for sync to work")
             return testUserId
             #else
             print("⚠️ [FIREBASE] No Firebase Auth user - user must sign in with Apple")
@@ -1849,6 +3612,7 @@ class FirebaseSyncService: ObservableObject {
         #if canImport(FirebaseFirestore)
         listener?.remove()
         invitationListener?.remove()
+        friendSessionAlertsListener?.remove()
         #endif
         
         #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
@@ -1857,5 +3621,6 @@ class FirebaseSyncService: ObservableObject {
         }
         #endif
     }
+    #endif
 }
 

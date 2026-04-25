@@ -118,7 +118,9 @@ struct MoodGoalsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Goals & Achievements")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .sheet(isPresented: $showingNewGoal) {
                 CreateGoalView(
                     title: $newGoalTitle,
@@ -141,6 +143,7 @@ struct MoodGoalsView: View {
                         showingNewGoal = false
                     }
                 )
+                .macOSSheetFrameForm()
             }
             .onAppear {
                 // Update goal progress
@@ -202,7 +205,7 @@ struct CreateGoalView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(.systemBackground))
+                            .fill(Color.platformSystemBackground)
                             .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
                     )
                     
@@ -244,7 +247,7 @@ struct CreateGoalView: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(.systemGray6))
+                                .fill(Color.platformSystemGray6)
                         )
                         
                         Toggle(isOn: $hasTargetDate) {
@@ -268,21 +271,22 @@ struct CreateGoalView: View {
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemGray6))
+                                    .fill(Color.platformSystemGray6)
                             )
                         }
                     }
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(.systemBackground))
+                            .fill(Color.platformSystemBackground)
                             .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
                     )
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.platformSystemGroupedBackground)
             .navigationTitle("New Goal")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -299,6 +303,23 @@ struct CreateGoalView: View {
                     .disabled(title.isEmpty)
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button("Save") {
+                        onSave()
+                        dismiss()
+                    }
+                    .font(.body.weight(.semibold))
+                    .disabled(title.isEmpty)
+                }
+            }
+            #endif
         }
     }
 }
@@ -342,7 +363,7 @@ struct GoalCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         )
     }
@@ -369,7 +390,7 @@ struct MoodAchievementCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         )
     }

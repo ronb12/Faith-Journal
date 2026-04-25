@@ -130,7 +130,7 @@ struct GlobalSearchView17: View {
     }
 
     var categoryFilter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 ForEach(GlobalSearchView.SearchCategory.allCases, id: \.self) { category in
                     Button(action: {

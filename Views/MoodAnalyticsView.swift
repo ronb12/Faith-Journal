@@ -33,9 +33,9 @@ struct MoodAnalyticsView: View {
     @State private var showingSettings = false
     
     enum Timeframe: String, CaseIterable {
-        case week = "Week"
-        case month = "Month"
-        case year = "Year"
+        case week = "This Week"
+        case month = "This Month"
+        case year = "This Year"
         case all = "All Time"
     }
     
@@ -94,6 +94,12 @@ struct MoodAnalyticsView: View {
                             }
                             .pickerStyle(SegmentedPickerStyle())
                             .padding(.horizontal)
+
+                            Text("Mood data stays on this device unless you use iCloud or sync. Analytics use only check-ins already saved in Faith Journal.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal)
                             
                             switch selectedTab {
                             case .overview:
@@ -111,7 +117,7 @@ struct MoodAnalyticsView: View {
                 }
                 .navigationTitle("Mood Analytics")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         Menu {
                             Button(action: { showingInsights = true }) {
                                 Label("Insights", systemImage: "lightbulb.fill")
@@ -135,18 +141,23 @@ struct MoodAnalyticsView: View {
                 }
                 .sheet(isPresented: $showingInsights) {
                     MoodInsightsView(analyticsService: analyticsService)
+                        .macOSSheetFrameStandard()
                 }
                 .sheet(isPresented: $showingGoals) {
                     MoodGoalsView(goalsService: goalsService)
+                        .macOSSheetFrameForm()
                 }
                 .sheet(isPresented: $showingHeatmap) {
                     MoodHeatmapView()
+                        .macOSSheetFrameStandard()
                 }
                 .sheet(isPresented: $showingExport) {
                     MoodExportView()
+                        .macOSSheetFrameStandard()
                 }
                 .sheet(isPresented: $showingSettings) {
                     MoodSettingsView()
+                        .macOSSheetFrameStandard()
                 }
             }
         } else {
@@ -324,7 +335,7 @@ struct PatternsTab: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemBackground))
+                        .fill(Color.platformSystemBackground)
                         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                 )
                 .padding(.horizontal)
@@ -365,7 +376,7 @@ struct GoalsTab: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(.systemBackground))
+                                .fill(Color.platformSystemBackground)
                         )
                         .padding(.horizontal)
                     }
@@ -392,7 +403,7 @@ struct GoalsTab: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(Color(.systemBackground))
+                                .fill(Color.platformSystemBackground)
                         )
                         .padding(.horizontal)
                     }
@@ -425,7 +436,7 @@ struct GoalsTab: View {
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemBackground))
+                                    .fill(Color.platformSystemBackground)
                                     .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                             )
                         }
@@ -456,7 +467,7 @@ struct GoalsTab: View {
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemBackground))
+                                    .fill(Color.platformSystemBackground)
                                     .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                             )
                         }
@@ -502,7 +513,7 @@ struct CorrelationsTab: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(.systemGray6))
+                                .fill(Color.platformSystemGray6)
                         )
                         .padding(.horizontal)
                     }
@@ -533,7 +544,7 @@ struct CorrelationsTab: View {
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 8)
-                                .fill(Color(.systemGray6))
+                                .fill(Color.platformSystemGray6)
                         )
                         .padding(.horizontal)
                     }
@@ -571,7 +582,7 @@ struct PatternCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         )
     }
@@ -604,7 +615,7 @@ struct StreakCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         )
     }
@@ -690,7 +701,7 @@ struct MoodAnalyticsTrendChart: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
             .padding(.horizontal)
@@ -733,7 +744,7 @@ struct MoodDistributionChart: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(.systemBackground))
+                        .fill(Color.platformSystemBackground)
                         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
                 )
                 .padding(.horizontal)
@@ -768,7 +779,7 @@ struct MoodStatCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         )
     }
@@ -813,7 +824,7 @@ struct MoodEntryRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         )
         .padding(.horizontal)

@@ -7,6 +7,8 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+
+#if os(iOS)
 import UIKit
 
 struct DocumentPickerView: UIViewControllerRepresentable {
@@ -35,7 +37,6 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         }
         
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            // Copy files to app's document directory
             let fileManager = FileManager.default
             guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
             
@@ -45,10 +46,8 @@ struct DocumentPickerView: UIViewControllerRepresentable {
                 let fileName = url.lastPathComponent
                 let destinationURL = documentsPath.appendingPathComponent("attachments").appendingPathComponent(fileName)
                 
-                // Create attachments directory if it doesn't exist
                 try? fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
                 
-                // Copy file
                 do {
                     if fileManager.fileExists(atPath: destinationURL.path) {
                         try fileManager.removeItem(at: destinationURL)
@@ -64,4 +63,45 @@ struct DocumentPickerView: UIViewControllerRepresentable {
         }
     }
 }
+#elseif os(macOS)
+import AppKit
 
+struct DocumentPickerView: View {
+    @Binding var selectedFileURLs: [URL]
+    var allowedContentTypes: [UTType]
+    var allowsMultipleSelection: Bool
+    
+    var body: some View {
+        EmptyView()
+            .onAppear {
+            let panel = NSOpenPanel()
+            panel.allowsMultipleSelection = allowsMultipleSelection
+            panel.canChooseDirectories = false
+            panel.canChooseFiles = true
+            panel.allowedContentTypes = allowedContentTypes
+            
+            if panel.runModal() == .OK {
+                let fileManager = FileManager.default
+                guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+                
+                for url in panel.urls {
+                    let fileName = url.lastPathComponent
+                    let destinationURL = documentsPath.appendingPathComponent("attachments").appendingPathComponent(fileName)
+                    
+                    try? fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    
+                    do {
+                        if fileManager.fileExists(atPath: destinationURL.path) {
+                            try fileManager.removeItem(at: destinationURL)
+                        }
+                        try fileManager.copyItem(at: url, to: destinationURL)
+                        selectedFileURLs.append(destinationURL)
+                    } catch {
+                        print("Error copying file: \(error)")
+                    }
+                }
+            }
+        }
+    }
+}
+#endif

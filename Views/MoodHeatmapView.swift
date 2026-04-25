@@ -48,7 +48,7 @@ struct MoodHeatmapView: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemBackground))
+                            .fill(Color.platformSystemBackground)
                     )
                     
                     // Heatmap Grid
@@ -113,13 +113,15 @@ struct MoodHeatmapView: View {
                 .padding()
             }
             .navigationTitle("Mood Heatmap")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
     }
     
     private func intensityColor(_ intensity: Double, themeManager: ThemeManager) -> Color {
         if intensity == 0 {
-            return Color(.systemGray5)
+            return Color.platformSystemGray5
         } else if intensity < 4 {
             return Color.red.opacity(0.3)
         } else if intensity < 6 {
@@ -141,7 +143,7 @@ struct DayCell: View {
     
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
-            .fill(hasEntry ? intensityColor(Double(intensity), themeManager: themeManager) : Color(.systemGray5))
+            .fill(hasEntry ? intensityColor(Double(intensity), themeManager: themeManager) : Color.platformSystemGray5)
             .aspectRatio(1, contentMode: .fit)
             .overlay(
                 Text("\(day)")

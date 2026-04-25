@@ -8,10 +8,14 @@
 import Foundation
 import CloudKit
 import Combine
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 @MainActor
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 class CloudKitUserService: ObservableObject {
     static let shared: CloudKitUserService = {
         // Only instantiate if running on iOS 17 or later
@@ -33,8 +37,13 @@ class CloudKitUserService: ObservableObject {
     private init(disableCloudKit: Bool = false) {
         self.cloudKitDisabled = disableCloudKit
         // Set fallback values immediately
-        currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-        currentUserName = UIDevice.current.name
+        #if os(iOS)
+        currentUserID = PlatformDevice.identifier
+        currentUserName = PlatformDevice.name
+        #elseif os(macOS)
+        currentUserID = UUID().uuidString
+        currentUserName = ProcessInfo.processInfo.hostName
+        #endif
 
         // If CloudKit is disabled (by OS or explicit), skip CloudKit setup
         guard !disableCloudKit else {
@@ -83,49 +92,49 @@ class CloudKitUserService: ObservableObject {
                 // No iCloud account - app works fine without it
                 // Use device identifier instead (no sign-in required)
                 isAuthenticated = false
-                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-                currentUserName = UIDevice.current.name
+                currentUserID = PlatformDevice.identifier
+                currentUserName = PlatformDevice.name
             case .couldNotDetermine:
                 // Can't determine status - use device identifier (no sign-in required)
                 isAuthenticated = false
-                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-                currentUserName = UIDevice.current.name
+                currentUserID = PlatformDevice.identifier
+                currentUserName = PlatformDevice.name
             case .restricted:
                 // Restricted - use device identifier (no sign-in required)
                 isAuthenticated = false
-                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-                currentUserName = UIDevice.current.name
+                currentUserID = PlatformDevice.identifier
+                currentUserName = PlatformDevice.name
             case .temporarilyUnavailable:
                 // Temporarily unavailable - use device identifier (no sign-in required)
                 isAuthenticated = false
-                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-                currentUserName = UIDevice.current.name
+                currentUserID = PlatformDevice.identifier
+                currentUserName = PlatformDevice.name
             @unknown default:
                 // Unknown status - use device identifier (no sign-in required)
                 isAuthenticated = false
-                currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-                currentUserName = UIDevice.current.name
+                currentUserID = PlatformDevice.identifier
+                currentUserName = PlatformDevice.name
             }
         } catch {
             // If CloudKit fails, use fallback values (no sign-in required)
             isAuthenticated = false
-            currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-            currentUserName = UIDevice.current.name
+            currentUserID = PlatformDevice.identifier
+            currentUserName = PlatformDevice.name
         }
     }
     
     func fetchUserID() async {
         if cloudKitDisabled {
-            currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-            currentUserName = UIDevice.current.name
+            currentUserID = PlatformDevice.identifier
+            currentUserName = PlatformDevice.name
             return
         }
         // Only fetch CloudKit user ID if we're authenticated and have a container
         // This prevents triggering Apple ID sign-in prompt
         guard isAuthenticated, let container = container else {
             // Not authenticated or no container - use device identifier (no sign-in required)
-            currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-            currentUserName = UIDevice.current.name
+            currentUserID = PlatformDevice.identifier
+            currentUserName = PlatformDevice.name
             return
         }
         do {
@@ -146,12 +155,12 @@ class CloudKitUserService: ObservableObject {
                 }
             } catch {
                 // Fallback to device name if CloudKit unavailable
-                currentUserName = UIDevice.current.name
+                currentUserName = PlatformDevice.name
             }
         } catch {
             // Fallback to device identifier (no sign-in required)
-            currentUserID = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-            currentUserName = UIDevice.current.name
+            currentUserID = PlatformDevice.identifier
+            currentUserName = PlatformDevice.name
         }
     }
     
@@ -160,7 +169,7 @@ class CloudKitUserService: ObservableObject {
         if let id = currentUserID, !id.isEmpty {
             return id
         }
-        return UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        return PlatformDevice.identifier
     }
     
     var displayName: String {
@@ -168,7 +177,7 @@ class CloudKitUserService: ObservableObject {
         if let name = currentUserName, !name.isEmpty {
             return name
         }
-        return UIDevice.current.name
+        return PlatformDevice.name
     }
 }
 

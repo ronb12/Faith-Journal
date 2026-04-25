@@ -146,6 +146,9 @@ struct BroadcastStreamView_HLS: View {
     @State private var lastNetworkQualityCheck: Date?
     @State private var qualityAdjustmentTimer: Timer?
     
+    /// When the host entered the stream view. Used to avoid ending the session on immediate onDisappear (e.g. SwiftUI re-render or accidental dismiss before stream really started).
+    @State private var streamEnteredAt: Date?
+    
     // Picture-in-Picture
     @State private var pipController: AVPictureInPictureController?
     @State private var pipPlayer: AVPlayer?
@@ -784,6 +787,7 @@ struct BroadcastStreamView_HLS: View {
                 }
             }
             .onAppear {
+                streamEnteredAt = Date()
                 if isHost {
                     Task {
                         startBroadcasting()
@@ -869,8 +873,9 @@ struct BroadcastStreamView_HLS: View {
                 if isHost {
                     captionsService.stopTranscription()
                     
-                    // If host is leaving and session is still active, end the session
-                    if let session = session, session.isActive {
+                    // Only end session if host has been in stream for 5+ seconds (avoids ending when view disappears before stream really started, e.g. SwiftUI re-render or accidental dismiss)
+                    let elapsed = streamEnteredAt.map { Date().timeIntervalSince($0) } ?? 0
+                    if let session = session, session.isActive, elapsed >= 5 {
                         session.isActive = false
                         session.endTime = Date()
                         
@@ -957,7 +962,7 @@ struct BroadcastStreamView_HLS: View {
     }
     
     private var streamStatsView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 // Timer
                 HStack(spacing: 4) {
@@ -1428,7 +1433,7 @@ struct BroadcastStreamView_HLS: View {
                                 .foregroundColor(.primary)
                         }
                         
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 12) {
                                 ForEach(VideoFilter.allCases, id: \.self) { filter in
                                     Button(action: { selectedFilter = filter }) {

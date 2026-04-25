@@ -7,7 +7,11 @@
 
 import Foundation
 import UserNotifications
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 @MainActor
 class NotificationService: NSObject, ObservableObject {
@@ -60,6 +64,7 @@ class NotificationService: NSObject, ObservableObject {
     
     /// Clear the app badge
     func clearBadge() {
+        #if os(iOS)
         // Set badge to 0 using the new iOS 17+ API
         if #available(iOS 17.0, *) {
             UNUserNotificationCenter.current().setBadgeCount(0) { error in
@@ -70,6 +75,10 @@ class NotificationService: NSObject, ObservableObject {
         } else {
             UIApplication.shared.applicationIconBadgeNumber = 0
         }
+        #elseif os(macOS)
+        // Dock tile badge so the app icon shows notification count when installed
+        NSApplication.shared.dockTile.badgeLabel = nil
+        #endif
         badgeCount = 0
         
         // Remove all delivered notifications to prevent badge from reappearing
@@ -101,6 +110,7 @@ class NotificationService: NSObject, ObservableObject {
                 let unreadCount = oneTimeNotifications.count
                 self.badgeCount = unreadCount
                 
+                #if os(iOS)
                 // Update badge using the new iOS 17+ API
                 if #available(iOS 17.0, *) {
                     UNUserNotificationCenter.current().setBadgeCount(unreadCount) { error in
@@ -111,6 +121,10 @@ class NotificationService: NSObject, ObservableObject {
                 } else {
                     UIApplication.shared.applicationIconBadgeNumber = unreadCount
                 }
+                #elseif os(macOS)
+                // Dock tile badge so the app icon shows notification count when installed
+                NSApplication.shared.dockTile.badgeLabel = unreadCount > 0 ? "\(unreadCount)" : nil
+                #endif
             }
         }
     }
@@ -165,6 +179,14 @@ class NotificationService: NSObject, ObservableObject {
             title: "Bible Study Invitation",
             body: "\(hostName) invited you to join '\(sessionTitle)'. Invite code: \(inviteCode)",
             identifier: "session-invitation-\(inviteCode)"
+        )
+    }
+
+    func scheduleFriendSessionNotification(hostName: String, sessionTitle: String, sessionId: String) {
+        scheduleNotification(
+            title: "Friend's Live Session",
+            body: "\(hostName) started a live session: \(sessionTitle)",
+            identifier: "friend-session-\(sessionId)"
         )
     }
     
@@ -308,6 +330,30 @@ class NotificationService: NSObject, ObservableObject {
             }
         }
     }
+
+    private static let lastFriendRequestNotificationKey = "lastFriendRequestNotificationTime"
+    private static let friendRequestNotificationThrottleSeconds: TimeInterval = 60
+
+    /// Schedule a local notification for pending friend requests (same mechanism as devotional reminders). Throttled to at most once per 60 seconds.
+    func scheduleFriendRequestReminderIfNeeded(count: Int) {
+        guard isAuthorized, count > 0 else { return }
+        let now = Date()
+        let last = UserDefaults.standard.object(forKey: Self.lastFriendRequestNotificationKey) as? Date ?? .distantPast
+        guard now.timeIntervalSince(last) >= Self.friendRequestNotificationThrottleSeconds else { return }
+        UserDefaults.standard.set(now, forKey: Self.lastFriendRequestNotificationKey)
+
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["friend-request-reminder"])
+        let content = UNMutableNotificationContent()
+        content.title = "Friend request"
+        content.body = count == 1 ? "You have 1 new friend request" : "You have \(count) new friend requests"
+        content.sound = .default
+        content.userInfo = ["type": "friend_request"]
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(identifier: "friend-request-reminder", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error { print("Error scheduling friend request reminder: \(error)") }
+        }
+    }
 }
 
 extension NotificationService: UNUserNotificationCenterDelegate {
@@ -327,26 +373,32 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         } else {
             // Show badge for one-time notifications
             completionHandler([.banner, .sound, .badge])
+            // Update dock badge on macOS so app icon shows count when installed
+            Task { @MainActor in
+                self.updateBadgeCount()
+            }
         }
     }
     
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        // Handle notification tap
+        // Handle notification tap (local and remote)
         let identifier = response.notification.request.identifier
-        
+        let userInfo = response.notification.request.content.userInfo
+        let type = userInfo["type"] as? String
+
         Task { @MainActor in
             // Clear badge when user taps on notification
             self.clearBadge()
-            
-            if identifier.contains("session-invitation") {
-                // Navigate to invitations
+
+            if type == "friend_request" {
+                NotificationCenter.default.post(name: NSNotification.Name("NavigateToFaithFriends"), object: nil)
+            } else if identifier.contains("session-invitation") {
                 NotificationCenter.default.post(name: NSNotification.Name("NavigateToInvitations"), object: nil)
-            } else if identifier.contains("message") {
-                // Navigate to live sessions
+            } else if identifier.contains("message") || identifier.contains("friend-session") {
                 NotificationCenter.default.post(name: NSNotification.Name("NavigateToLiveSessions"), object: nil)
             }
         }
-        
+
         completionHandler()
     }
 }

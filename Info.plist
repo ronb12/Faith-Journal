@@ -50,6 +50,8 @@
     </array>
     <key>NSMicrophoneUsageDescription</key>
     <string>Faith Journal needs access to your microphone to record audio prayers and reflections.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Faith Journal uses speech recognition so you can dictate your journal entries by voice.</string>
     <key>NSCameraUsageDescription</key>
     <string>Faith Journal needs access to your camera to add photos to your journal entries.</string>
     <key>NSPhotoLibraryUsageDescription</key>

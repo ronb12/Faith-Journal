@@ -1,8 +1,13 @@
 import SwiftUI
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct LandingView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Binding var hasLoggedIn: Bool
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showLogin = false
@@ -11,22 +16,18 @@ struct LandingView: View {
         _hasLoggedIn = hasLoggedIn
     }
     
-    private var screenBounds: CGRect {
-        UIScreen.main.bounds
-    }
-    
     var body: some View {
         ZStack {
-            // Base purple background - ensures no black shows through
-            Color.purple.opacity(0.8)
+            // Base theme background - ensures no black shows through
+            themeManager.colors.primary.opacity(0.8)
                 .ignoresSafeArea(.all)
             
             // Gradient Background - fills entire screen
             LinearGradient(
                 colors: [
-                    Color.purple.opacity(0.8),
-                    Color.blue.opacity(0.9),
-                    Color.purple.opacity(0.7)
+                    themeManager.colors.primary.opacity(0.8),
+                    themeManager.colors.secondary.opacity(0.9),
+                    themeManager.colors.primary.opacity(0.7)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -107,7 +108,7 @@ struct LandingView: View {
                                 Image(systemName: "arrow.right")
                                     .font(.headline)
                             }
-                            .foregroundColor(.purple)
+                            .foregroundColor(themeManager.colors.primary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
@@ -116,12 +117,14 @@ struct LandingView: View {
                                     .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
                             )
                         }
+                        .accessibilityLabel("Get Started")
+                        .accessibilityHint("Open sign in with Apple, Email, or Demo")
                         .padding(.horizontal, 24)
                         
-                        // Demo Button - Only show in simulator or for testing
-                        #if targetEnvironment(simulator)
+                        // Demo Button - Show in simulator and on macOS (Sign in with Apple may need extra setup on Mac)
+                        #if targetEnvironment(simulator) || os(macOS)
                         Button(action: {
-                            print("🔄 [LANDING] Try Demo button tapped (Simulator)")
+                            print("🔄 [LANDING] Try Demo button tapped")
                             // Skip login and onboarding for demo (simulator only)
                             // Update both AppStorage values immediately
                             UserDefaults.standard.set(true, forKey: "hasLoggedIn")
@@ -142,18 +145,17 @@ struct LandingView: View {
                                     .font(.headline)
                                     .font(.body.weight(.semibold))
                             }
-                            .foregroundColor(.white)
+                            .foregroundColor(themeManager.colors.primary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.white.opacity(0.8), lineWidth: 2)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .fill(Color.white.opacity(0.1))
-                                    )
+                                    .fill(Color.white)
+                                    .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
                             )
                         }
+                        .accessibilityLabel("Try Demo")
+                        .accessibilityHint("Skip sign in and use the app as a demo user")
                         .padding(.horizontal, 24)
                         #endif
                     }
@@ -166,14 +168,23 @@ struct LandingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea(.all, edges: .all)
+        #if os(iOS)
         .statusBar(hidden: false)
+        #endif
         .preferredColorScheme(.dark)
+        #if os(iOS)
         .fullScreenCover(isPresented: $showLogin) {
             LoginView(hasLoggedIn: $hasLoggedIn)
                 .onAppear {
                     print("🔄 [LANDING] LoginView appeared via fullScreenCover")
                 }
         }
+        #else
+        .sheet(isPresented: $showLogin) {
+            LoginView(hasLoggedIn: $hasLoggedIn)
+                .macOSSheetFrameForm()
+        }
+        #endif
         .onChange(of: showLogin) { oldValue, newValue in
             print("🔄 [LANDING] showLogin changed from \(oldValue) to \(newValue)")
         }
@@ -203,15 +214,29 @@ struct FeatureRow: View {
 }
 
 struct AppIconView: View {
+    #if os(iOS)
     @State private var appIcon: UIImage?
+    #else
+    @State private var appIcon: NSImage?
+    #endif
+    
+    private func appIconImage(_ icon: PlatformImage) -> some View {
+        let img: Image
+        #if os(iOS)
+        img = Image(uiImage: icon)
+        #else
+        img = Image(nsImage: icon)
+        #endif
+        return img
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 26))
+    }
     
     var body: some View {
         Group {
             if let icon = appIcon {
-                Image(uiImage: icon)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 26))
+                appIconImage(icon)
             } else {
                 // Fallback to system icon if app icon not found
                 Image(systemName: "book.closed.fill")
@@ -230,13 +255,11 @@ struct AppIconView: View {
     }
     
     private func loadAppIcon() {
-        // Try multiple methods to get the app icon
+        #if os(iOS)
         if let icon = UIImage(named: "AppIcon") {
             appIcon = icon
             return
         }
-        
-        // Try to get from bundle icons
         if let iconsDictionary = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
            let primaryIconsDictionary = iconsDictionary["CFBundlePrimaryIcon"] as? [String: Any],
            let iconFiles = primaryIconsDictionary["CFBundleIconFiles"] as? [String] {
@@ -247,21 +270,32 @@ struct AppIconView: View {
                 }
             }
         }
-        
-        // Try common app icon names
-        let commonNames = ["AppIcon-1024x1024", "AppIcon-60x60@3x", "iPhone_120x120", "AppIcon"]
-        for name in commonNames {
+        for name in ["AppIcon-1024x1024", "AppIcon-60x60@3x", "iPhone_120x120", "AppIcon"] {
             if let icon = UIImage(named: name) {
                 appIcon = icon
                 return
             }
         }
-        
-        // Last resort: try to get from assets
         if let path = Bundle.main.path(forResource: "AppIcon", ofType: "png", inDirectory: nil),
            let icon = UIImage(contentsOfFile: path) {
             appIcon = icon
         }
+        #else
+        if let icon = NSImage(named: "AppIcon") {
+            appIcon = icon
+            return
+        }
+        for name in ["AppIcon-1024x1024", "AppIcon"] {
+            if let icon = NSImage(named: name) {
+                appIcon = icon
+                return
+            }
+        }
+        if let path = Bundle.main.path(forResource: "AppIcon", ofType: "png", inDirectory: nil),
+           let icon = NSImage(contentsOfFile: path) {
+            appIcon = icon
+        }
+        #endif
     }
 }
 
@@ -271,7 +305,7 @@ struct FaithJournalLogo: View {
     }
 }
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 #Preview {
     LandingView()
 }

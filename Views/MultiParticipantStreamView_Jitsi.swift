@@ -131,7 +131,9 @@ struct MultiParticipantStreamView_Jitsi: View {
                 .background(Color.black.opacity(0.8))
             }
         }
+        #if os(iOS)
         .navigationBarHidden(true)
+        #endif
         .alert("Error", isPresented: $showingError) {
             Button("OK") { }
         } message: {
@@ -152,7 +154,7 @@ struct MultiParticipantStreamView_Jitsi: View {
         Task {
             do {
                 let userId = userService.userIdentifier
-                let userName = userService.displayName
+                let userName = userService.getProfileDisplayName(userProfile: nil)
                 
                 // Generate room name from session ID
                 let roomName = "faith-journal-\(session.id.uuidString)"

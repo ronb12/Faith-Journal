@@ -10,7 +10,15 @@ final class MoodEntry {
     var intensity: Int = 5
     var notes: String?
     var date: Date = Date()
-    var tags: [String] = []
+    private var tagsJSON: String = "[]"
+    var tags: [String] {
+        get {
+            guard let data = tagsJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set { tagsJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]" }
+    }
     var createdAt: Date = Date()
     
     // Enhanced properties
@@ -22,13 +30,37 @@ final class MoodEntry {
     var weather: String? // Weather condition
     var temperature: Double? // Temperature in Fahrenheit
     var timeOfDay: String = "" // Morning, Afternoon, Evening, Night
-    var activities: [String] = [] // Activities done (prayer, reading, meditation, etc.)
+    private var activitiesJSON: String = "[]"
+    var activities: [String] {
+        get {
+            guard let data = activitiesJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set { activitiesJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]" }
+    }
     var energyLevel: Int = 5 // 1-10
     var sleepQuality: Int? // 1-10, optional
     var linkedJournalEntryId: UUID? // Link to JournalEntry
-    var linkedPrayerRequestIds: [UUID] = [] // Link to PrayerRequests
+    private var linkedPrayerRequestIdsJSON: String = "[]"
+    var linkedPrayerRequestIds: [UUID] {
+        get {
+            guard let data = linkedPrayerRequestIdsJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([UUID].self, from: data) else { return [] }
+            return decoded
+        }
+        set { linkedPrayerRequestIdsJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]" }
+    }
     var linkedReadingPlanId: UUID? // Link to ReadingPlan
-    var triggers: [String] = [] // What triggered this mood
+    private var triggersJSON: String = "[]"
+    var triggers: [String] {
+        get {
+            guard let data = triggersJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set { triggersJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]" }
+    }
     var photoURL: URL? // Optional photo
     var voiceNoteURL: URL? // Optional voice note
     
@@ -38,11 +70,11 @@ final class MoodEntry {
         self.intensity = max(1, min(10, intensity))
         self.notes = notes
         self.date = Date()
-        self.tags = tags
+        self.tagsJSON = (try? JSONEncoder().encode(tags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         self.createdAt = Date()
         self.moodCategory = moodCategory
         self.emoji = emoji
-        self.activities = activities
+        self.activitiesJSON = (try? JSONEncoder().encode(activities)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         self.energyLevel = max(1, min(10, energyLevel))
         
         // Set time of day

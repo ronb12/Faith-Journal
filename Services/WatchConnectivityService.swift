@@ -6,8 +6,9 @@
 //
 
 import Foundation
-import WatchConnectivity
 import SwiftData
+#if os(iOS)
+import WatchConnectivity
 
 @available(iOS 17.0, *)
 @MainActor
@@ -320,4 +321,18 @@ extension WatchConnectivityService: WCSessionDelegate {
         }
     }
 }
+#else
+/// Stub for macOS - Watch Connectivity not available
+@available(macOS 14.0, *)
+@MainActor
+class WatchConnectivityService: ObservableObject {
+    static let shared = WatchConnectivityService()
+    @Published var isReachable = false
+    @Published var isPaired = false
+    @Published var isWatchAppInstalled = false
+    func configure(modelContext: ModelContext) {}
+    func sendJournalEntry(_ entry: JournalEntry) {}
+    func sendPrayerRequest(_ request: PrayerRequest) {}
+}
+#endif
 

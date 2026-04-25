@@ -218,7 +218,7 @@ struct LiveStreamView: View {
         VStack(spacing: 16) {
             // Participant list (if multiple participants)
             if participants.count > 1 {
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 12) {
                                     ForEach(participants) { participant in
                                         VStack(spacing: 4) {

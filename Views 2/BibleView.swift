@@ -563,7 +563,7 @@ struct BibleView: View {
                     .padding(.horizontal)
                 
                 // Search filters
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 8) {
                         ForEach(SearchFilter.allCases, id: \.self) { filter in
                             Button(action: {
@@ -594,7 +594,7 @@ struct BibleView: View {
                             .font(.caption)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(recentSearches.prefix(5), id: \.self) { search in
                                     Button(action: {

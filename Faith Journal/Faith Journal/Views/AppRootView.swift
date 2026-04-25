@@ -26,7 +26,12 @@ struct AppRootView: View {
     
     // For testing: Set to true to bypass login and show ContentView directly
     private let bypassLoginForTesting = false
-    
+
+    /// UI tests pass `--uitesting` so flows can reach the main shell without manual login.
+    private var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitesting")
+    }
+
     // Firebase sync service - use @ObservedObject for shared singleton
     @ObservedObject private var firebaseSync = FirebaseSyncService.shared
     
@@ -43,7 +48,7 @@ struct AppRootView: View {
             
             #if targetEnvironment(simulator)
             // In simulator, allow demo mode to bypass login
-            if bypassLoginForTesting || (hasLoggedIn && hasCompletedOnboarding) {
+            if isUITesting || bypassLoginForTesting || (hasLoggedIn && hasCompletedOnboarding) {
                 ContentView()
                     .environmentObject(appNavigation)
             } else if hasLoggedIn && !hasCompletedOnboarding {
@@ -54,7 +59,7 @@ struct AppRootView: View {
             #else
             // On real devices, always require proper authentication
             // Check if user has properly authenticated (not just demo mode)
-            if bypassLoginForTesting {
+            if isUITesting || bypassLoginForTesting {
                 ContentView()
                     .environmentObject(appNavigation)
             } else if hasLoggedIn && hasCompletedOnboarding {
@@ -262,8 +267,8 @@ struct AppRootView: View {
                 print("🔗 [DEEP LINK] Extracted invite code (no host): \(extractedCode ?? "nil")")
             }
         }
-        // Also handle https://faithjournal.app/invite/CODE format (for universal links)
-        else if url.scheme == "https" && url.host == "faithjournal.app" {
+        // Also handle https://faith-journal.web.app/invite/CODE format (for universal links)
+        else if url.scheme == "https" && url.host == "faith-journal.web.app" {
             let pathComponents = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
             if pathComponents.first == "invite", let code = pathComponents.dropFirst().first {
                 extractedCode = code

@@ -1,5 +1,33 @@
 import Foundation
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
+
+private func _resizeImage(_ image: PlatformImage, maxDimension: CGFloat) -> PlatformImage {
+    #if os(iOS)
+    let size = image.size
+    guard size.width > maxDimension || size.height > maxDimension else { return image }
+    let ratio = min(maxDimension / size.width, maxDimension / size.height)
+    let newSize = CGSize(width: size.width * ratio, height: size.height * ratio)
+    let renderer = UIGraphicsImageRenderer(size: newSize)
+    return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
+    #elseif os(macOS)
+    let size = image.size
+    guard size.width > maxDimension || size.height > maxDimension else { return image }
+    let ratio = min(maxDimension / size.width, maxDimension / size.height)
+    let newSize = NSSize(width: size.width * ratio, height: size.height * ratio)
+    let newImage = NSImage(size: newSize)
+    newImage.lockFocus()
+    NSGraphicsContext.current?.imageInterpolation = .high
+    image.draw(in: NSRect(origin: .zero, size: newSize))
+    newImage.unlockFocus()
+    return newImage
+    #else
+    return image
+    #endif
+}
 
 #if canImport(FirebaseAuth)
 import FirebaseAuth
@@ -46,6 +74,8 @@ class ProfileManager: ObservableObject {
     @Published var profileImageURL: String?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// Bulk live-session tools in Settings require `admin: true` and/or `role` `admin` on the Firebase ID token (set via Admin SDK).
+    @Published private(set) var isFirebaseAppAdmin: Bool = false
     
     private init() {
         Task { @MainActor in
@@ -55,10 +85,24 @@ class ProfileManager: ObservableObject {
     
     // MARK: - Save Profile
     
+    /// Effective user ID: Auth if signed in, or test user on simulator/macOS
+    private var effectiveUserId: String? {
+        #if canImport(FirebaseAuth)
+        if let uid = Auth.auth().currentUser?.uid { return uid }
+        #if targetEnvironment(simulator) || os(macOS)
+        return "simulator-test-user-shared"
+        #else
+        return nil
+        #endif
+        #else
+        return nil
+        #endif
+    }
+    
     /// Save profile name to Firestore
     func saveProfileName(_ name: String) async throws {
         #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
-        guard let userId = Auth.auth().currentUser?.uid else {
+        guard let userId = effectiveUserId else {
             throw ProfileError.notAuthenticated
         }
         guard let db else {
@@ -66,21 +110,59 @@ class ProfileManager: ObservableObject {
         }
         
         let userRef = db.collection("users").document(userId)
-        try await userRef.setData([
+        let email = Auth.auth().currentUser?.email
+        let nameLower = name.lowercased()
+        var userData: [String: Any] = [
             "name": name,
+            "nameLower": nameLower,
             "updatedAt": Timestamp(date: Date())
-        ], merge: true)
+        ]
+        if let email, !email.isEmpty {
+            userData["email"] = email
+            userData["emailLower"] = email.lowercased()
+        }
+        try await userRef.setData(userData, merge: true)
         
         self.userName = name
+        FirebaseSyncService.shared.upsertUserSearchProfile(userId: userId, displayName: name, email: email, avatarURL: profileImageURL)
         #else
         throw ProfileError.notAuthenticated
         #endif
     }
     
+    /// Save image to local storage only; returns relative path. Used by saveProfile for combined write.
+    private func saveProfileImageToLocal(_ image: PlatformImage, userId: String) async throws -> String {
+        let resized = _resizeImage(image, maxDimension: 400)
+        var imageData: Data?
+        var compressionQuality: CGFloat = 0.7
+        for _ in 0..<3 {
+            if let data = platformImageToJPEGData(resized, quality: compressionQuality) {
+                imageData = data
+                break
+            }
+            compressionQuality -= 0.2
+        }
+        guard let imageData else { throw ProfileError.invalidImage }
+        
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            throw ProfileError.unknown
+        }
+        let profilePicturesDir = documentsDirectory.appendingPathComponent("profilePictures")
+        try? FileManager.default.createDirectory(at: profilePicturesDir, withIntermediateDirectories: true, attributes: nil)
+        
+        let imageFileName = "\(userId).jpg"
+        let imageFileURL = profilePicturesDir.appendingPathComponent(imageFileName)
+        if FileManager.default.fileExists(atPath: imageFileURL.path) {
+            try? FileManager.default.removeItem(at: imageFileURL)
+        }
+        try imageData.write(to: imageFileURL, options: [.atomic])
+        return "profilePictures/\(imageFileName)"
+    }
+    
     /// Save profile picture to local storage and update Firestore
-    func saveProfilePicture(_ image: UIImage) async throws {
+    func saveProfilePicture(_ image: PlatformImage) async throws {
         #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
-        guard let userId = Auth.auth().currentUser?.uid else {
+        guard let userId = effectiveUserId else {
             print("❌ [ProfileManager] User not authenticated")
             throw ProfileError.notAuthenticated
         }
@@ -88,18 +170,16 @@ class ProfileManager: ObservableObject {
             throw ProfileError.firebaseNotConfigured
         }
         
-        print("🔄 [ProfileManager] Starting profile picture save for user: \(userId)")
-        print("📸 [ProfileManager] Image size: \(image.size.width)x\(image.size.height)")
-        print("📸 [ProfileManager] Image scale: \(image.scale)")
+        // Resize large images for faster save (profile pics don't need full resolution)
+        let resized = _resizeImage(image, maxDimension: 400)
         
-        // Convert image to JPEG data - try multiple compression qualities if needed
+        // Convert to JPEG - use 0.7 for smaller file, faster write
         var imageData: Data?
-        var compressionQuality: CGFloat = 0.8
+        var compressionQuality: CGFloat = 0.7
         var attempts = 0
         let maxAttempts = 3
-        
         while attempts < maxAttempts {
-            if let data = image.jpegData(compressionQuality: compressionQuality) {
+            if let data = platformImageToJPEGData(resized, quality: compressionQuality) {
                 imageData = data
                 print("✅ [ProfileManager] Image converted to JPEG data: \(data.count) bytes (quality: \(compressionQuality))")
                 break
@@ -210,6 +290,94 @@ class ProfileManager: ObservableObject {
         #endif
     }
     
+    /// Save live session thumbnail to local storage the same way profile pictures are saved: resize, JPEG with quality fallback, atomic write, verify.
+    /// Returns full file URL string or nil. Use before dismiss so thumbnail survives app restart; then upload to Firebase in background.
+    func saveLiveSessionThumbnailToLocalSync(sessionId: UUID, image: PlatformImage) -> String? {
+        // Same as profile picture: resize for thumbnails (max 400)
+        let resized = _resizeImage(image, maxDimension: 400)
+        // Same JPEG conversion as saveProfilePicture: start 0.7, retry with lower quality
+        var imageData: Data?
+        var compressionQuality: CGFloat = 0.7
+        for _ in 0..<3 {
+            if let data = platformImageToJPEGData(resized, quality: compressionQuality) {
+                imageData = data
+                break
+            }
+            compressionQuality -= 0.2
+        }
+        guard let imageData else {
+            print("⚠️ [ProfileManager] Live session thumbnail JPEG conversion failed")
+            return nil
+        }
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            print("⚠️ [ProfileManager] No documents directory for live session thumbnail")
+            return nil
+        }
+        let dirName = "liveSessionThumbnails"
+        let dir = documentsDirectory.appendingPathComponent(dirName)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+            let fileName = "\(sessionId.uuidString).jpg"
+            let fileURL = dir.appendingPathComponent(fileName)
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+            try imageData.write(to: fileURL, options: [.atomic])
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                print("✅ [ProfileManager] Live session thumbnail saved (same as profile picture flow): \(fileURL.path)")
+                return fileURL.absoluteString
+            }
+            print("⚠️ [ProfileManager] Live session thumbnail file not found after write")
+            return nil
+        } catch {
+            print("⚠️ [ProfileManager] Live session thumbnail sync save failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Save live session thumbnail to local storage (same flow as profile picture: resize, JPEG, write to Documents).
+    /// Returns full file URL string for display. Does not touch Firestore.
+    func saveLiveSessionThumbnailToLocal(sessionId: UUID, image: PlatformImage) async throws -> String {
+        // Resize for thumbnails (same as profile: max 400)
+        let resized = _resizeImage(image, maxDimension: 400)
+        
+        var imageData: Data?
+        var compressionQuality: CGFloat = 0.7
+        var attempts = 0
+        let maxAttempts = 3
+        while attempts < maxAttempts {
+            if let data = platformImageToJPEGData(resized, quality: compressionQuality) {
+                imageData = data
+                print("✅ [ProfileManager] Live session thumbnail JPEG: \(data.count) bytes (quality: \(compressionQuality))")
+                break
+            }
+            attempts += 1
+            compressionQuality -= 0.2
+        }
+        guard attempts < maxAttempts, let imageData else {
+            print("❌ [ProfileManager] Failed to convert thumbnail to JPEG")
+            throw ProfileError.invalidImage
+        }
+        
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            throw ProfileError.unknown
+        }
+        
+        let dirName = "liveSessionThumbnails"
+        let dir = documentsDirectory.appendingPathComponent(dirName)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        
+        let fileName = "\(sessionId.uuidString).jpg"
+        let fileURL = dir.appendingPathComponent(fileName)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+        try imageData.write(to: fileURL, options: [.atomic])
+        
+        print("✅ [ProfileManager] Live session thumbnail saved: \(fileURL.path)")
+        return fileURL.absoluteString
+    }
+    
     /// Remove profile picture
     @MainActor
     func removeProfilePicture() async throws {
@@ -263,36 +431,87 @@ class ProfileManager: ObservableObject {
         #endif
     }
     
-    /// Save both name and picture
-    func saveProfile(name: String?, image: UIImage?) async throws {
-        print("🔄 [ProfileManager] saveProfile called - name: \(name ?? "nil"), image: \(image != nil ? "present" : "nil")")
-        
+    /// Save both name and picture. Optimized: single Firestore write when both change.
+    func saveProfile(name: String?, image: PlatformImage?) async throws {
+        print("🔄 [ProfileManager] saveProfile START")
         await MainActor.run {
             self.isLoading = true
             self.errorMessage = nil
         }
-        
         defer {
             Task { @MainActor in
                 self.isLoading = false
             }
         }
-        
+
         do {
-            if let name = name, !name.isEmpty {
-                print("💾 [ProfileManager] Saving profile name...")
-                try await saveProfileName(name)
+            let nameToSave = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let hasName = (nameToSave?.isEmpty == false)
+            let hasImage = image != nil
+            print("🔄 [ProfileManager] hasName=\(hasName) hasImage=\(hasImage)")
+
+            #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
+            guard let userId = effectiveUserId, let db else {
+                print("❌ [ProfileManager] Abort: no userId or db (effectiveUserId=\(String(describing: effectiveUserId)) db=\(db != nil))")
+                throw ProfileError.notAuthenticated
+            }
+            print("🔄 [ProfileManager] userId=\(userId), writing to Firestore...")
+            let userRef = db.collection("users").document(userId)
+            let email = Auth.auth().currentUser?.email
+            
+            // Build combined Firestore data - single write is faster than two
+            var userData: [String: Any] = ["updatedAt": Timestamp(date: Date())]
+            if hasName, let n = nameToSave {
+                userData["name"] = n
+                userData["nameLower"] = n.lowercased()
+                self.userName = n
+                if let e = email, !e.isEmpty {
+                    userData["email"] = e
+                    userData["emailLower"] = e.lowercased()
+                }
             }
             
-            if let image = image {
-                print("📸 [ProfileManager] Saving profile picture...")
-                try await saveProfilePicture(image)
-            } else {
-                // Check if user wants to remove existing image
-                // If profileImageURL exists but no new image provided, we keep the existing one
-                // Only remove if explicitly requested (handled in ProfileEditView)
-                print("ℹ️ [ProfileManager] No image provided, keeping existing image if any")
+            if hasImage, let img = image {
+                print("🔄 [ProfileManager] Saving image to local...")
+                let relativePath = try await saveProfileImageToLocal(img, userId: userId)
+                print("🔄 [ProfileManager] Image saved locally: \(relativePath)")
+                userData["profileImageURL"] = relativePath
+                userData["profileImageStorageType"] = "local"
+                if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                    let fullURL = docs.appendingPathComponent(relativePath).absoluteString
+                    await MainActor.run { self.profileImageURL = fullURL }
+                }
             }
+            
+            print("🔄 [ProfileManager] Firestore setData START...")
+            do {
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    group.addTask {
+                        try await userRef.setData(userData, merge: true)
+                    }
+                    group.addTask {
+                        try await Task.sleep(nanoseconds: 10_000_000_000)  // 10s timeout
+                        throw NSError(domain: "ProfileManager", code: -2, userInfo: [NSLocalizedDescriptionKey: "Network timeout"])
+                    }
+                    _ = try await group.next()!
+                    group.cancelAll()
+                }
+                print("🔄 [ProfileManager] Firestore setData DONE")
+            } catch let err as NSError where err.domain == "ProfileManager" && err.code == -2 {
+                // Firestore timed out - profile is saved locally, sync will retry when online
+                print("⚠️ [ProfileManager] Firestore timeout - profile saved locally, will sync when online")
+            }
+            if hasName, let n = nameToSave {
+                FirebaseSyncService.shared.upsertUserSearchProfile(userId: userId, displayName: n, email: email, avatarURL: profileImageURL)
+            }
+            #else
+            if hasName, let n = nameToSave {
+                try await saveProfileName(n)
+            }
+            if hasImage, let img = image {
+                try await saveProfilePicture(img)
+            }
+            #endif
         } catch {
             print("❌ [ProfileManager] Error in saveProfile: \(error.localizedDescription)")
             if let nsError = error as NSError? {
@@ -308,6 +527,31 @@ class ProfileManager: ObservableObject {
         print("✅ [ProfileManager] saveProfile completed successfully")
     }
     
+    // MARK: - Firebase admin (custom claims on ID token)
+    
+    @MainActor
+    func refreshFirebaseAppAdminClaim() async {
+        #if canImport(FirebaseAuth)
+        guard let user = Auth.auth().currentUser else {
+            isFirebaseAppAdmin = false
+            return
+        }
+        do {
+            let result = try await user.getIDTokenResult(forcingRefresh: true)
+            let claims = result.claims
+            let fromFlag = (claims["admin"] as? Bool) == true
+            let role = (claims["role"] as? String)?.lowercased()
+            let fromRole = role == "admin" || role == "superadmin"
+            isFirebaseAppAdmin = fromFlag || fromRole
+        } catch {
+            print("⚠️ [ProfileManager] refreshFirebaseAppAdminClaim failed: \(error.localizedDescription)")
+            isFirebaseAppAdmin = false
+        }
+        #else
+        isFirebaseAppAdmin = false
+        #endif
+    }
+    
     // MARK: - Load Profile
     
     /// Load profile from Firestore
@@ -318,6 +562,7 @@ class ProfileManager: ObservableObject {
             print("⚠️ [ProfileManager] User not authenticated, cannot load profile")
             self.userName = ""
             self.profileImageURL = nil
+            await refreshFirebaseAppAdminClaim()
             return
         }
         
@@ -331,6 +576,7 @@ class ProfileManager: ObservableObject {
         
         guard let db else {
             print("⚠️ [ProfileManager] Firebase not configured yet - skipping profile load")
+            await refreshFirebaseAppAdminClaim()
             return
         }
         
@@ -339,6 +585,7 @@ class ProfileManager: ObservableObject {
             
             guard document.exists, let data = document.data() else {
                 print("ℹ️ [ProfileManager] No profile document found for user: \(userId)")
+                await refreshFirebaseAppAdminClaim()
                 return
             }
             
@@ -350,6 +597,14 @@ class ProfileManager: ObservableObject {
                     updated = true
                     print("✅ [ProfileManager] Loaded profile name: \(name)")
                 }
+                var email = data["email"] as? String
+                if (email == nil || email!.isEmpty), let authEmail = Auth.auth().currentUser?.email {
+                    email = authEmail
+                    // Persist email to users/ for Faith Friends search
+                    try? await db.collection("users").document(userId).setData(["email": authEmail], merge: true)
+                }
+                let avatarURL = (data["profileImageURL"] as? String) ?? self.profileImageURL
+                FirebaseSyncService.shared.upsertUserSearchProfile(userId: userId, displayName: name, email: email, avatarURL: avatarURL)
             } else {
                 print("ℹ️ [ProfileManager] No name field in profile document")
             }
@@ -386,15 +641,17 @@ class ProfileManager: ObservableObject {
             print("❌ [ProfileManager] Error loading profile: \(error.localizedDescription)")
             self.errorMessage = error.localizedDescription
         }
+        await refreshFirebaseAppAdminClaim()
         #else
         print("⚠️ [ProfileManager] Firebase not available, cannot load profile")
         self.userName = ""
         self.profileImageURL = nil
+        isFirebaseAppAdmin = false
         #endif
     }
     
     /// Load profile image from URL (supports both local file paths and remote URLs)
-    nonisolated func loadProfileImage(from urlString: String) async throws -> UIImage? {
+    nonisolated func loadProfileImage(from urlString: String) async throws -> PlatformImage? {
         // Check if it's a local file path
         if urlString.hasPrefix("file://") || urlString.hasPrefix("/") {
             // Local file path
@@ -415,14 +672,14 @@ class ProfileManager: ObservableObject {
             guard let data = try? Data(contentsOf: fileURL) else {
                 return nil
             }
-            return UIImage(data: data)
+            return platformImageFromData(data)
         } else {
             // Remote URL (for backward compatibility if needed)
             guard let url = URL(string: urlString) else {
                 return nil
             }
             let (data, _) = try await URLSession.shared.data(from: url)
-            return UIImage(data: data)
+            return platformImageFromData(data)
         }
     }
     

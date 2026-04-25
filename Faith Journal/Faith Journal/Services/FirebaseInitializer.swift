@@ -19,7 +19,7 @@ import FirebaseFirestore
 import FirebaseAuth
 #endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 class FirebaseInitializer {
     static let shared = FirebaseInitializer()
     
@@ -124,6 +124,9 @@ class FirebaseInitializer {
         
         // Configure Firebase App (FirebaseCore already checked at line 35)
         FirebaseApp.configure()
+        
+        // Reduce Firebase console noise (e.g. "10.29.0 - [FirebaseFirestore][I-FST000001] (null)")
+        FirebaseConfiguration.shared.setLoggerLevel(.warning)
         
         // Log Firebase App configuration details
         if let app = FirebaseApp.app() {

@@ -46,6 +46,17 @@ struct PrayerView: View {
         return filtered
     }
     
+    /// Removes duplicate requests with the same title and details (e.g. from templates), keeping the most recent.
+    var displayedRequests: [PrayerRequest] {
+        var seen = Set<String>()
+        return filteredRequests.filter { request in
+            let key = "\(request.title)|\(request.details)"
+            if seen.contains(key) { return false }
+            seen.insert(key)
+            return true
+        }
+    }
+    
     var body: some View {
         if #available(iOS 17.0, *) {
             NavigationStack {
@@ -59,11 +70,11 @@ struct PrayerView: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(10)
                         
                         HStack {
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 8) {
                                     FilterChip(title: "All", isSelected: selectedFilter == .all) {
                                         selectedFilter = .all
@@ -83,9 +94,9 @@ struct PrayerView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.systemBackground))
+                    .background(Color.platformSystemBackground)
                     
-                    if filteredRequests.isEmpty {
+                    if displayedRequests.isEmpty {
                         VStack(spacing: 20) {
                             Image(systemName: "hands.sparkles")
                                 .font(.system(size: 60))
@@ -115,11 +126,11 @@ struct PrayerView: View {
                             }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(.systemGroupedBackground))
+                        .background(Color.platformSystemGroupedBackground)
                     } else {
                         // Prayer Requests List
                         List {
-                            ForEach(filteredRequests) { request in
+                            ForEach(displayedRequests) { request in
                                 NavigationLink(destination: PrayerRequestDetailView(request: request)) {
                                     PrayerRequestRow(request: request)
                                 }
@@ -131,7 +142,7 @@ struct PrayerView: View {
                 }
                 .navigationTitle("Prayer Requests")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         Button(action: { showingNewRequest = true }) {
                             Image(systemName: "plus")
                         }
@@ -139,6 +150,7 @@ struct PrayerView: View {
                 }
                 .sheet(isPresented: $showingNewRequest) {
                     NewPrayerRequestView()
+                        .macOSSheetFrameForm()
                 }
             }
             .onAppear {
@@ -155,8 +167,8 @@ struct PrayerView: View {
     private func deleteRequest(at offsets: IndexSet) {
         var requestsToDelete: [PrayerRequest] = []
         for index in offsets {
-            guard index < filteredRequests.count else { continue }
-            let request = filteredRequests[index]
+            guard index < displayedRequests.count else { continue }
+            let request = displayedRequests[index]
             requestsToDelete.append(request)
             modelContext.delete(request)
         }
@@ -228,7 +240,7 @@ struct PrayerRequestRow: View {
     var statusColor: Color {
         switch request.status {
         case .active:
-            return .blue
+            return themeManager.colors.secondary
         case .answered:
             return .green
         case .archived:
@@ -281,7 +293,7 @@ struct PrayerRequestRow: View {
             }
             
             if !request.tags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 4) {
                         ForEach(request.tags.prefix(3), id: \.self) { tag in
                             Text(tag)
@@ -357,6 +369,7 @@ enum RecurringPrayer: String, CaseIterable {
 
 @available(iOS 17.0, *)
 struct NewPrayerRequestView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
@@ -395,9 +408,17 @@ struct NewPrayerRequestView: View {
     @State private var linkedJournalEntryId: UUID?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoURL: URL?
-    @State private var photoImage: UIImage?
+    @State private var photoImage: PlatformImage?
     @State private var recurringPrayer: RecurringPrayer = .none
     
+    // Sharing
+    @State private var isSharedWithFriends = false
+
+    // Fasting
+    @State private var isFasting = false
+    @State private var fastingStartDate = Date()
+    @State private var fastingEndDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+
     // Prayer templates
     @State private var showingTemplatePicker = false
     @State private var selectedTemplate: PrayerTemplate?
@@ -407,6 +428,7 @@ struct NewPrayerRequestView: View {
     @State private var errorMessage = ""
     @State private var isSaving = false
     @State private var showingSaveSuccess = false
+    @State private var showingDiscardConfirmation = false
     @State private var showingBibleVersePicker = false
     @State private var showingJournalEntryPicker = false
     @State private var isTranscribing = false
@@ -425,16 +447,18 @@ struct NewPrayerRequestView: View {
     @State private var hasUnsavedChanges = false
     
     // Categories with icons and colors
-    let categories: [PrayerCategory] = [
-        PrayerCategory(name: "Health", icon: "heart.fill", color: .red),
-        PrayerCategory(name: "Family", icon: "person.2.fill", color: .blue),
-        PrayerCategory(name: "Work", icon: "briefcase.fill", color: .orange),
-        PrayerCategory(name: "Relationships", icon: "heart.circle.fill", color: .pink),
-        PrayerCategory(name: "Spiritual Growth", icon: "book.fill", color: .purple),
-        PrayerCategory(name: "Financial", icon: "dollarsign.circle.fill", color: .green),
-        PrayerCategory(name: "Emotional", icon: "brain.head.profile", color: .indigo),
-        PrayerCategory(name: "Other", icon: "ellipsis.circle.fill", color: .gray)
-    ]
+    var categories: [PrayerCategory] {
+        [
+            PrayerCategory(name: "Health", icon: "heart.fill", color: .red),
+            PrayerCategory(name: "Family", icon: "person.2.fill", color: themeManager.colors.secondary),
+            PrayerCategory(name: "Work", icon: "briefcase.fill", color: .orange),
+            PrayerCategory(name: "Relationships", icon: "heart.circle.fill", color: .pink),
+            PrayerCategory(name: "Spiritual Growth", icon: "book.fill", color: themeManager.colors.primary),
+            PrayerCategory(name: "Financial", icon: "dollarsign.circle.fill", color: .green),
+            PrayerCategory(name: "Emotional", icon: "brain.head.profile", color: .indigo),
+            PrayerCategory(name: "Other", icon: "ellipsis.circle.fill", color: .gray)
+        ]
+    }
     
     enum DateSelectionMode {
         case today, yesterday, custom
@@ -481,18 +505,21 @@ struct NewPrayerRequestView: View {
                 backgroundView
                 scrollContentView
             }
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .navigationTitle(requestToEdit == nil ? "New Prayer Request" : "Edit Prayer Request")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     Button("Cancel") {
                         if hasUnsavedChanges {
-                            // Could show confirmation dialog
+                            showingDiscardConfirmation = true
+                        } else {
+                            dismiss()
                         }
-                        dismiss()
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button(action: saveRequest) {
                         if isSaving {
                             ProgressView()
@@ -507,12 +534,15 @@ struct NewPrayerRequestView: View {
         }
         .sheet(isPresented: $showingTemplatePicker) {
             PrayerTemplatePickerView(selectedTemplate: $selectedTemplate)
+                .macOSSheetFrameStandard()
         }
         .sheet(isPresented: $showingBibleVersePicker) {
             BibleVersePickerView(selectedVerse: $relatedBibleVerse)
+                .macOSSheetFrameStandard()
         }
         .sheet(isPresented: $showingJournalEntryPicker) {
             JournalEntryPickerView(selectedEntryId: $linkedJournalEntryId)
+                .macOSSheetFrameStandard()
         }
         .alert("Error", isPresented: $showingErrorAlert) {
             Button("OK") { }
@@ -521,13 +551,21 @@ struct NewPrayerRequestView: View {
         }
         .alert(requestToEdit == nil ? "Prayer Request Saved" : "Prayer Request Updated", isPresented: $showingSaveSuccess) {
             Button("OK") {
-                dismiss()
+                RewardedInterstitialManager.shared.tryShowAd { dismiss() }
             }
         } message: {
             Text(requestToEdit == nil ? "Your prayer request has been saved successfully!" : "Your prayer request has been updated successfully!")
         }
+        .confirmationDialog("Discard Changes?", isPresented: $showingDiscardConfirmation, titleVisibility: .visible) {
+            Button("Discard", role: .destructive) { dismiss() }
+            Button("Keep Editing", role: .cancel) { }
+        } message: {
+            Text("You have unsaved changes. Are you sure you want to discard them?")
+        }
         .onAppear {
+            #if os(iOS)
             setupSpeechRecognizer()
+            #endif
             setupAutoSave()
             loadSuggestedPartners()
             
@@ -566,11 +604,9 @@ struct NewPrayerRequestView: View {
             }
             
             // Auto-save when privacy changes
-            if !title.isEmpty && !description.isEmpty {
+            if let _ = requestToEdit, !title.isEmpty && !description.isEmpty {
                 hasUnsavedChanges = true
-                Task {
-                    await saveRequestImmediately()
-                }
+                Task { await saveRequestImmediately() }
             } else {
                 hasUnsavedChanges = true
                 saveDraft()
@@ -586,15 +622,14 @@ struct NewPrayerRequestView: View {
                                 .foregroundColor(.white)
                                 .font(.title3)
                             Text(toastMessage)
-                                .font(.subheadline)
-                                .font(.body.weight(.medium))
+                                .font(.subheadline.weight(.medium))
                                 .foregroundColor(.white)
                         }
                         .padding(.horizontal, 20)
                         .padding(.vertical, 14)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(isPrivate ? Color.purple : Color.blue)
+                                .fill(isPrivate ? themeManager.colors.primary : themeManager.colors.secondary)
                                 .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
                         )
                         .padding(.horizontal, 20)
@@ -611,7 +646,7 @@ struct NewPrayerRequestView: View {
     // MARK: - View Components
     
     private var backgroundView: some View {
-        Color(.systemGroupedBackground)
+        Color.platformSystemGroupedBackground
             .ignoresSafeArea()
     }
     
@@ -643,9 +678,9 @@ struct NewPrayerRequestView: View {
     private var gradientHeader: some View {
         LinearGradient(
             colors: [
-                Color.purple.opacity(0.8),
-                Color.blue.opacity(0.9),
-                Color.purple.opacity(0.7)
+                themeManager.colors.primary.opacity(0.8),
+                themeManager.colors.secondary.opacity(0.9),
+                themeManager.colors.primary.opacity(0.7)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -658,9 +693,8 @@ struct NewPrayerRequestView: View {
                     Image(systemName: "hands.sparkles.fill")
                         .font(.system(size: 32))
                         .foregroundColor(.white)
-                    Text("New Prayer Request")
-                        .font(.title2)
-                        .font(.body.weight(.bold))
+                    Text(requestToEdit == nil ? "New Prayer Request" : "Edit Prayer Request")
+                        .font(.title2.weight(.bold))
                         .foregroundColor(.white)
                     Spacer()
                 }
@@ -679,12 +713,11 @@ struct NewPrayerRequestView: View {
                         Image(systemName: "doc.text.fill")
                             .foregroundColor(.yellow)
                         Text("Use Template")
-                            .font(.subheadline)
-                            .font(.body.weight(.medium))
+                            .font(.subheadline.weight(.medium))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
                 }
                 
@@ -712,14 +745,14 @@ struct NewPrayerRequestView: View {
                 } label: {
                     HStack {
                         Image(systemName: "calendar")
-                            .foregroundColor(.blue)
+                            .foregroundColor(themeManager.colors.secondary)
                         Text(dateSelectionMode == .today ? "Today" : dateSelectionMode == .yesterday ? "Yesterday" : "Custom")
                             .font(.subheadline)
                             .font(.body.weight(.medium))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
                 }
             }
@@ -728,7 +761,7 @@ struct NewPrayerRequestView: View {
                     DatePicker("Request Date", selection: $requestDate, displayedComponents: .date)
                     .datePickerStyle(.compact)
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
             }
         }
@@ -739,7 +772,7 @@ struct NewPrayerRequestView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "text.bubble.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Prayer Title")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -747,11 +780,11 @@ struct NewPrayerRequestView: View {
             TextField("What would you like to pray for?", text: $title)
                 .textFieldStyle(.plain)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -760,12 +793,13 @@ struct NewPrayerRequestView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "text.alignleft")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Description")
                     .font(.headline)
                     .foregroundColor(.primary)
                 Spacer()
-                // Voice-to-Text Button
+                #if os(iOS)
+                // Voice-to-Text Button (iOS only - SFSpeechRecognizer not fully supported on macOS)
                 Button(action: startVoiceToText) {
                     HStack(spacing: 4) {
                         Image(systemName: isTranscribing ? "waveform" : "mic.fill")
@@ -776,9 +810,10 @@ struct NewPrayerRequestView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(isTranscribing ? Color.red : Color.blue)
+                    .background(isTranscribing ? Color.red : themeManager.colors.secondary)
                     .cornerRadius(8)
                 }
+                #endif
             }
             
             ZStack(alignment: .topLeading) {
@@ -793,7 +828,7 @@ struct NewPrayerRequestView: View {
                     .scrollContentBackground(.hidden)
             }
             .padding(8)
-            .background(Color(.systemGray6))
+            .background(Color.platformSystemGray6)
             .cornerRadius(12)
             
             // Character count
@@ -805,7 +840,7 @@ struct NewPrayerRequestView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -814,14 +849,24 @@ struct NewPrayerRequestView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "folder.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Category")
                     .font(.headline)
                     .foregroundColor(.primary)
             }
             
-            // Visual Category Picker
-            ScrollView(.horizontal, showsIndicators: false) {
+            #if os(macOS)
+            // Dropdown on macOS — horizontal scroll unreliable
+            Picker("Category", selection: $selectedCategory) {
+                ForEach(categories) { category in
+                    Label(category.name, systemImage: category.icon)
+                        .tag(category.name)
+                }
+            }
+            .pickerStyle(.menu)
+            #else
+            // Visual Category Picker on iOS
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(categories) { category in
                         Button(action: {
@@ -831,12 +876,11 @@ struct NewPrayerRequestView: View {
                                 Image(systemName: category.icon)
                                     .font(.title2)
                                 Text(category.name)
-                                    .font(.caption)
-                                    .font(.body.weight(.medium))
+                                    .font(.caption.weight(.medium))
                             }
                             .foregroundColor(selectedCategory == category.name ? .white : .primary)
                             .frame(width: 80, height: 80)
-                            .background(selectedCategory == category.name ? category.color : Color(.systemGray6))
+                            .background(selectedCategory == category.name ? category.color : Color.platformSystemGray6)
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -847,9 +891,10 @@ struct NewPrayerRequestView: View {
                 }
                 .padding(.horizontal, 4)
             }
+            #endif
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -858,13 +903,23 @@ struct NewPrayerRequestView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Priority")
                     .font(.headline)
                     .foregroundColor(.primary)
             }
             
-            // Priority Picker
+            #if os(macOS)
+            // Dropdown on macOS — horizontal scroll unreliable
+            Picker("Priority", selection: $priority) {
+                ForEach(PrayerPriority.allCases, id: \.self) { priorityLevel in
+                    Label(priorityLevel.rawValue, systemImage: priorityLevel.icon)
+                        .tag(priorityLevel)
+                }
+            }
+            .pickerStyle(.menu)
+            #else
+            // Priority Picker on iOS
             HStack(spacing: 12) {
                 ForEach(PrayerPriority.allCases, id: \.self) { priorityLevel in
                     Button(action: {
@@ -874,20 +929,20 @@ struct NewPrayerRequestView: View {
                             Image(systemName: priorityLevel.icon)
                                 .font(.title3)
                             Text(priorityLevel.rawValue)
-                                .font(.caption)
-                                .font(.body.weight(.medium))
+                                .font(.caption.weight(.medium))
                         }
                         .foregroundColor(priority == priorityLevel ? .white : .primary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(priority == priorityLevel ? priorityLevel.color : Color(.systemGray6))
+                        .background(priority == priorityLevel ? priorityLevel.color : Color.platformSystemGray6)
                         .cornerRadius(12)
                     }
                 }
             }
+            #endif
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -896,7 +951,7 @@ struct NewPrayerRequestView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "tag.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Tags")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -904,7 +959,7 @@ struct NewPrayerRequestView: View {
             
             // Tag Chips
             if !requestTags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 8) {
                         ForEach(requestTags, id: \.self) { tag in
                             HStack(spacing: 6) {
@@ -920,7 +975,7 @@ struct NewPrayerRequestView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
-                            .background(Color.purple)
+                            .background(themeManager.colors.primary)
                             .cornerRadius(16)
                         }
                     }
@@ -936,17 +991,36 @@ struct NewPrayerRequestView: View {
                     }
                 Button(action: addTag) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                         .font(.title3)
                 }
                 .disabled(newTagText.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformSystemGray6)
             .cornerRadius(12)
             
-            // Quick Tag Buttons - Scrollable
-            ScrollView(.horizontal, showsIndicators: false) {
+            // Quick Tag Buttons
+            #if os(macOS)
+            // Dropdown on macOS — add tag from preset list
+            HStack {
+                Text("Quick add:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Menu {
+                    ForEach(prayerQuickTags, id: \.self) { quickTag in
+                        Button(quickTag) {
+                            if !requestTags.contains(quickTag) {
+                                requestTags.append(quickTag)
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Add tag", systemImage: "plus.circle")
+                }
+            }
+            #else
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 8) {
                     ForEach(prayerQuickTags, id: \.self) { quickTag in
                         Button(action: {
@@ -955,25 +1029,25 @@ struct NewPrayerRequestView: View {
                             }
                         }) {
                             Text(quickTag)
-                                .font(.caption)
-                                .font(.body.weight(.medium))
+                                .font(.caption.weight(.medium))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
-                                .background(requestTags.contains(quickTag) ? Color.purple.opacity(0.3) : Color(.systemGray5))
-                                .foregroundColor(requestTags.contains(quickTag) ? .purple : .primary)
+                                .background(requestTags.contains(quickTag) ? themeManager.colors.primary.opacity(0.3) : Color.platformSystemGray5)
+                                .foregroundColor(requestTags.contains(quickTag) ? themeManager.colors.primary : .primary)
                                 .cornerRadius(12)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(requestTags.contains(quickTag) ? Color.purple : Color.clear, lineWidth: 1.5)
+                                        .stroke(requestTags.contains(quickTag) ? themeManager.colors.primary : Color.clear, lineWidth: 1.5)
                                 )
                         }
                     }
                 }
                 .padding(.horizontal, 4)
             }
+            #endif
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -982,7 +1056,7 @@ struct NewPrayerRequestView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "bell.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Prayer Reminders")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -999,8 +1073,7 @@ struct NewPrayerRequestView: View {
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Prayer Reminder Time")
-                            .font(.subheadline)
-                            .font(.body.weight(.medium))
+                            .font(.subheadline.weight(.medium))
                             .foregroundColor(.primary)
                         DatePicker("", selection: $reminderTime, displayedComponents: .hourAndMinute)
                             .datePickerStyle(.compact)
@@ -1008,8 +1081,7 @@ struct NewPrayerRequestView: View {
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Prayer Reminder Frequency")
-                            .font(.subheadline)
-                            .font(.body.weight(.medium))
+                            .font(.subheadline.weight(.medium))
                             .foregroundColor(.primary)
                         Picker("Prayer Reminder Frequency", selection: $reminderFrequency) {
                             ForEach(ReminderFrequency.allCases, id: \.self) { frequency in
@@ -1020,12 +1092,12 @@ struct NewPrayerRequestView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -1034,7 +1106,7 @@ struct NewPrayerRequestView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "plus.circle.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Additional Features")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -1044,7 +1116,7 @@ struct NewPrayerRequestView: View {
             Button(action: { showingBibleVersePicker = true }) {
                 HStack {
                     Image(systemName: "book.fill")
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                     Text(relatedBibleVerse.isEmpty ? "Add Bible Verse" : relatedBibleVerse)
                         .foregroundColor(relatedBibleVerse.isEmpty ? .secondary : .primary)
                     Spacer()
@@ -1054,7 +1126,7 @@ struct NewPrayerRequestView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
             }
             
@@ -1062,7 +1134,7 @@ struct NewPrayerRequestView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "person.2.fill")
-                        .foregroundColor(.blue)
+                        .foregroundColor(themeManager.colors.secondary)
                     Text("Prayer Partners")
                         .font(.headline)
                         .foregroundColor(.primary)
@@ -1076,7 +1148,7 @@ struct NewPrayerRequestView: View {
                 
                 // Partner Chips
                 if !prayerPartners.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(prayerPartners, id: \.self) { partner in
                                 HStack(spacing: 6) {
@@ -1099,7 +1171,7 @@ struct NewPrayerRequestView: View {
                                 .padding(.vertical, 8)
                                 .background(
                                     LinearGradient(
-                                        colors: [Color.blue, Color.purple],
+                                        colors: [themeManager.colors.secondary, themeManager.colors.primary],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
@@ -1113,7 +1185,7 @@ struct NewPrayerRequestView: View {
                 // Add Partner Input
                 HStack {
                     Image(systemName: "person.badge.plus")
-                        .foregroundColor(.blue)
+                        .foregroundColor(themeManager.colors.secondary)
                     TextField("Add prayer partner name...", text: $newPartnerText)
                         .textFieldStyle(.plain)
                         .onSubmit {
@@ -1123,14 +1195,14 @@ struct NewPrayerRequestView: View {
                         addPrayerPartner()
                     }) {
                         Image(systemName: "plus.circle.fill")
-                            .foregroundColor(newPartnerText.trimmingCharacters(in: .whitespaces).isEmpty ? .gray : .blue)
+                            .foregroundColor(newPartnerText.trimmingCharacters(in: .whitespaces).isEmpty ? .gray : themeManager.colors.secondary)
                             .font(.title3)
                     }
                     .disabled(newPartnerText.trimmingCharacters(in: .whitespaces).isEmpty)
                     .buttonStyle(PlainButtonStyle())
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
                 
                 // Quick Suggestions (from previous entries)
@@ -1139,7 +1211,7 @@ struct NewPrayerRequestView: View {
                         Text("Suggestions")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(suggestedPartners.prefix(5), id: \.self) { partner in
                                     Button(action: {
@@ -1156,7 +1228,7 @@ struct NewPrayerRequestView: View {
                                         }
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
-                                        .background(Color(.systemGray5))
+                                        .background(Color.platformSystemGray5)
                                         .foregroundColor(.primary)
                                         .cornerRadius(12)
                                     }
@@ -1167,14 +1239,14 @@ struct NewPrayerRequestView: View {
                 }
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformSystemGray6)
             .cornerRadius(12)
             
             // Link Journal Entry
             Button(action: { showingJournalEntryPicker = true }) {
                 HStack {
                     Image(systemName: "book.closed.fill")
-                        .foregroundColor(.blue)
+                        .foregroundColor(themeManager.colors.secondary)
                     Text(linkedJournalEntryId == nil ? "Link Journal Entry" : "Journal Entry Linked")
                         .foregroundColor(linkedJournalEntryId == nil ? .secondary : .primary)
                     Spacer()
@@ -1184,10 +1256,37 @@ struct NewPrayerRequestView: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 .cornerRadius(12)
             }
             
+            // Fasting
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: "flame.fill")
+                        .foregroundColor(.orange)
+                    Text("Fasting for this Prayer")
+                        .font(.headline)
+                    Spacer()
+                    Toggle("", isOn: $isFasting)
+                        .onChange(of: isFasting) { _, _ in hasUnsavedChanges = true }
+                }
+                if isFasting {
+                    VStack(alignment: .leading, spacing: 8) {
+                        DatePicker("Start", selection: $fastingStartDate, displayedComponents: .date)
+                        DatePicker("End", selection: $fastingEndDate, in: fastingStartDate..., displayedComponents: .date)
+                    }
+                    .padding()
+                    .background(Color.orange.opacity(0.08))
+                    .cornerRadius(10)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            .padding()
+            .background(Color.platformSystemGray6)
+            .cornerRadius(12)
+            .animation(.easeInOut(duration: 0.2), value: isFasting)
+
             // Photo Attachment
             HStack {
                 PhotosPicker(selection: $selectedPhoto, matching: .images) {
@@ -1202,7 +1301,7 @@ struct NewPrayerRequestView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
                 }
                 
@@ -1214,14 +1313,14 @@ struct NewPrayerRequestView: View {
                         Image(systemName: "trash")
                             .foregroundColor(.red)
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(12)
                     }
                 }
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -1230,22 +1329,40 @@ struct NewPrayerRequestView: View {
         VStack(spacing: 12) {
             HStack {
                 Image(systemName: "lock.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Private Prayer")
                     .font(.headline)
                 Spacer()
                 Toggle("", isOn: $isPrivate)
+                    .onChange(of: isPrivate) { _, newValue in
+                        if newValue { isSharedWithFriends = false }
+                    }
+            }
+
+            HStack {
+                Image(systemName: "person.2.fill")
+                    .foregroundColor(themeManager.colors.secondary)
+                Text("Share with Friends")
+                    .font(.headline)
+                Spacer()
+                Toggle("", isOn: $isSharedWithFriends)
+                    .disabled(isPrivate)
+                    .opacity(isPrivate ? 0.4 : 1)
+            }
+            if isSharedWithFriends && !isPrivate {
+                Label("Friends can see this prayer and pray along with you.", systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             
             // Privacy Notice
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "info.circle.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(themeManager.colors.secondary)
                     .font(.caption)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Privacy Notice")
-                        .font(.caption)
-                        .font(.body.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundColor(.primary)
                     Text("All prayer requests are stored securely on your device and synced via Firebase. Private prayers are only visible to you.")
                         .font(.caption2)
@@ -1255,11 +1372,11 @@ struct NewPrayerRequestView: View {
                 Spacer()
             }
             .padding(12)
-            .background(Color.blue.opacity(0.1))
+            .background(themeManager.colors.secondary.opacity(0.1))
             .cornerRadius(10)
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color.platformSystemBackground)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
@@ -1316,11 +1433,11 @@ struct NewPrayerRequestView: View {
         guard let item = item else { return }
         Task {
             if let data = try? await item.loadTransferable(type: Data.self),
-               let image = UIImage(data: data),
+               let image = platformImageFromData(data),
                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
                 let fileName = "\(UUID().uuidString).jpg"
                 let fileURL = documentsPath.appendingPathComponent(fileName)
-                if let jpegData = image.jpegData(compressionQuality: 0.8) {
+                if let jpegData = platformImageToJPEGData(image, quality: 0.8) {
                     try? jpegData.write(to: fileURL)
                     photoURL = fileURL
                     photoImage = image
@@ -1483,6 +1600,11 @@ struct NewPrayerRequestView: View {
         reminderTime = request.reminderTime
         reminderFrequency = ReminderFrequency(rawValue: request.reminderFrequency) ?? .daily
         
+        isFasting = request.isFasting
+        fastingStartDate = request.fastingStartDate ?? Date()
+        fastingEndDate = request.fastingEndDate ?? Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        isSharedWithFriends = request.isSharedWithFriends
+
         // Extract category from tags if present
         if let firstTag = request.tags.first,
            categories.contains(where: { $0.name == firstTag }) {
@@ -1510,6 +1632,10 @@ struct NewPrayerRequestView: View {
             existingRequest.enableReminder = enableReminder
             existingRequest.reminderTime = reminderTime
             existingRequest.reminderFrequency = reminderFrequency.rawValue
+            existingRequest.isFasting = isFasting
+            existingRequest.fastingStartDate = isFasting ? fastingStartDate : nil
+            existingRequest.fastingEndDate = isFasting ? fastingEndDate : nil
+            existingRequest.isSharedWithFriends = isSharedWithFriends
             existingRequest.updatedAt = Date()
             
             // Schedule reminder if enabled
@@ -1553,12 +1679,16 @@ struct NewPrayerRequestView: View {
             request.enableReminder = enableReminder
             request.reminderTime = reminderTime
             request.reminderFrequency = reminderFrequency.rawValue
-            
+            request.isFasting = isFasting
+            request.fastingStartDate = isFasting ? fastingStartDate : nil
+            request.fastingEndDate = isFasting ? fastingEndDate : nil
+            request.isSharedWithFriends = isSharedWithFriends
+
             // Schedule reminder if enabled
             if enableReminder {
                 scheduleReminder()
             }
-            
+
             modelContext.insert(request)
             
             do {
@@ -1629,6 +1759,7 @@ struct PrayerTemplate: Identifiable, Equatable {
 
 @available(iOS 17.0, *)
 struct PrayerTemplatePickerView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedTemplate: PrayerTemplate?
     
@@ -1658,15 +1789,17 @@ struct PrayerTemplatePickerView: View {
                                 .lineLimit(3)
                             Text(template.category)
                                 .font(.caption)
-                                .foregroundColor(.purple)
+                                .foregroundColor(themeManager.colors.primary)
                         }
                     }
                 }
             }
             .navigationTitle("Prayer Templates")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -1705,9 +1838,11 @@ struct JournalEntryPickerView: View {
                 }
             }
             .navigationTitle("Link Journal Entry")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -1718,6 +1853,7 @@ struct JournalEntryPickerView: View {
 @available(iOS 17.0, *)
 struct PrayerRequestDetailView: View {
     let request: PrayerRequest
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.modelContext) private var modelContext
     @State private var showingEditSheet = false
     @State private var showingAnswerSheet = false
@@ -1743,7 +1879,7 @@ struct PrayerRequestDetailView: View {
     var statusColor: Color {
         switch request.status {
         case .active:
-            return .blue
+            return themeManager.colors.secondary
         case .answered:
             return .green
         case .archived:
@@ -1758,8 +1894,7 @@ struct PrayerRequestDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text(request.title)
-                            .font(.title)
-                            .font(.body.weight(.bold))
+                            .font(.title.weight(.bold))
                         
                         Spacer()
                         
@@ -1782,8 +1917,7 @@ struct PrayerRequestDetailView: View {
                         Spacer()
                         
                         Text(request.status.rawValue)
-                            .font(.subheadline)
-                            .font(.body.weight(.medium))
+                            .font(.subheadline.weight(.medium))
                             .padding(.horizontal, 12)
                             .padding(.vertical, 4)
                             .background(statusColor.opacity(0.1))
@@ -1803,15 +1937,15 @@ struct PrayerRequestDetailView: View {
                         Text("Tags")
                             .font(.headline)
                             .foregroundColor(.primary)
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(request.tags, id: \.self) { tag in
                                     Text(tag)
                                         .font(.caption)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
-                                        .background(Color.purple.opacity(0.1))
-                                        .foregroundColor(.purple)
+                                        .background(themeManager.colors.primary.opacity(0.1))
+                                        .foregroundColor(themeManager.colors.primary)
                                         .cornerRadius(8)
                                 }
                             }
@@ -1824,12 +1958,12 @@ struct PrayerRequestDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "person.2.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(themeManager.colors.secondary)
                             Text("Prayer Partners")
                                 .font(.headline)
                                 .foregroundColor(.primary)
                         }
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(request.prayerPartners, id: \.self) { partner in
                                     HStack(spacing: 6) {
@@ -1843,7 +1977,7 @@ struct PrayerRequestDetailView: View {
                                     .padding(.vertical, 6)
                                     .background(
                                         LinearGradient(
-                                            colors: [Color.blue, Color.purple],
+                                            colors: [themeManager.colors.secondary, themeManager.colors.primary],
                                             startPoint: .leading,
                                             endPoint: .trailing
                                         )
@@ -1860,7 +1994,7 @@ struct PrayerRequestDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "bell.fill")
-                                .foregroundColor(.purple)
+                                .foregroundColor(themeManager.colors.primary)
                             Text("Prayer Reminder")
                                 .font(.headline)
                                 .foregroundColor(.primary)
@@ -1871,8 +2005,7 @@ struct PrayerRequestDetailView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 Text(request.reminderTime, style: .time)
-                                    .font(.subheadline)
-                                    .font(.body.weight(.medium))
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundColor(.primary)
                             }
                             HStack {
@@ -1880,13 +2013,12 @@ struct PrayerRequestDetailView: View {
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 Text(request.reminderFrequency)
-                                    .font(.subheadline)
-                                    .font(.body.weight(.medium))
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundColor(.primary)
                             }
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(12)
                     }
                 }
@@ -1921,6 +2053,75 @@ struct PrayerRequestDetailView: View {
                     .cornerRadius(12)
                 }
                 
+                // Fasting Section
+                if request.isFasting {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "flame.fill")
+                                .foregroundColor(.orange)
+                            Text("Fasting")
+                                .font(.headline)
+                        }
+                        HStack(spacing: 16) {
+                            if let start = request.fastingStartDate {
+                                Label(start.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            if let end = request.fastingEndDate {
+                                Image(systemName: "arrow.right")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                                Label(end.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.orange.opacity(0.08))
+                    .cornerRadius(12)
+                }
+
+                // Prayer Check-in
+                if request.status == .active {
+                    VStack(spacing: 10) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Prayer Streak")
+                                    .font(.headline)
+                                HStack(spacing: 4) {
+                                    Image(systemName: "flame.fill")
+                                        .foregroundColor(currentStreak > 0 ? .orange : .gray)
+                                    Text(currentStreak == 1 ? "\(currentStreak) day" : "\(currentStreak) days")
+                                        .font(.subheadline)
+                                        .foregroundColor(currentStreak > 0 ? .orange : .secondary)
+                                    Text("• \(request.checkInDates.count) total prayers")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Spacer()
+                        }
+                        Button(action: checkInToday) {
+                            HStack {
+                                Image(systemName: hasCheckedInToday ? "hands.and.sparkles.fill" : "hands.and.sparkles")
+                                Text(hasCheckedInToday ? "Prayed Today ✓" : "I Prayed for This Today")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(hasCheckedInToday ? Color.green.opacity(0.15) : themeManager.colors.primary)
+                            .foregroundColor(hasCheckedInToday ? .green : .white)
+                            .cornerRadius(12)
+                        }
+                        .disabled(hasCheckedInToday)
+                    }
+                    .padding()
+                    .background(Color.platformSystemBackground)
+                    .cornerRadius(16)
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                }
+
                 // Action Buttons
                 if request.status == .active {
                     Button(action: { showingAnswerSheet = true }) {
@@ -1939,9 +2140,11 @@ struct PrayerRequestDetailView: View {
             .padding()
         }
         .navigationTitle("Prayer Details")
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Menu {
                     Button(action: { showingShareSheet = true }) {
                         Label("Share", systemImage: "square.and.arrow.up")
@@ -1964,12 +2167,15 @@ struct PrayerRequestDetailView: View {
         }
         .sheet(isPresented: $showingShareSheet) {
             ActivityView(activityItems: [shareText])
+                .macOSSheetFrameCompact()
         }
         .sheet(isPresented: $showingEditSheet) {
             NewPrayerRequestView(request: request)
+                .macOSSheetFrameForm()
         }
         .sheet(isPresented: $showingAnswerSheet) {
             AnswerPrayerRequestView(request: request)
+                .macOSSheetFrameForm()
         }
         .alert("Delete Prayer Request", isPresented: $showingDeleteAlert) {
             Button("Delete", role: .destructive) {
@@ -2015,11 +2221,9 @@ struct PrayerRequestDetailView: View {
     private func activateRequest() {
         request.status = .active
         request.updatedAt = Date()
-        
+
         do {
             try modelContext.save()
-            
-            // Sync to Firebase
             Task {
                 await FirebaseSyncService.shared.syncPrayerRequest(request)
                 print("✅ [FIREBASE] Prayer request status change synced to Firebase")
@@ -2029,6 +2233,41 @@ struct PrayerRequestDetailView: View {
             ErrorHandler.shared.handle(.saveFailed)
         }
     }
+
+    private var hasCheckedInToday: Bool {
+        let today = Calendar.current.startOfDay(for: Date())
+        return request.checkInDates.contains { Calendar.current.startOfDay(for: $0) == today }
+    }
+
+    private var currentStreak: Int {
+        guard !request.checkInDates.isEmpty else { return 0 }
+        let sorted = request.checkInDates.map { Calendar.current.startOfDay(for: $0) }
+            .sorted(by: >)
+            .reduce(into: [Date]()) { if !$0.contains($1) { $0.append($1) } }
+        var streak = 0
+        var day = Calendar.current.startOfDay(for: Date())
+        for date in sorted {
+            if date == day {
+                streak += 1
+                day = Calendar.current.date(byAdding: .day, value: -1, to: day) ?? day
+            } else {
+                break
+            }
+        }
+        return streak
+    }
+
+    private func checkInToday() {
+        guard !hasCheckedInToday else { return }
+        request.checkInDates.append(Date())
+        request.updatedAt = Date()
+        do {
+            try modelContext.save()
+            Task { await FirebaseSyncService.shared.syncPrayerRequest(request) }
+        } catch {
+            print("❌ Error saving check-in: \(error.localizedDescription)")
+        }
+    }
 }
 
 @available(iOS 17.0, *)
@@ -2036,50 +2275,107 @@ struct AnswerPrayerRequestView: View {
     let request: PrayerRequest
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var answerNotes = ""
-    
+    @State private var answerDate = Date()
+
+    init(request: PrayerRequest) {
+        self.request = request
+        _answerNotes = State(initialValue: request.answerNotes ?? "")
+        _answerDate = State(initialValue: request.answerDate ?? Date())
+    }
+
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("How was your prayer answered?")) {
-                    TextEditor(text: $answerNotes)
-                        .frame(height: 120)
-                }
-                
-                Section {
-                    Text("Marking this prayer as answered will help you track God's faithfulness in your life.")
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 48))
+                            .foregroundColor(.green)
+                        Text("Prayer Answered!")
+                            .font(.title2.weight(.bold))
+                        Text("\"\(request.title)\"")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 8)
+
+                    // Date
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("When was it answered?")
+                            .font(.headline)
+                        DatePicker("Answer Date", selection: $answerDate, in: ...Date(), displayedComponents: .date)
+                            .datePickerStyle(.graphical)
+                    }
+                    .padding()
+                    .background(Color.platformSystemBackground)
+                    .cornerRadius(16)
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+
+                    // Testimony
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "text.quote")
+                                .foregroundColor(themeManager.colors.primary)
+                            Text("How did God answer?")
+                                .font(.headline)
+                        }
+                        Text("Record your testimony — how it was answered, what you felt, what God showed you.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TextEditor(text: $answerNotes)
+                            .frame(minHeight: 140)
+                            .padding(8)
+                            .background(Color.platformSystemGray6)
+                            .cornerRadius(10)
+                    }
+                    .padding()
+                    .background(Color.platformSystemBackground)
+                    .cornerRadius(16)
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+
+                    Text("This testimony will be saved to your prayer history and can be shared to encourage others.")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
+                .padding()
             }
-            .navigationTitle("Prayer Answered")
+            .background(Color.platformSystemGray6.ignoresSafeArea())
+            .navigationTitle("Record Answer")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { saveAnswer() }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save Testimony") { saveAnswer() }
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(.green)
                 }
             }
         }
     }
-    
+
     private func saveAnswer() {
         request.status = .answered
         request.isAnswered = true
-        request.answerDate = Date()
+        request.answerDate = answerDate
         request.answerNotes = answerNotes.isEmpty ? nil : answerNotes
         request.updatedAt = Date()
-        
+
         do {
             try modelContext.save()
-            
-            // Sync to Firebase
             Task {
                 await FirebaseSyncService.shared.syncPrayerRequest(request)
                 print("✅ [FIREBASE] Prayer request answer synced to Firebase")
             }
-            
             dismiss()
         } catch {
             print("❌ Error saving prayer answer: \(error.localizedDescription)")
@@ -2142,10 +2438,10 @@ struct EditPrayerRequestView: View {
             }
             .navigationTitle("Edit Prayer Request")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Save") { saveChanges() }
                         .disabled(title.isEmpty || description.isEmpty)
                 }

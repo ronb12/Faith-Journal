@@ -80,7 +80,7 @@ struct StatisticsView: View {
                     .padding()
                     
                     // Scrollable Category Tabs
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 12) {
                             ForEach(StatsTab.allCases, id: \.self) { tab in
                                 Button(action: {
@@ -136,6 +136,7 @@ struct StatisticsView: View {
                             case .mood:
                                 MoodTab(
                                     moods: filteredMoods,
+                                    statsTimeframe: convertTimeframe(selectedTimeframe),
                                     statsService: statsService,
                                     themeManager: themeManager
                                 )
@@ -177,6 +178,9 @@ struct StatisticsView: View {
                             }
                             Button(action: { showingExport = true }) {
                                 Label("Export Report", systemImage: "square.and.arrow.up")
+                            }
+                            Button(action: { showingMoodAnalytics = true }) {
+                                Label("Mood Analytics", systemImage: "chart.bar.fill")
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")

@@ -91,6 +91,7 @@ struct AgoraParticipantGridView: View {
                 }
             }
         }
+        .id(agoraService.participantCount)
     }
     
     private func calculateColumns(for count: Int) -> Int {

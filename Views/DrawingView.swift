@@ -6,17 +6,22 @@
 //
 
 import SwiftUI
+#if os(iOS)
 import PencilKit
+#endif
 
 struct DrawingView: View {
     @Environment(\.dismiss) var dismiss
     @Binding var drawingData: Data?
     
+    #if os(iOS)
     @State private var canvas = PKCanvasView()
     @State private var toolPicker = PKToolPicker()
     @State private var isToolPickerVisible = false
+    #endif
     
     var body: some View {
+        #if os(iOS)
         ZStack {
             Color.white
                 .ignoresSafeArea()
@@ -114,8 +119,21 @@ struct DrawingView: View {
         .onAppear {
             setupToolPicker()
         }
+        #else
+        VStack(spacing: 24) {
+            Image(systemName: "pencil.tip.crop.circle.badge.plus")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            Text("Drawing is available on iPhone and iPad")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            Button("Done") { dismiss() }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #endif
     }
     
+    #if os(iOS)
     private func setupToolPicker() {
         toolPicker.addObserver(canvas)
         toolPicker.setVisible(true, forFirstResponder: canvas)
@@ -129,8 +147,10 @@ struct DrawingView: View {
         )
         drawingData = image.jpegData(compressionQuality: 0.8)
     }
+    #endif
 }
 
+#if os(iOS)
 struct DrawingCanvasView: UIViewRepresentable {
     @Binding var canvas: PKCanvasView
     var toolPicker: PKToolPicker
@@ -146,4 +166,5 @@ struct DrawingCanvasView: UIViewRepresentable {
         // Update if needed
     }
 }
+#endif
 

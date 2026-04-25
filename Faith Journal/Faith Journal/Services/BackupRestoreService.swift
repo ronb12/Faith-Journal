@@ -9,8 +9,13 @@ import Foundation
 import SwiftData
 import PDFKit
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 @MainActor
 class BackupRestoreService: ObservableObject {
     static let shared = BackupRestoreService()
@@ -212,7 +217,7 @@ class BackupRestoreService: ObservableObject {
         let metadata = BackupMetadata(
             version: "1.0",
             timestamp: Date(),
-            deviceInfo: UIDevice.current.model,
+            deviceInfo: PlatformDevice.name,
             dataCounts: BackupMetadata.DataCounts(
                 journalEntries: journalEntries.count,
                 prayerRequests: prayerRequests.count,
@@ -703,82 +708,79 @@ class BackupRestoreService: ObservableObject {
     // MARK: - Export Journal as PDF
     
     func exportJournalAsPDF(entries: [JournalEntry], title: String = "My Faith Journal") async throws -> URL {
-        let pdfMetaData = [
-            kCGPDFContextCreator: "Faith Journal",
-            kCGPDFContextAuthor: "Faith Journal User",
-            kCGPDFContextTitle: title
-        ]
-        
-        let format = UIGraphicsPDFRendererFormat()
-        format.documentInfo = pdfMetaData as [String: Any]
-        
         let pageWidth = 8.5 * 72.0
         let pageHeight = 11 * 72.0
         let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
-        
-        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
-        
         let filename = "FaithJournal_\(title.replacingOccurrences(of: " ", with: "_"))_\(ISO8601DateFormatter().string(from: Date())).pdf"
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let pdfURL = documentsPath.appendingPathComponent(filename)
         
+        #if os(iOS)
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = [kCGPDFContextCreator: "Faith Journal", kCGPDFContextAuthor: "Faith Journal User", kCGPDFContextTitle: title] as [String: Any]
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        let titleFont = UIFont.boldSystemFont(ofSize: 24)
+        let dateFont = UIFont.systemFont(ofSize: 12)
+        let contentFont = UIFont.systemFont(ofSize: 14)
         let data = renderer.pdfData { context in
             context.beginPage()
-            
-            let titleFont = UIFont.boldSystemFont(ofSize: 24)
-            let dateFont = UIFont.systemFont(ofSize: 12)
-            let contentFont = UIFont.systemFont(ofSize: 14)
-            
             var currentY: CGFloat = 50
-            
-            // Title
-            title.draw(at: CGPoint(x: 50, y: currentY), withAttributes: [
-                .font: titleFont,
-                .foregroundColor: UIColor.label
-            ])
+            title.draw(at: CGPoint(x: 50, y: currentY), withAttributes: [.font: titleFont, .foregroundColor: UIColor.label])
             currentY += 40
-            
-            // Entries
             for entry in entries.sorted(by: { $0.date > $1.date }) {
-                // Check if we need a new page
                 if currentY > pageHeight - 200 {
                     context.beginPage()
                     currentY = 50
                 }
-                
-                // Entry date
                 let dateFormatter = DateFormatter()
                 dateFormatter.dateStyle = .long
                 let dateString = dateFormatter.string(from: entry.date)
-                
-                dateString.draw(at: CGPoint(x: 50, y: currentY), withAttributes: [
-                    .font: dateFont,
-                    .foregroundColor: UIColor.secondaryLabel
-                ])
+                dateString.draw(at: CGPoint(x: 50, y: currentY), withAttributes: [.font: dateFont, .foregroundColor: UIColor.secondaryLabel])
                 currentY += 25
-                
-                // Entry title
                 if !entry.title.isEmpty {
-                    entry.title.draw(at: CGPoint(x: 50, y: currentY), withAttributes: [
-                        .font: UIFont.boldSystemFont(ofSize: 16),
-                        .foregroundColor: UIColor.label
-                    ])
+                    entry.title.draw(at: CGPoint(x: 50, y: currentY), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 16), .foregroundColor: UIColor.label])
                     currentY += 25
                 }
-                
-                // Entry content
                 let contentRect = CGRect(x: 50, y: currentY, width: pageWidth - 100, height: pageHeight - currentY - 50)
-                entry.content.draw(in: contentRect, withAttributes: [
-                    .font: contentFont,
-                    .foregroundColor: UIColor.label
-                ])
-                
+                entry.content.draw(in: contentRect, withAttributes: [.font: contentFont, .foregroundColor: UIColor.label])
                 currentY += entry.content.height(withConstrainedWidth: pageWidth - 100, font: contentFont) + 40
             }
         }
-        
         try data.write(to: pdfURL)
-        
+        #elseif os(macOS)
+        var mediaBox = pageRect
+        guard let context = CGContext(pdfURL as CFURL, mediaBox: &mediaBox, [kCGPDFContextCreator: "Faith Journal", kCGPDFContextAuthor: "Faith Journal User", kCGPDFContextTitle: title] as CFDictionary) else {
+            throw BackupError.encodingFailed
+        }
+        context.beginPDFPage(nil)
+        let titleFont = NSFont.boldSystemFont(ofSize: 24)
+        let dateFont = NSFont.systemFont(ofSize: 12)
+        let contentFont = NSFont.systemFont(ofSize: 14)
+        var currentY: CGFloat = pageHeight - 50
+        NSAttributedString(string: title, attributes: [.font: titleFont, .foregroundColor: NSColor.labelColor]).draw(at: CGPoint(x: 50, y: currentY))
+        currentY -= 40
+        for entry in entries.sorted(by: { $0.date > $1.date }) {
+            if currentY < 200 {
+                context.endPDFPage()
+                context.beginPDFPage(nil)
+                currentY = pageHeight - 50
+            }
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .long
+            let dateString = dateFormatter.string(from: entry.date)
+            NSAttributedString(string: dateString, attributes: [.font: dateFont, .foregroundColor: NSColor.secondaryLabelColor]).draw(at: CGPoint(x: 50, y: currentY))
+            currentY -= 25
+            if !entry.title.isEmpty {
+                NSAttributedString(string: entry.title, attributes: [.font: NSFont.boldSystemFont(ofSize: 16), .foregroundColor: NSColor.labelColor]).draw(at: CGPoint(x: 50, y: currentY))
+                currentY -= 25
+            }
+            let contentRect = CGRect(x: 50, y: 50, width: pageWidth - 100, height: currentY - 50)
+            NSAttributedString(string: entry.content, attributes: [.font: contentFont, .foregroundColor: NSColor.labelColor]).draw(in: contentRect)
+            currentY -= entry.content.height(withConstrainedWidth: pageWidth - 100, font: contentFont) + 40
+        }
+        context.endPDFPage()
+        context.closePDF()
+        #endif
         return pdfURL
     }
 }
@@ -803,8 +805,13 @@ enum BackupError: LocalizedError {
     }
 }
 
+#if os(iOS)
+typealias PlatformFont = UIFont
+#elseif os(macOS)
+typealias PlatformFont = NSFont
+#endif
 extension String {
-    func height(withConstrainedWidth width: CGFloat, font: UIFont) -> CGFloat {
+    func height(withConstrainedWidth width: CGFloat, font: PlatformFont) -> CGFloat {
         let constraintRect = CGSize(width: width, height: .greatestFiniteMagnitude)
         let boundingBox = self.boundingRect(with: constraintRect, options: .usesLineFragmentOrigin, attributes: [.font: font], context: nil)
         return ceil(boundingBox.height)

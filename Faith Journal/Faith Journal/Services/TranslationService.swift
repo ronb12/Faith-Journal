@@ -116,50 +116,33 @@ class TranslationService: ObservableObject {
     }
     
     // iOS native translation using Translation framework
-    // Note: TranslationSession API availability varies by SDK version
-    // Using conditional compilation to handle API availability
+    // Note: TranslationSession API availability varies by SDK version.
+    // - iOS 26+: TranslationSession(installedSource:target:) for programmatic use
+    // - iOS 18-25: Session only available via SwiftUI .translationTask modifier (no programmatic init)
     private func translateWithTranslationSession(text: String, from sourceLanguage: String, to targetLanguage: String) async -> String? {
-        #if canImport(Translation)
-        // Check for Translation framework availability at runtime
-        // TranslationSession requires iOS 18.0+ / visionOS 2.0+
-        if #available(iOS 18.0, *) {
-            // Convert language codes to Locale.Language
-            let sourceLang = Locale.Language(identifier: sourceLanguage)
-            let targetLang = Locale.Language(identifier: targetLanguage)
-            
-            // Create translation session using iOS native Translation framework
-            // This uses Apple's native translation engine (same as system-wide translation)
-            // Note: SDK 26.0+ required (iOS 18.0+)
-            guard #available(iOS 26.0, *) else {
-                print("⚠️ TranslationSession requires SDK 26.0+ (iOS 18.0+)")
-                return nil
+        #if canImport(Translation) && os(iOS)
+        // TranslationSession(installedSource:target:) is available in iOS 26.0+
+        guard #available(iOS 26.0, *) else {
+            print("⚠️ Programmatic TranslationSession requires iOS 26.0+ (use SwiftUI .translationTask for iOS 18-25)")
+            return nil
+        }
+        // Convert language codes to Locale.Language
+        let sourceLang = Locale.Language(identifier: sourceLanguage)
+        let targetLang = Locale.Language(identifier: targetLanguage)
+
+        // Create translation session using iOS native Translation framework
+        let session = TranslationSession(installedSource: sourceLang, target: targetLang)
+
+        do {
+            try await session.prepareTranslation()
+            let response = try await session.translate(text)
+            return response.targetText
+        } catch {
+            print("❌ TranslationSession error: \(error.localizedDescription)")
+            if let nsError = error as NSError?,
+               nsError.domain.contains("Translation") || nsError.localizedDescription.contains("model") {
+                print("💡 Translation models may need to be downloaded. iOS will prompt automatically.")
             }
-            let session = TranslationSession(installedSource: sourceLang, target: targetLang)
-            
-            do {
-                // Prepare the translation session (ensures models are available)
-                // iOS will automatically download models if needed
-                try await session.prepareTranslation()
-                
-                // Translate the text using Apple's native translation service
-                // translate() returns TranslationSession.Response
-                let response = try await session.translate(text)
-                
-                // Extract the translated text from the response
-                // TranslationSession.Response.targetText contains the translated string
-                return response.targetText
-            } catch {
-                print("❌ TranslationSession error: \(error.localizedDescription)")
-                // If models aren't downloaded, iOS will prompt user automatically
-                if let nsError = error as NSError? {
-                    if nsError.domain.contains("Translation") || nsError.localizedDescription.contains("model") {
-                        print("💡 Translation models may need to be downloaded. iOS will prompt automatically.")
-                    }
-                }
-                return nil
-            }
-        } else {
-            print("⚠️ TranslationSession requires iOS 18.0+")
             return nil
         }
         #else

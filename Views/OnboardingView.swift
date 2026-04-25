@@ -10,7 +10,6 @@ import SwiftUI
 struct OnboardingView: View {
     @Binding var hasCompletedOnboarding: Bool
     @State private var currentPage = 0
-    @AppStorage("hasCompletedOnboarding") private var onboardingCompleted = false
     
     let pages = [
         OnboardingPage(
@@ -48,7 +47,7 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             // Background that fills entire screen
-            Color(.systemGroupedBackground)
+            Color.platformSystemGroupedBackground
                 .ignoresSafeArea(.all, edges: .all)
             
             VStack(spacing: 0) {
@@ -58,7 +57,9 @@ struct OnboardingView: View {
                         .tag(index)
                 }
             }
+            #if os(iOS)
             .tabViewStyle(.page(indexDisplayMode: .never))
+            #endif
             
             VStack(spacing: 16) {
                 // Custom page indicators
@@ -117,7 +118,6 @@ struct OnboardingView: View {
     }
     
     private func completeOnboarding() {
-        onboardingCompleted = true
         hasCompletedOnboarding = true
     }
 }

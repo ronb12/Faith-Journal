@@ -14,6 +14,9 @@ import UIKit
 import FirebaseFirestore
 import FirebaseAuth
 #endif
+#if canImport(FirebaseStorage)
+import FirebaseStorage
+#endif
 
 @MainActor
 @available(iOS 17.0, *)
@@ -25,6 +28,9 @@ class FirebaseSyncService: ObservableObject {
     private var listener: ListenerRegistration?
     private var prayerRequestListener: ListenerRegistration?
     private var invitationListener: ListenerRegistration?
+    #if canImport(FirebaseAuth)
+    private var authStateListenerHandle: AuthStateDidChangeListenerHandle?
+    #endif
     
     /// Lazy Firestore database access - only initializes after Firebase is configured
     /// Note: Settings are already configured in FirebaseInitializer, so we just get the instance
@@ -45,6 +51,13 @@ class FirebaseSyncService: ObservableObject {
     }
     #else
     private let db: Any? = nil
+    #endif
+    
+    #if canImport(FirebaseStorage)
+    private var storage: Storage? {
+        guard FirebaseInitializer.shared.isConfigured else { return nil }
+        return Storage.storage()
+    }
     #endif
     
     @Published var isSyncing = false
@@ -71,6 +84,16 @@ class FirebaseSyncService: ObservableObject {
     /// Configure the sync service with a ModelContext
     func configure(modelContext: ModelContext) {
         self.modelContext = modelContext
+        
+        guard FirebaseInitializer.shared.isConfigured else {
+            print("⚠️ [FIREBASE] Sync not configured yet - Firebase not initialized (check GoogleService-Info.plist)")
+            return
+        }
+        
+        // Ensure sync starts when Auth state becomes available (e.g. after late restore)
+        #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
+        installAuthStateListenerIfNeeded()
+        #endif
         
         // For simulator testing, use shared test user ID for cross-device sync
         // Note: This requires Firestore security rules to allow unauthenticated access
@@ -99,7 +122,53 @@ class FirebaseSyncService: ObservableObject {
             startListening()
         } else {
             print("⚠️ [FIREBASE] User not authenticated yet, listener will start after sign-in")
+            // Delayed retry: Auth may restore asynchronously shortly after app launch
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_500_000_000) // 2.5 seconds
+                if self.modelContext != nil, getCurrentUserId() != nil {
+                    print("✅ [FIREBASE] Auth restored late - starting listener now")
+                    startListening()
+                    await syncAllData()
+                }
+            }
         }
+    }
+    
+    #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
+    private func installAuthStateListenerIfNeeded() {
+        guard authStateListenerHandle == nil else { return }
+        
+        authStateListenerHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            guard let self else { return }
+            Task { @MainActor in
+                if let user {
+                    print("✅ [FIREBASE] Auth state changed: signed in (\(user.uid))")
+                    guard self.modelContext != nil else {
+                        print("⚠️ [FIREBASE] ModelContext not set yet; will start listening after configure(modelContext:)")
+                        return
+                    }
+                    self.restartListening()
+                    await self.syncAllData()
+                    await ProfileManager.shared.loadProfile()
+                } else {
+                    print("⚠️ [FIREBASE] Auth state changed: signed out")
+                    self.stopListeningInternal()
+                }
+            }
+        }
+        print("✅ [FIREBASE] Installed Auth state listener")
+    }
+    #endif
+    
+    private func stopListeningInternal() {
+        #if canImport(FirebaseFirestore)
+        listener?.remove()
+        listener = nil
+        prayerRequestListener?.remove()
+        prayerRequestListener = nil
+        invitationListener?.remove()
+        invitationListener = nil
+        #endif
     }
     
     /// Test Firebase connection by writing a test document
@@ -321,8 +390,9 @@ class FirebaseSyncService: ObservableObject {
     
     // MARK: - Journal Entries Sync
     
-    /// Sync a journal entry to Firebase
-    func syncJournalEntry(_ entry: JournalEntry) async {
+    /// Sync a journal entry to Firebase.
+    /// - Parameter updateSyncState: If true (default), updates isSyncing for UI. Set to false when called from syncAllData so the full-sync indicator stays active.
+    func syncJournalEntry(_ entry: JournalEntry, updateSyncState: Bool = true) async {
         #if canImport(FirebaseFirestore)
         guard let db = db else {
             print("❌ [FIREBASE] Cannot sync - Firebase Firestore not available")
@@ -337,8 +407,11 @@ class FirebaseSyncService: ObservableObject {
             return
         }
         
-        isSyncing = true
+        if updateSyncState {
+            isSyncing = true
+        }
         syncError = nil
+        defer { if updateSyncState { isSyncing = false } }
         
         do {
             let entryRef = db.collection("users").document(userId)
@@ -404,8 +477,6 @@ class FirebaseSyncService: ObservableObject {
                 }
             }
         }
-        
-        isSyncing = false
         #else
         print("⚠️ [FIREBASE] Firebase not available - cannot sync")
         #endif
@@ -480,6 +551,92 @@ class FirebaseSyncService: ObservableObject {
         }
         #else
         print("⚠️ [FIREBASE] Firebase not available - cannot sync devotional completion")
+        #endif
+    }
+    
+    /// Fetch devotional completions from Firebase and merge into local storage (UserDefaults + SwiftData).
+    /// Enables cross-device sync so devotionals marked done on one device show on all devices.
+    func fetchDevotionalCompletionsFromFirebase() async {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let userId = getCurrentUserId() else { return }
+        guard let modelContext = modelContext else { return }
+        
+        do {
+            let completionsRef = db.collection("users").document(userId)
+                .collection("devotionalCompletions")
+            let snapshot = try await completionsRef.getDocuments()
+            
+            guard !snapshot.documents.isEmpty else {
+                print("📿 [FIREBASE] No devotional completions in Firebase to fetch")
+                return
+            }
+            
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
+            let calendar = Calendar.current
+            var mergedCount = 0
+            
+            for document in snapshot.documents {
+                let data = document.data()
+                let isCompleted = (data["isCompleted"] as? Bool) ?? false
+                guard isCompleted else { continue }
+                
+                // Document ID is the date string (e.g. "2026-02-15")
+                let dateString = document.documentID
+                guard let devotionalDate = dateFormatter.date(from: dateString) else {
+                    print("⚠️ [FIREBASE] Skipping devotional completion - invalid date: \(dateString)")
+                    continue
+                }
+                
+                // Merge into UserDefaults (primary for DevotionalManager)
+                let key = "devotional_completed_\(dateString)"
+                UserDefaults.standard.set(true, forKey: key)
+                
+                // Merge into SwiftData (backup / consistency)
+                let startOfDay = calendar.startOfDay(for: devotionalDate)
+                guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else { continue }
+                
+                let devotionalId = (data["devotionalId"] as? String).flatMap(UUID.init) ?? UUID()
+                let descriptor = FetchDescriptor<DevotionalCompletion>(
+                    predicate: #Predicate<DevotionalCompletion> { completion in
+                        completion.devotionalDate >= startOfDay && completion.devotionalDate < endOfDay
+                    }
+                )
+                
+                if let results = try? modelContext.fetch(descriptor), let existing = results.first {
+                    if !existing.isCompleted {
+                        existing.isCompleted = true
+                        existing.completedAt = (data["completedAt"] as? Timestamp)?.dateValue()
+                        existing.updatedAt = Date()
+                        mergedCount += 1
+                    }
+                } else {
+                    let completion = DevotionalCompletion(
+                        devotionalId: devotionalId,
+                        devotionalDate: devotionalDate,
+                        isCompleted: true
+                    )
+                    if let completedAt = (data["completedAt"] as? Timestamp)?.dateValue() {
+                        completion.completedAt = completedAt
+                    }
+                    modelContext.insert(completion)
+                    mergedCount += 1
+                }
+            }
+            
+            if mergedCount > 0 {
+                try? modelContext.save()
+                modelContext.processPendingChanges()
+                print("✅ [FIREBASE] Fetched and merged \(mergedCount) devotional completions from Firebase")
+                
+                // Refresh DevotionalManager UI on main actor
+                await MainActor.run {
+                    DevotionalManager.shared.reloadCompletionStatusForAllDevotionals()
+                }
+            }
+        } catch {
+            print("❌ [FIREBASE] Failed to fetch devotional completions: \(error.localizedDescription)")
+        }
         #endif
     }
     
@@ -1023,6 +1180,66 @@ class FirebaseSyncService: ObservableObject {
         } catch {
             print("❌ [FIREBASE] Failed to delete session invitation: \(error.localizedDescription)")
         }
+        #endif
+    }
+    
+    /// Save thumbnail URL to a live session (uses configured ModelContext). Call after upload succeeds.
+    func saveThumbnailURL(sessionId: UUID, urlString: String) {
+        guard let modelContext = modelContext else {
+            print("⚠️ [LIVE SESSION] No modelContext configured, cannot save thumbnail URL")
+            return
+        }
+        do {
+            var descriptor = FetchDescriptor<LiveSession>()
+            descriptor.predicate = #Predicate<LiveSession> { $0.id == sessionId }
+            if let session = try modelContext.fetch(descriptor).first {
+                session.thumbnailURL = urlString
+                try modelContext.save()
+                print("✅ [LIVE SESSION] Thumbnail URL saved: \(urlString.prefix(60))...")
+                Task { await syncLiveSession(session) }
+            } else {
+                print("⚠️ [LIVE SESSION] Session not found for id \(sessionId), cannot save thumbnail URL")
+            }
+        } catch {
+            print("⚠️ [LIVE SESSION] Failed to save thumbnail URL: \(error.localizedDescription)")
+        }
+    }
+
+    /// Upload live session thumbnail (cover image). Returns download URL.
+    /// Requires Firebase Auth (Sign in with Apple) and Storage enabled in Firebase Console.
+    func uploadLiveSessionThumbnail(sessionId: UUID, imageData: Data) async throws -> String {
+        #if canImport(FirebaseStorage)
+        guard getCurrentUserId() != nil else {
+            throw NSError(domain: "FirebaseSyncService", code: -2, userInfo: [NSLocalizedDescriptionKey: "You must be signed in to upload a thumbnail. Sign in with Apple in Settings."])
+        }
+        guard let storage = storage else {
+            throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Storage not available"])
+        }
+        let fileName = "\(sessionId.uuidString).jpg"
+        let ref = storage.reference().child("liveSessionThumbnails").child(fileName)
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+        do {
+            _ = try await ref.putDataAsync(imageData, metadata: metadata)
+            let downloadURL = try await ref.downloadURL()
+            return downloadURL.absoluteString
+        } catch {
+            let nsError = error as NSError
+            let code = StorageErrorCode(rawValue: nsError.code)
+            print("⚠️ [LIVE SESSION] Thumbnail upload failed: domain=\(nsError.domain), code=\(nsError.code), \(nsError.localizedDescription)")
+            if let userInfo = nsError.userInfo as? [String: Any], !userInfo.isEmpty {
+                print("⚠️ [LIVE SESSION] Error userInfo: \(userInfo)")
+            }
+            if code == .unauthenticated || code == .unauthorized {
+                throw NSError(domain: "FirebaseSyncService", code: nsError.code, userInfo: [NSLocalizedDescriptionKey: "Sign in with Apple required to upload thumbnails. Go to Settings to sign in."])
+            }
+            if code == .bucketNotFound || code == .unknown {
+                throw NSError(domain: "FirebaseSyncService", code: nsError.code, userInfo: [NSLocalizedDescriptionKey: "Storage isn’t set up. In Firebase Console go to Build → Storage and turn on Cloud Storage, then try again."])
+            }
+            throw NSError(domain: "FirebaseSyncService", code: nsError.code, userInfo: [NSLocalizedDescriptionKey: "Upload failed: \(nsError.localizedDescription)"])
+        }
+        #else
+        throw NSError(domain: "FirebaseSyncService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Firebase Storage not available"])
         #endif
     }
     
@@ -1920,20 +2137,42 @@ class FirebaseSyncService: ObservableObject {
             return
         }
         
+        // Skip if a full sync is already in progress (avoids multiple overlapping syncs and repeated timeouts)
+        guard !isSyncing else {
+            print("ℹ️ [FIREBASE] Full sync already in progress - skipping")
+            return
+        }
+        
         isSyncing = true
         syncError = nil
+        defer { isSyncing = false }
+        
+        // Safety: if sync hangs (e.g. network), clear isSyncing after 5 min so UI doesn't stay stuck
+        let timeoutSeconds: UInt64 = 300
+        let timeoutTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: timeoutSeconds * 1_000_000_000)
+            if !Task.isCancelled {
+                isSyncing = false
+                syncError = "Sync timed out (\(timeoutSeconds)s) - try on Wi‑Fi or tap Sync Now again"
+                print("⚠️ [FIREBASE] Sync timed out after \(timeoutSeconds)s - check network")
+            }
+        }
+        defer { timeoutTask.cancel() }
         
         print("🔄 [FIREBASE] Starting full sync for user: \(userId)")
         
         var syncedCount = 0
         var errorCount = 0
         
+        // Pull devotional completions from Firebase first (so they show on all devices)
+        await fetchDevotionalCompletionsFromFirebase()
+        
         // Sync journal entries
         let journalDescriptor = FetchDescriptor<JournalEntry>()
         if let entries = try? modelContext.fetch(journalDescriptor) {
             print("📝 [FIREBASE] Syncing \(entries.count) journal entries...")
             for entry in entries {
-                await syncJournalEntry(entry)
+                await syncJournalEntry(entry, updateSyncState: false)
                 if syncError == nil {
                     syncedCount += 1
                 } else {
@@ -2033,7 +2272,7 @@ class FirebaseSyncService: ObservableObject {
         }
         
         lastSyncDate = Date()
-        isSyncing = false
+        syncError = nil  // Clear so Settings shows "Synced" not a previous error
         
         if errorCount > 0 {
             print("⚠️ [FIREBASE] Full sync completed with \(errorCount) errors")
@@ -2123,6 +2362,7 @@ class FirebaseSyncService: ObservableObject {
                 "tags": session.tags,
                 "isPrivate": session.isPrivate,
                 "createdAt": Timestamp(date: session.createdAt),
+                "thumbnailURL": session.thumbnailURL ?? NSNull(),
                 "lastSyncedAt": Timestamp(date: Date())
             ]
             
@@ -2596,7 +2836,13 @@ class FirebaseSyncService: ObservableObject {
     deinit {
         #if canImport(FirebaseFirestore)
         listener?.remove()
+        prayerRequestListener?.remove()
         invitationListener?.remove()
+        #endif
+        #if canImport(FirebaseAuth)
+        if let handle = authStateListenerHandle {
+            Auth.auth().removeStateDidChangeListener(handle)
+        }
         #endif
     }
 }

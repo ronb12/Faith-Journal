@@ -7,21 +7,151 @@
 
 import SwiftUI
 import SwiftData
+import AVKit
+#if os(iOS)
 import UIKit
+#endif
 import UniformTypeIdentifiers
+
+/// Returns true if the string looks like a device name (iPhone, iPad, or exact device/host name).
+@available(iOS 17.0, *)
+fileprivate func isDeviceName(_ s: String) -> Bool {
+    let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+    if t.isEmpty { return true }
+    if t.contains("iPhone") || t.contains("iPad") || t.contains("iPod") { return true }
+    #if os(iOS)
+    if t == UIDevice.current.name { return true }
+    #else
+    if t == ProcessInfo.processInfo.hostName { return true }
+    #endif
+    return false
+}
+
+/// Best display name for the current user (profile name when set; never returns device name).
+/// Posted when a live session thumbnail URL is saved so the list can refresh and show the custom image.
+fileprivate let liveSessionThumbnailDidSaveNotification = Notification.Name("LiveSessionThumbnailDidSave")
+
+/// Sample replay URL for trying the replay player (short test video).
+fileprivate let sampleReplayVideoURL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+
+@available(iOS 17.0, *)
+@MainActor
+fileprivate func profileDisplayNameForCurrentUser(userProfile: UserProfile?, userService: LocalUserService) -> String {
+    let pm = ProfileManager.shared.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !pm.isEmpty && !isDeviceName(pm) { return pm }
+    let name = (userProfile?.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    if !name.isEmpty && !isDeviceName(name) { return name }
+    let raw = userService.getDisplayName(userProfile: userProfile)
+    return isDeviceName(raw) ? "Participant" : raw
+}
+
+/// Display name for session host: prefers profile name, never shows device name (returns "Host" instead).
+@available(iOS 17.0, *)
+@MainActor
+fileprivate func liveSessionHostDisplayName(session: LiveSession, isHost: Bool, userProfile: UserProfile?) -> String {
+    if isHost {
+        let pm = ProfileManager.shared.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !pm.isEmpty && !isDeviceName(pm) { return pm }
+        let name = (userProfile?.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty && !isDeviceName(name) { return name }
+        return "Host"
+    }
+    let stored = session.hostName.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !stored.isEmpty && !isDeviceName(stored) { return stored }
+    return "Host"
+}
+
+// MARK: - Stream Template (Feature 4)
+
+struct LiveStreamTemplate: Identifiable {
+    let id = UUID()
+    let name: String
+    let icon: String
+    let color: Color
+    let title: String
+    let description: String
+    let category: String
+    let tags: [String]
+    let suggestedSegments: [StreamSegment]
+}
+
+extension LiveStreamTemplate {
+    static let all: [LiveStreamTemplate] = [
+        LiveStreamTemplate(
+            name: "Sunday Sermon", icon: "megaphone.fill", color: .purple,
+            title: "Sunday Morning Sermon", description: "Join us for worship and the Word of God.",
+            category: "Bible Study", tags: ["Sermon", "Worship", "Sunday"],
+            suggestedSegments: [
+                StreamSegment(name: "Opening Worship", scriptureReference: "", durationMinutes: 15),
+                StreamSegment(name: "Message", scriptureReference: "", durationMinutes: 30),
+                StreamSegment(name: "Altar Call", scriptureReference: "", durationMinutes: 10),
+                StreamSegment(name: "Closing Prayer", scriptureReference: "", durationMinutes: 5)
+            ]
+        ),
+        LiveStreamTemplate(
+            name: "Bible Study", icon: "book.fill", color: .blue,
+            title: "Weekly Bible Study", description: "Deep dive into scripture together.",
+            category: "Bible Study", tags: ["Bible Study", "Scripture", "Learning"],
+            suggestedSegments: [
+                StreamSegment(name: "Review & Prayer", scriptureReference: "", durationMinutes: 5),
+                StreamSegment(name: "Scripture Reading", scriptureReference: "", durationMinutes: 15),
+                StreamSegment(name: "Discussion", scriptureReference: "", durationMinutes: 25),
+                StreamSegment(name: "Application & Close", scriptureReference: "", durationMinutes: 10)
+            ]
+        ),
+        LiveStreamTemplate(
+            name: "Prayer Meeting", icon: "hands.sparkles.fill", color: .orange,
+            title: "Community Prayer Meeting", description: "Come together to lift each other up in prayer.",
+            category: "Prayer", tags: ["Prayer", "Intercession", "Community"],
+            suggestedSegments: [
+                StreamSegment(name: "Praise & Worship", scriptureReference: "", durationMinutes: 10),
+                StreamSegment(name: "Prayer Requests", scriptureReference: "", durationMinutes: 5),
+                StreamSegment(name: "Corporate Prayer", scriptureReference: "", durationMinutes: 20),
+                StreamSegment(name: "Thanksgiving", scriptureReference: "", durationMinutes: 5)
+            ]
+        ),
+        LiveStreamTemplate(
+            name: "Worship Night", icon: "music.note.list", color: .pink,
+            title: "Worship Night", description: "An evening of praise, worship, and God's presence.",
+            category: "Worship", tags: ["Worship", "Praise", "Music"],
+            suggestedSegments: [
+                StreamSegment(name: "Worship Set 1", scriptureReference: "", durationMinutes: 20),
+                StreamSegment(name: "Devotional Word", scriptureReference: "", durationMinutes: 10),
+                StreamSegment(name: "Worship Set 2", scriptureReference: "", durationMinutes: 20),
+                StreamSegment(name: "Prayer & Close", scriptureReference: "", durationMinutes: 10)
+            ]
+        )
+    ]
+}
+
+// MARK: - Wall Prayer Request (Feature 1)
+
+struct WallPrayerRequest: Identifiable {
+    let id: String
+    let text: String
+    let authorName: String
+    var isPinned: Bool
+}
 
 @available(iOS 17.0, *)
 struct LiveSessionsView: View {
     @Query(sort: [SortDescriptor(\LiveSession.startTime, order: .reverse)]) var allSessions: [LiveSession]
     @Query(sort: [SortDescriptor(\LiveSessionParticipant.joinedAt, order: .reverse)]) var allParticipants: [LiveSessionParticipant]
     @Query(sort: [SortDescriptor(\SessionInvitation.createdAt, order: .reverse)]) var allInvitations: [SessionInvitation]
+    @Query var allMessages: [ChatMessage]
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     // Use regular property for singleton, not @StateObject
     private let userService = LocalUserService.shared
     // CloudKitPublicSyncService removed - use Firebase for sync in the future
     // @State private var syncService: CloudKitPublicSyncService?
     @State private var showingCreateSession = false
     @State private var selectedSession: LiveSession?
+    /// Tap a session card → open stream directly. Nil when stream is dismissed.
+    @State private var sessionToStream: LiveSession?
+    @State private var pendingDeleteSessionId: UUID?
+    @State private var pendingDeleteHostId: String?
+    @State private var pendingDeleteIsHost: Bool = false
     @State private var showingSessionDetail = false
     @State private var showingInvitations = false
     @State private var searchText = ""
@@ -30,11 +160,16 @@ struct LiveSessionsView: View {
     @State private var selectedSort: SessionSort = .recentlyStarted
     @State private var isLoadingPublicSessions = false
     @State private var publicSessions: [LiveSession] = []
+    /// Forces list to re-render when a thumbnail is saved (so @Query shows updated thumbnailURL).
+    @State private var thumbnailRefreshID = UUID()
+    @State private var showingSampleReplay = false
+    @State private var showingSortFilterHelp = false
     
     enum SessionFilter: String, CaseIterable {
         case liveNow = "Live Now"
         case upcoming = "Upcoming"
         case past = "Past"
+        case replays = "Replays"
         case mySessions = "My Sessions"
         case favorites = "Favorites"
         case archived = "Archived"
@@ -47,14 +182,14 @@ struct LiveSessionsView: View {
         case alphabetical = "Alphabetical"
     }
     
-    // Combine local and public sessions, removing duplicates
+    // Combine local sessions + public sessions from Firestore (invited + all public non-private)
     var allSessionsCombined: [LiveSession] {
         var combined = allSessions
-        // Add public sessions that aren't already in local
+        // Add only sessions the user has received an invitation for
         let localIds = Set(combined.map { $0.id })
-        for publicSession in publicSessions {
-            if !localIds.contains(publicSession.id) {
-                combined.append(publicSession)
+        for invitedSession in publicSessions {
+            if !localIds.contains(invitedSession.id) {
+                combined.append(invitedSession)
             }
         }
         // Remove duplicates by ID, keeping most recent
@@ -81,6 +216,14 @@ struct LiveSessionsView: View {
         allSessionsCombined.filter { !$0.isActive && !$0.isScheduled && !$0.isArchived }
     }
     
+    /// Past sessions that have a replay (public sessions: no invite code needed to watch).
+    var replaySessions: [LiveSession] {
+        pastSessions.filter { session in
+            guard let url = session.recordingURL, !url.isEmpty else { return false }
+            return !url.hasPrefix("file://") // only cloud replays (watchable by anyone)
+        }
+    }
+    
     var mySessions: [LiveSession] {
         let userId = userService.userIdentifier
         return allSessionsCombined.filter { $0.hostId == userId && !$0.isArchived }
@@ -102,6 +245,8 @@ struct LiveSessionsView: View {
             return upcomingSessions
         case .past:
             return pastSessions
+        case .replays:
+            return replaySessions
         case .mySessions:
             return mySessions
         case .favorites:
@@ -111,8 +256,14 @@ struct LiveSessionsView: View {
         }
     }
     
+    /// Predefined categories shown in the filter bar (matches create-session options + Worship).
+    private static let filterCategories = ["All", "Bible Study", "Devotional", "Fellowship", "Other", "Prayer", "Testimony", "Worship"]
+    
     var categories: [String] {
         var cats = Set(allActiveSessions.map { $0.category })
+        for name in Self.filterCategories where name != "All" {
+            cats.insert(name)
+        }
         cats.insert("All")
         return Array(cats).sorted()
     }
@@ -170,48 +321,47 @@ struct LiveSessionsView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(10)
                     .padding(.horizontal)
                     
-                    // Filter Picker
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                    // Session filter dropdown (Live Now, Upcoming, Past, Replays…)
+                    HStack {
+                        Text("Show:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Picker("Show", selection: $selectedFilter) {
                             ForEach(SessionFilter.allCases, id: \.self) { filter in
-                                SessionFilterChip(
-                                    title: filter.rawValue,
-                                    isSelected: selectedFilter == filter,
-                                    count: filterCount(for: filter)
-                                ) {
-                                    selectedFilter = filter
+                                Text("\(filter.rawValue) (\(filterCount(for: filter)))").tag(filter)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color.platformSystemGray6)
+                    
+                    // Category dropdown (same style as Sort)
+                    if !categories.isEmpty {
+                        HStack {
+                            Text("Category:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Picker("Category", selection: $selectedCategory) {
+                                ForEach(categories, id: \.self) { category in
+                                    Text(category).tag(category)
                                 }
                             }
+                            .pickerStyle(.menu)
+                            Spacer()
                         }
                         .padding(.horizontal)
-                    }
-                    .padding(.vertical, 8)
-                    
-                    // Category Filter
-                    if !categories.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(categories, id: \.self) { category in
-                                    CategoryChip(
-                                        title: category,
-                                        isSelected: selectedCategory == category,
-                                        color: Color.purple
-                                    ) {
-                                        selectedCategory = category
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
                         .padding(.vertical, 8)
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                     }
                     
-                    // Sort Picker
+                    // Sort Picker + Help
                     HStack {
                         Text("Sort:")
                             .font(.caption)
@@ -222,10 +372,23 @@ struct LiveSessionsView: View {
                             }
                         }
                         .pickerStyle(.menu)
+                        Button {
+                            showingSortFilterHelp = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.title3)
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
                         Spacer()
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 4)
+                    .alert("Live Sessions", isPresented: $showingSortFilterHelp) {
+                        Button("OK", role: .cancel) { }
+                    } message: {
+                        Text("Live Now: sessions currently in progress. Use the filter tabs to see Upcoming, Past, Replays, or My Sessions. Sort changes the order (e.g. Recently Started, Most Popular).")
+                    }
                     
                     if filteredSessions.isEmpty {
                         VStack(spacing: 20) {
@@ -262,45 +425,95 @@ struct LiveSessionsView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding()
                     } else {
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                // Live Now Section (if applicable)
-                                if selectedFilter == .liveNow && !liveNowSessions.isEmpty {
-                                    SectionHeader(title: "🔴 Live Now", count: liveNowSessions.count)
-                                    
-                                    ForEach(liveNowSessions.prefix(3)) { session in
-                                        EnhancedLiveSessionCard(session: session) {
-                                            selectedSession = session
-                                            showingSessionDetail = true
+                        GeometryReader { geo in
+                            // Adaptive grid: iPhone 1 col; iPad portrait 2 col; iPad landscape 3 col
+                            let width = max(geo.size.width, 1)
+                            let gridColumns: [GridItem] = horizontalSizeClass == .regular
+                                ? (width >= 900
+                                    ? [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+                                    : [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)])
+                                : [GridItem(.flexible(), spacing: 12)]
+                            
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 16) {
+                                    // Live Now Section (if applicable)
+                                    if selectedFilter == .liveNow && !liveNowSessions.isEmpty {
+                                        LiveNowSectionHeader(count: liveNowSessions.count)
+                                        
+                                        LazyVGrid(columns: gridColumns, spacing: 12) {
+                                            ForEach(liveNowSessions.prefix(6)) { session in
+                                                EnhancedLiveSessionCard(session: session, onTap: {
+                                                    if !session.isArchived { sessionToStream = session }
+                                                }, onInfo: { selectedSession = session }, onRemove: { removeSessionFromList(session) })
+                                                    .id(session.id.uuidString + (session.thumbnailURL ?? ""))
+                                            }
                                         }
                                     }
                                     
-                                    if liveNowSessions.count > 3 {
-                                        Button("View All Live Sessions") {
-                                            // Show all live sessions
+                                    // Main Session Grid (when Live Now is shown, skip already-shown to avoid duplicates)
+                                    let sessionsToShow = selectedFilter == .liveNow && !liveNowSessions.isEmpty
+                                        ? Array(filteredSessions.dropFirst(min(6, liveNowSessions.count)))
+                                        : filteredSessions
+                                    if selectedFilter == .replays {
+                                        Text("Public replays — no invite code needed")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                        Button(action: { showingSampleReplay = true }) {
+                                            HStack(spacing: 12) {
+                                                Image(systemName: "play.rectangle.fill")
+                                                    .font(.title)
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text("Try sample replay")
+                                                        .font(.headline)
+                                                    Text("Play a short sample video to try the replay player")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondary)
+                                                }
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                            }
+                                            .padding()
+                                            .background(Color.purple.opacity(0.15))
+                                            .foregroundColor(.primary)
+                                            .cornerRadius(12)
                                         }
-                                        .font(.subheadline)
-                                        .foregroundColor(.purple)
-                                        .padding(.vertical, 8)
+                                        .buttonStyle(.plain)
+                                    }
+                                    if !sessionsToShow.isEmpty {
+                                        if selectedFilter == .liveNow && !liveNowSessions.isEmpty {
+                                            SectionHeader(title: "All Sessions", count: sessionsToShow.count)
+                                        }
+                                        if selectedFilter == .replays {
+                                            SectionHeader(title: "Replays", count: sessionsToShow.count)
+                                        }
+                                        LazyVGrid(columns: gridColumns, spacing: 12) {
+                                            ForEach(sessionsToShow) { session in
+                                                EnhancedLiveSessionCard(session: session, onTap: {
+                                                    if !session.isArchived { sessionToStream = session }
+                                                }, onInfo: { selectedSession = session }, onRemove: { removeSessionFromList(session) })
+                                                    .id(session.id.uuidString + (session.thumbnailURL ?? ""))
+                                            }
+                                        }
                                     }
                                 }
-                                
-                                // Main Session List
-                                ForEach(filteredSessions) { session in
-                                    EnhancedLiveSessionCard(session: session) {
-                                        selectedSession = session
-                                        showingSessionDetail = true
-                                    }
-                                }
+                                .id(thumbnailRefreshID)
+                                .padding()
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding()
                         }
+                        .frame(minHeight: 0)
                     }
                 }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: liveSessionThumbnailDidSaveNotification)) { _ in
+                    thumbnailRefreshID = UUID()
+                }
                 .navigationTitle("Live Sessions")
-                .navigationViewStyle(.stack) // Force full-width layout on iPad
+                #if os(iOS)
+                .navigationViewStyle(.stack)
+                #endif
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
+                    ToolbarItem(placement: .cancellationAction) {
                         Button(action: { showingInvitations = true }) {
                             ZStack(alignment: .topTrailing) {
                                 Image(systemName: "envelope.fill")
@@ -320,7 +533,22 @@ struct LiveSessionsView: View {
                         }
                     }
                     
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
+                        Button(action: {
+                            Task { await refreshPublicSessions() }
+                        }) {
+                            if isLoadingPublicSessions {
+                                ProgressView()
+                                    .scaleEffect(0.9)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.body.weight(.semibold))
+                            }
+                        }
+                        .disabled(isLoadingPublicSessions)
+                        .accessibilityLabel("Refresh live sessions")
+                    }
+                    ToolbarItem(placement: .automatic) {
                         Button(action: { showingCreateSession = true }) {
                             Image(systemName: "plus")
                                 .font(.body.weight(.semibold))
@@ -329,13 +557,46 @@ struct LiveSessionsView: View {
                 }
                 .sheet(isPresented: $showingInvitations) {
                     InvitationsView()
+                        .macOSSheetFrameStandard()
                 }
                 .sheet(isPresented: $showingCreateSession) {
                     CreateLiveSessionView()
+                        .macOSSheetFrameForm()
                 }
-                .sheet(item: $selectedSession) { session in
-                    LiveSessionDetailView(session: session)
+                .sheet(isPresented: $showingSampleReplay) {
+                    RecordingPlayerView(recordingURL: sampleReplayVideoURL)
+                        .macOSSheetFrameForm()
                 }
+                .sheet(item: $selectedSession, onDismiss: { performPendingSessionDelete() }) { session in
+                    LiveSessionDetailView(
+                        session: session,
+                        onPrepareDelete: { id, hostId, isHost in
+                            pendingDeleteSessionId = id
+                            pendingDeleteHostId = hostId
+                            pendingDeleteIsHost = isHost
+                        },
+                        onDeleted: { deletedId in
+                            selectedSession = nil
+                            publicSessions = publicSessions.filter { $0.id != deletedId }
+                        }
+                    )
+                    .macOSSheetFrameLarge()
+                }
+                #if os(iOS)
+                .fullScreenCover(item: $sessionToStream, onDismiss: { sessionToStream = nil }) { session in
+                    if #available(iOS 17.0, *) {
+                        MultiParticipantStreamView(session: session)
+                    }
+                }
+                #endif
+                #if os(macOS)
+                .sheet(item: $sessionToStream, onDismiss: { sessionToStream = nil }) { session in
+                    if #available(macOS 14.0, *) {
+                        MultiParticipantStreamView(session: session)
+                            .macOSSheetFrameLarge()
+                    }
+                }
+                #endif
                 .onAppear {
                     // Ensure CloudKit services are initialized before use
                     // Note: App works fully without CloudKit - this is optional for multi-user features
@@ -344,6 +605,7 @@ struct LiveSessionsView: View {
                         // Sync service initialization removed
                         // Give services a moment to initialize
                         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                        archiveOldSessionsIfNeeded()
                         loadPublicSessions()
                         setupSubscriptions()
                     }
@@ -351,48 +613,73 @@ struct LiveSessionsView: View {
                 .refreshable {
                     await refreshPublicSessions()
                 }
-            }
         } else {
             Text("Live Sessions are only available on iOS 17+")
         }
     }
     
+    /// Archives ended sessions older than 30 days so they only appear under "Archived".
+    private func archiveOldSessionsIfNeeded() {
+        let daysToKeepInPast = 30
+        guard let cutoff = Calendar.current.date(byAdding: .day, value: -daysToKeepInPast, to: Date()) else { return }
+        var descriptor = FetchDescriptor<LiveSession>(predicate: #Predicate<LiveSession> { $0.endTime != nil && !$0.isArchived })
+        descriptor.sortBy = [SortDescriptor(\.endTime, order: .forward)]
+        guard let ended = try? modelContext.fetch(descriptor) else { return }
+        var archivedCount = 0
+        for session in ended {
+            guard let end = session.endTime, end < cutoff else { continue }
+            session.isArchived = true
+            archivedCount += 1
+        }
+        if archivedCount > 0 {
+            do {
+                try modelContext.save()
+                print("✅ Auto-archived \(archivedCount) session(s) older than \(daysToKeepInPast) days")
+            } catch {
+                print("❌ Auto-archive save failed: \(error)")
+            }
+        }
+    }
+
     private func loadPublicSessions() {
         isLoadingPublicSessions = true
         Task { @MainActor in
-            // Wait a bit for CloudKit to initialize if needed
-            if !userService.isAuthenticated {
-                // CloudKit might still be initializing - wait and recheck
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                // Re-check authentication after delay
-                await userService.checkAuthentication()
-            }
-            
-            // CloudKitPublicSyncService removed - use Firebase for sync
-            // Only fetch public sessions if authenticated
-            if userService.isAuthenticated {
-                // let sessions = // CloudKitPublicSyncService removed - use Firebase for sync
-                // try await sync.fetchPublicSessions()
-                // publicSessions = sessions
-                publicSessions = [] // Firebase sync to be implemented
-            } else {
-                // Not authenticated or sync service unavailable - just use local sessions
-                publicSessions = []
-            }
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s for invitations to load
+            await loadInvitedAndPublicSessions()
             isLoadingPublicSessions = false
         }
     }
     
+    /// Called by the refresh button and pull-to-refresh. Fetches from Firebase and updates the list.
     private func refreshPublicSessions() async {
-        // CloudKitPublicSyncService removed - use Firebase for sync
-        guard await MainActor.run(body: { userService.isAuthenticated }) else { return }
-        // CloudKitPublicSyncService removed - use Firebase for sync
-        // let sync = await MainActor.run(body: { syncService })
+        await MainActor.run { isLoadingPublicSessions = true }
+        await loadInvitedAndPublicSessions()
+        await MainActor.run { isLoadingPublicSessions = false }
+    }
+    
+    /// Fetch invited sessions plus all public (non-private) live sessions from Firestore so they appear in Live Now.
+    private func loadInvitedAndPublicSessions() async {
+        let userId = userService.userIdentifier
+        let invitedSessionIds = allInvitations
+            .filter { $0.hostId != userId && !$0.isExpired }
+            .map { $0.sessionId }
         
-        // CloudKitPublicSyncService removed - use Firebase for sync
-        // let sessions = try await sync.fetchPublicSessions()
+        var fetched: [LiveSession] = []
+        for sessionId in invitedSessionIds {
+            if let session = await FirebaseSyncService.shared.fetchLiveSessionPublic(sessionId: sessionId) {
+                fetched.append(session)
+            }
+        }
+        let invitedIds = Set(fetched.map { $0.id })
+        let publicSessionsFromFirestore = await FirebaseSyncService.shared.fetchPublicSessions()
+        for session in publicSessionsFromFirestore {
+            if !invitedIds.contains(session.id) {
+                fetched.append(session)
+            }
+        }
+        
         await MainActor.run {
-            self.publicSessions = [] // Firebase sync to be implemented
+            self.publicSessions = fetched
         }
     }
     
@@ -424,12 +711,99 @@ struct LiveSessionsView: View {
             return upcomingSessions.count
         case .past:
             return pastSessions.count
+        case .replays:
+            return replaySessions.count
         case .mySessions:
             return mySessions.count
         case .favorites:
             return favoriteSessions.count
         case .archived:
             return archivedSessions.count
+        }
+    }
+
+    /// Called when the session detail sheet is dismissed; performs delete if user confirmed delete (avoids SwiftData fault crash).
+    private func performPendingSessionDelete() {
+        guard let sessionId = pendingDeleteSessionId, let hostId = pendingDeleteHostId else { return }
+        let isHostDeletion = pendingDeleteIsHost
+        pendingDeleteSessionId = nil
+        pendingDeleteHostId = nil
+        pendingDeleteIsHost = false
+
+        // Defer delete so the sheet view is fully gone and no longer holds the session (avoids "detached without resolving attribute faults" on .tags, .relatedResources, etc.)
+        let ctx = modelContext
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000) // 0.35s
+            guard let session = (try? ctx.fetch(FetchDescriptor<LiveSession>(predicate: #Predicate<LiveSession> { $0.id == sessionId })))?.first else { return }
+            if isHostDeletion {
+                for inv in (try? ctx.fetch(FetchDescriptor<SessionInvitation>()))?.filter({ $0.sessionId == sessionId }) ?? [] { ctx.delete(inv) }
+                for p in (try? ctx.fetch(FetchDescriptor<LiveSessionParticipant>()))?.filter({ $0.sessionId == sessionId }) ?? [] { ctx.delete(p) }
+            } else {
+                if let me = (try? ctx.fetch(FetchDescriptor<LiveSessionParticipant>()))?.first(where: { $0.sessionId == sessionId && $0.userId == LocalUserService.shared.userIdentifier }) {
+                    ctx.delete(me)
+                }
+            }
+            for m in (try? ctx.fetch(FetchDescriptor<ChatMessage>()))?.filter({ $0.sessionId == sessionId }) ?? [] { ctx.delete(m) }
+            ctx.delete(session)
+            do {
+                try ctx.save()
+                if isHostDeletion {
+                    await FirebaseSyncService.shared.deleteLiveSession(sessionId: sessionId, hostId: hostId)
+                }
+            } catch {
+                print("Error deleting session: \(error)")
+            }
+        }
+    }
+
+    /// Remove or delete a session from the list. Hosts delete from Firebase; participants remove locally.
+    /// Sessions can be local (SwiftData) or from publicSessions (Firebase-only); only local ones are deleted from context.
+    private func removeSessionFromList(_ session: LiveSession) {
+        let sessionId = session.id
+        let isHost = session.hostId == userService.userIdentifier
+        let isLocalSession = allSessions.contains { $0.id == sessionId }
+
+        if isLocalSession {
+            if isHost {
+                let sessionParticipants = allParticipants.filter { $0.sessionId == sessionId }
+                for participant in sessionParticipants {
+                    modelContext.delete(participant)
+                }
+                let sessionInvitations = allInvitations.filter { $0.sessionId == sessionId }
+                for invitation in sessionInvitations {
+                    modelContext.delete(invitation)
+                }
+            } else {
+                if let userParticipant = allParticipants.first(where: { $0.sessionId == sessionId && $0.userId == userService.userIdentifier }) {
+                    modelContext.delete(userParticipant)
+                }
+            }
+
+            let sessionMessages = allMessages.filter { $0.sessionId == sessionId }
+            for message in sessionMessages {
+                modelContext.delete(message)
+            }
+
+            modelContext.delete(session)
+
+            do {
+                try modelContext.save()
+                if isHost {
+                    Task { await FirebaseSyncService.shared.deleteLiveSession(session) }
+                }
+                // Remove from publicSessions so combined list updates immediately (assign new array so SwiftUI refreshes)
+                publicSessions = publicSessions.filter { $0.id != sessionId }
+            } catch {
+                print("Error removing session: \(error)")
+            }
+        } else {
+            // Session only in publicSessions (invited from Firebase) – remove from list and remove invitation so it doesn’t reappear
+            publicSessions = publicSessions.filter { $0.id != sessionId }
+            let invitationsToRemove = allInvitations.filter { $0.sessionId == sessionId }
+            for invitation in invitationsToRemove {
+                modelContext.delete(invitation)
+            }
+            try? modelContext.save()
         }
     }
 }
@@ -443,6 +817,26 @@ struct SectionHeader: View {
     var body: some View {
         HStack {
             Text(title)
+                .font(.headline)
+                .font(.body.weight(.bold))
+            Text("(\(count))")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+/// "Live Now" section title with a red dot (SF Symbol so it never renders as "?").
+private struct LiveNowSectionHeader: View {
+    let count: Int
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "circle.fill")
+                .font(.system(size: 8))
+                .foregroundColor(.red)
+            Text("Live Now")
                 .font(.headline)
                 .font(.body.weight(.bold))
             Text("(\(count))")
@@ -475,9 +869,10 @@ struct SessionFilterChip: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? Color.purple : Color(.systemGray5))
+                    .fill(isSelected ? Color.purple : Color.platformSystemGray5)
             )
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -485,39 +880,102 @@ struct SessionFilterChip: View {
 struct EnhancedLiveSessionCard: View {
     let session: LiveSession
     let onTap: () -> Void
+    var onInfo: (() -> Void)? = nil
+    var onRemove: (() -> Void)? = nil
     // Use regular property for singleton, not @StateObject
     private let userService = LocalUserService.shared
+    @Query var userProfiles: [UserProfile]
     @State private var isFavorite = false
-    
+
+    private var userProfile: UserProfile? { userProfiles.first }
+
     var isHost: Bool {
         session.hostId == userService.userIdentifier
     }
+
+    /// When current user is host, show profile name; otherwise session.hostName (never device name).
+    private var hostDisplayName: String {
+        liveSessionHostDisplayName(session: session, isHost: isHost, userProfile: userProfile)
+    }
+    
+    /// Format session duration (e.g. "8 min, 49 sec" or "1 hr 5 min") for ended sessions.
+    private func formatSessionDuration(_ seconds: TimeInterval) -> String {
+        let total = Int(max(0, seconds))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+        if hours > 0 {
+            return "\(hours) hr \(minutes) min"
+        }
+        if minutes > 0 {
+            return "\(minutes) min, \(secs) sec"
+        }
+        return "\(secs) sec"
+    }
+    
+    private var thumbnailPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(height: 180)
+            .overlay(
+                VStack {
+                    Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            )
+    }
     
     var body: some View {
-        Button(action: onTap) {
+        Button { onTap() } label: {
             VStack(alignment: .leading, spacing: 12) {
                 // Thumbnail/Preview Area
                 ZStack(alignment: .topTrailing) {
-                    // Thumbnail placeholder
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(height: 180)
-                        .overlay(
-                            VStack {
-                                Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.white.opacity(0.8))
+                    Group {
+                        if let urlString = session.thumbnailURL, !urlString.isEmpty, let url = URL(string: urlString) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                case .failure:
+                                    thumbnailPlaceholder
+                                case .empty:
+                                    thumbnailPlaceholder
+                                        .overlay(ProgressView())
+                                @unknown default:
+                                    thumbnailPlaceholder
+                                }
                             }
-                        )
+                            .id(urlString)
+                            .frame(height: 180)
+                            .clipped()
+                        } else {
+                            thumbnailPlaceholder
+                        }
+                    }
+                    .cornerRadius(12)
                     
-                    // Status badges
-                    HStack {
+                    // Top overlay: info button, status badges (LIVE/ENDED/etc), then favorite — single row to avoid overlap
+                    HStack(alignment: .center, spacing: 8) {
+                        if onInfo != nil {
+                            Button(action: { onInfo?() }) {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Circle().fill(Color.black.opacity(0.5)))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
                         if session.isActive {
                             HStack(spacing: 4) {
                                 Circle()
@@ -561,6 +1019,36 @@ struct EnhancedLiveSessionCard: View {
                             .cornerRadius(8)
                         }
                         
+                        if let url = session.recordingURL, !url.isEmpty, !url.hasPrefix("file://") {
+                            HStack(spacing: 4) {
+                                Image(systemName: "play.rectangle.fill")
+                                    .font(.caption2)
+                                Text("REPLAY")
+                                    .font(.caption2)
+                                    .font(.body.weight(.bold))
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.purple.opacity(0.9))
+                            .cornerRadius(8)
+                        }
+                        
+                        if session.isPrivate == true {
+                            HStack(spacing: 4) {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption2)
+                                Text("Private")
+                                    .font(.caption2)
+                                    .font(.body.weight(.bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.orange.opacity(0.9))
+                            .cornerRadius(8)
+                        }
+                        
                         Spacer()
                         
                         // Favorite button
@@ -593,7 +1081,7 @@ struct EnhancedLiveSessionCard: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "person.circle.fill")
                                         .font(.caption)
-                                    Text(session.hostName.isEmpty ? "Host" : session.hostName)
+                                    Text(hostDisplayName)
                                         .font(.caption)
                                 }
                                 .foregroundColor(.secondary)
@@ -606,6 +1094,19 @@ struct EnhancedLiveSessionCard: View {
                                     .background(Color.purple.opacity(0.2))
                                     .foregroundColor(.purple)
                                     .cornerRadius(8)
+                                if session.isPrivate == true {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: "lock.fill")
+                                            .font(.caption2)
+                                        Text("Private")
+                                            .font(.caption)
+                                    }
+                                    .foregroundColor(.orange)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 4)
+                                    .background(Color.orange.opacity(0.2))
+                                    .cornerRadius(8)
+                                }
                             }
                         }
                         
@@ -623,15 +1124,13 @@ struct EnhancedLiveSessionCard: View {
                                 }
                                 .foregroundColor(.secondary)
                                 
-                                if let endTime = session.endTime {
-                                    Text(endTime, style: .relative)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                }
+                                Text(formatSessionDuration(session.duration))
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                             }
                         } else if session.isActive && !isHost {
                             // Quick Join Button (if live)
-                            Button(action: onTap) {
+                            Button { onTap() } label: {
                                 Image(systemName: "play.circle.fill")
                                     .font(.title2)
                                     .foregroundColor(.green)
@@ -660,10 +1159,10 @@ struct EnhancedLiveSessionCard: View {
                             }
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        } else if let endTime = session.endTime {
+                        } else if session.endTime != nil {
                             HStack(spacing: 4) {
                                 Image(systemName: "clock.badge.checkmark.fill")
-                                Text("Ended \(endTime, style: .relative)")
+                                Text("Lasted \(formatSessionDuration(session.duration))")
                             }
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -688,7 +1187,7 @@ struct EnhancedLiveSessionCard: View {
                                     .font(.caption2)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Color(.systemGray5))
+                                    .background(Color.platformSystemGray5)
                                     .cornerRadius(4)
                             }
                         }
@@ -699,11 +1198,18 @@ struct EnhancedLiveSessionCard: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .contextMenu {
+            if let onRemove = onRemove {
+                Button(role: .destructive, action: onRemove) {
+                    Label(isHost ? "Delete Session" : "Remove from My Sessions", systemImage: "trash")
+                }
+            }
+        }
         .onAppear {
             isFavorite = session.isFavorite
         }
@@ -729,7 +1235,7 @@ struct LiveSessionCard: View {
     let onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
+        Button { onTap() } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -798,7 +1304,7 @@ struct LiveSessionCard: View {
                                 .font(.caption2)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color(.systemGray5))
+                                .background(Color.platformSystemGray5)
                                 .cornerRadius(4)
                         }
                     }
@@ -813,7 +1319,7 @@ struct LiveSessionCard: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.platformSystemBackground)
                     .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             )
         }
@@ -837,14 +1343,20 @@ struct CategoryChip: View {
                 .padding(.vertical, 10)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(isSelected ? color : Color(.systemGray5))
+                        .fill(isSelected ? color : Color.platformSystemGray5)
                 )
         }
-        .animation(.spring(response: 0.3), value: isSelected)
+        .buttonStyle(.plain)
     }
 }
 
 @available(iOS 17.0, *)
+/// Session type when creating: broadcast = 1 host + many viewers; conference = everyone on camera.
+enum CreateSessionType: String, CaseIterable {
+    case broadcast
+    case conference
+}
+
 struct CreateLiveSessionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -862,6 +1374,10 @@ struct CreateLiveSessionView: View {
     @State private var details = ""
     @State private var category = "Prayer"
     @State private var maxParticipants = 10
+    /// For broadcast: max audience size (50–1000). For conference: not used.
+    @State private var maxAudience: Int = 100
+    /// Session type at create: broadcast = 1 host + many viewers; conference = everyone on camera.
+    @State private var createSessionType: CreateSessionType = .broadcast
     @State private var tags = ""
     @State private var selectedTags: Set<String> = []
     @State private var manualTagInput = ""
@@ -872,10 +1388,34 @@ struct CreateLiveSessionView: View {
     @State private var addToCalendar = false
     @State private var durationLimitMinutes: Int = 30
     @State private var enableWaitingRoom: Bool = false
+    /// Record this session when you go live (saved so broadcast view can start recording automatically).
+    @AppStorage("recordNextSession") private var recordNextSession = false
+    /// When true, replay is uploaded so everyone can watch; when false, replay stays on this device only.
+    @AppStorage("uploadReplayToCloud") private var uploadReplayToCloud = false
     @State private var isRecurring: Bool = false
     @State private var recurrencePattern: String = "weekly"
-    
-    let categories = ["Prayer", "Bible Study", "Devotional", "Testimony", "Fellowship", "Other"]
+    @State private var selectedThumbnailImage: PlatformImage?
+    @State private var selectedThumbnailPreset: FaithThumbnailPreset?
+    @State private var showingThumbnailPicker = false
+    @State private var isCreating = false
+    @State private var createErrorMessage: String?
+
+    // Feature 4 – Templates
+    @State private var selectedTemplate: LiveStreamTemplate? = nil
+
+    // Feature 5 – Scheduled + Friend Notifications
+    @State private var notifyAllFriends: Bool = true
+    @State private var showingSchedulePicker = false
+
+    // Feature 6 – Agenda & Checklist
+    @State private var segments: [StreamSegment] = []
+    @State private var newSegmentName = ""
+    @State private var newSegmentRef = ""
+    @State private var checklistDone: [String: Bool] = [
+        "Microphone": false, "Camera": false, "Internet": false, "Bible": false, "Notes": false
+    ]
+
+    let categories = ["Prayer", "Bible Study", "Devotional", "Testimony", "Fellowship", "Worship", "Other"]
     let predefinedTags = ["Prayer", "Bible Study", "Fellowship", "Worship", "Testimony", "Encouragement", "Healing", "Praise", "Intercession", "Community"]
     let durationOptions: [Int] = [15, 30, 45, 60, 90, 0]
     
@@ -883,44 +1423,60 @@ struct CreateLiveSessionView: View {
         NavigationStack {
             ZStack {
                 // Background - use adaptive color for dark mode support
-                Color(.systemBackground).ignoresSafeArea()
+                Color.platformSystemBackground.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 24) {
                         // Header Section
                         headerSection
-                        
+
+                        // Feature 4 – Stream Templates
+                        streamTemplatesCard
+
                         // Session Details Card
                         sessionDetailsCard
-                        
+
+                        // Thumbnail (optional cover image)
+                        thumbnailCard
+
                         // Category Selection Card
                         categoryCard
-                        
+
                         // Settings Cards
                         participantsCard
 
                         timeLimitCard
-                        
-                        if scheduledDate != nil || enableReminders {
-                            scheduleCard
-                        }
+
+                        // Feature 5 – Schedule + Friend Notifications (always visible)
+                        scheduleAndNotifyCard
 
                         if scheduledDate != nil {
                             recurringSessionCard
                         }
-                        
+
                         if enableReminders {
                             remindersCard
                         }
-                        
+
+                        // Feature 6 – Segment Agenda
+                        segmentAgendaCard
+
+                        // Feature 6 – Pre-Stream Checklist
+                        preStreamChecklistCard
+
                         // Privacy & Tags Card
                         privacyAndTagsCard
+
+                        // Recording & Replay Card
+                        recordingAndReplayCard
                     }
                     .padding()
                 }
             }
             .navigationTitle("Create Live Session")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .onAppear {
                 // Initialize selectedTags from tags string if it exists
                 if !tags.isEmpty {
@@ -929,7 +1485,7 @@ struct CreateLiveSessionView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button(action: { dismiss() }) {
                         HStack(spacing: 4) {
                             Image(systemName: "xmark")
@@ -938,11 +1494,16 @@ struct CreateLiveSessionView: View {
                         .foregroundColor(.primary)
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button(action: { createSession() }) {
                         HStack(spacing: 6) {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Create")
+                            if isCreating {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Create")
+                            }
                         }
                         .font(.headline)
                         .foregroundColor(.white)
@@ -955,8 +1516,13 @@ struct CreateLiveSessionView: View {
                         )
                         .cornerRadius(12)
                     }
-                    .disabled(title.isEmpty || details.isEmpty)
+                    .disabled(title.isEmpty || details.isEmpty || isCreating)
                 }
+            }
+            .alert("Could not create session", isPresented: Binding(get: { createErrorMessage != nil }, set: { if !$0 { createErrorMessage = nil } })) {
+                Button("OK", role: .cancel) { createErrorMessage = nil }
+            } message: {
+                if let msg = createErrorMessage { Text(msg) }
             }
         }
     }
@@ -1003,17 +1569,17 @@ struct CreateLiveSessionView: View {
                     .font(.body)
                     .foregroundColor(.primary)
                     .padding()
-                    .background(Color(.tertiarySystemBackground))
+                    .background(Color.platformTertiarySystemBackground)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(.separator), lineWidth: 0.5)
+                            .stroke(Color.platformSeparator, lineWidth: 0.5)
                     )
                 
                 ZStack(alignment: .topLeading) {
                     if details.isEmpty {
                         Text("Describe your session...")
-                            .foregroundColor(Color(.placeholderText))
+                            .foregroundColor(Color.platformPlaceholderText)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                     }
@@ -1021,20 +1587,159 @@ struct CreateLiveSessionView: View {
                         .frame(minHeight: 120)
                         .foregroundColor(.primary)
                         .padding(4)
-                        .background(Color(.tertiarySystemBackground))
+                        .background(Color.platformTertiarySystemBackground)
                         .cornerRadius(12)
                         .scrollContentBackground(.hidden)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color(.separator), lineWidth: 0.5)
+                                .stroke(Color.platformSeparator, lineWidth: 0.5)
                         )
                 }
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondarySystemBackground)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+    
+    private var thumbnailCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "photo.fill")
+                    .foregroundColor(themeManager.colors.primary)
+                    .font(.title3)
+                Text("Thumbnail (optional)")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            Text("Add a cover image for your live session.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Button(action: {
+                selectedThumbnailPreset = nil
+                showingThumbnailPicker = true
+            }) {
+                Group {
+                    if let img = selectedThumbnailImage {
+                        platformImage(img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(height: 160)
+                            .clipped()
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.platformTertiarySystemBackground)
+                            .frame(height: 160)
+                            .overlay(
+                                VStack(spacing: 8) {
+                                    Image(systemName: "photo.badge.plus")
+                                        .font(.title)
+                                    Text("Tap to add from device")
+                                        .font(.subheadline)
+                                }
+                                .foregroundColor(.secondary)
+                            )
+                    }
+                }
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.platformSeparator, lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
+            Text("Or choose a faith-based preset:")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
+                HStack(spacing: 10) {
+                    ForEach(FaithThumbnailPreset.allCases) { preset in
+                        Button {
+                            if let img = platformImageFromFaithPreset(preset, size: CGSize(width: 400, height: 224)) {
+                                selectedThumbnailImage = img
+                                selectedThumbnailPreset = preset
+                            }
+                        } label: {
+                            presetThumbnailPreview(preset)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(selectedThumbnailPreset == preset ? themeManager.colors.primary : Color.clear, lineWidth: 3)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .frame(height: 72)
+            if selectedThumbnailImage != nil {
+                Button("Remove thumbnail") {
+                    selectedThumbnailImage = nil
+                    selectedThumbnailPreset = nil
+                }
+                .font(.subheadline)
+                .foregroundColor(themeManager.colors.primary)
+            }
+        }
+        .padding()
+        .background(Color.platformSecondarySystemBackground)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .sheet(isPresented: $showingThumbnailPicker) {
+            #if os(iOS)
+            ImagePicker(image: $selectedThumbnailImage)
+                .macOSSheetFrameCompact()
+            #elseif os(macOS)
+            MacImagePicker(image: $selectedThumbnailImage)
+                .macOSSheetFrameCompact()
+            #endif
+        }
+    }
+    
+    @ViewBuilder
+    private func presetThumbnailPreview(_ preset: FaithThumbnailPreset) -> some View {
+        // Prefer bundled asset from catalog (SwiftUI Image loads from main bundle)
+        Image(preset.assetImageName)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: 100, height: 56)
+            .clipped()
+            .cornerRadius(10)
+            .overlay(
+                // Fallback gradient + symbol if asset failed to load (empty/small image)
+                Group {
+                    if platformBundledImageForFaithPreset(preset, size: CGSize(width: 2, height: 2)) == nil {
+                        let (start, end) = faithPresetGradientColors(preset)
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(
+                                LinearGradient(colors: [start, end], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .overlay(
+                                Image(systemName: preset.symbolName)
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                            )
+                    }
+                }
+                .allowsHitTesting(false)
+            )
+    }
+    
+    private func faithPresetGradientColors(_ preset: FaithThumbnailPreset) -> (Color, Color) {
+        switch preset {
+        case .prayer: return (Color(red: 0.85, green: 0.65, blue: 0.2), Color(red: 0.6, green: 0.4, blue: 0.1))
+        case .bible: return (Color(red: 0.2, green: 0.35, blue: 0.7), Color(red: 0.1, green: 0.2, blue: 0.5))
+        case .cross: return (Color(red: 0.45, green: 0.25, blue: 0.65), Color(red: 0.3, green: 0.15, blue: 0.5))
+        case .worship: return (Color(red: 0.9, green: 0.5, blue: 0.2), Color(red: 0.7, green: 0.3, blue: 0.1))
+        case .peace: return (Color(red: 0.5, green: 0.75, blue: 0.9), Color(red: 0.3, green: 0.55, blue: 0.75))
+        case .heart: return (Color(red: 0.85, green: 0.35, blue: 0.45), Color(red: 0.65, green: 0.2, blue: 0.35))
+        case .community: return (Color(red: 0.2, green: 0.6, blue: 0.6), Color(red: 0.1, green: 0.45, blue: 0.5))
+        case .hope: return (Color(red: 0.95, green: 0.8, blue: 0.25), Color(red: 0.85, green: 0.6, blue: 0.1))
+        case .devotional: return (Color(red: 0.35, green: 0.3, blue: 0.65), Color(red: 0.2, green: 0.2, blue: 0.5))
+        case .faith: return (Color(red: 0.6, green: 0.4, blue: 0.75), Color(red: 0.9, green: 0.7, blue: 0.2))
+        }
     }
     
     private var categoryCard: some View {
@@ -1048,7 +1753,7 @@ struct CreateLiveSessionView: View {
                     .foregroundColor(.primary)
             }
             
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(categories, id: \.self) { cat in
                         CategoryChip(
@@ -1064,10 +1769,12 @@ struct CreateLiveSessionView: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondarySystemBackground)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
+    
+    private static let audienceOptions = [50, 100, 250, 500, 1000]
     
     private var participantsCard: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1080,46 +1787,73 @@ struct CreateLiveSessionView: View {
                     .foregroundColor(.primary)
             }
             
-            HStack {
-                Text("Max Participants")
-                    .foregroundColor(.primary)
-                Spacer()
-                HStack(spacing: 16) {
-                    Button(action: {
-                        if maxParticipants > 2 {
-                            maxParticipants -= 1
-                        }
-                    }) {
-                        Image(systemName: "minus.circle.fill")
-                            .foregroundColor(maxParticipants > 2 ? themeManager.colors.primary : .gray)
-                            .font(.title3)
-                    }
-                    .disabled(maxParticipants <= 2)
-                    
-                    Text("\(maxParticipants)")
-                        .font(.title2)
-                        .font(.body.weight(.semibold))
-                        .foregroundColor(.primary)
-                        .frame(minWidth: 40)
-                    
-                    Button(action: {
-                        if maxParticipants < 50 {
-                            maxParticipants += 1
-                        }
-                    }) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(maxParticipants < 50 ? themeManager.colors.primary : .gray)
-                            .font(.title3)
-                    }
-                    .disabled(maxParticipants >= 50)
-                }
+            // Session type: Broadcast (1 host + many viewers) vs Conference (everyone on camera)
+            Picker("Session type", selection: $createSessionType) {
+                Text("Broadcast (1 host, many viewers)").tag(CreateSessionType.broadcast)
+                Text("Conference (everyone on camera)").tag(CreateSessionType.conference)
             }
+            .pickerStyle(.menu)
             .padding()
-            .background(Color(.tertiarySystemBackground))
+            .background(Color.platformTertiarySystemBackground)
             .cornerRadius(12)
+            
+            if createSessionType == .broadcast {
+                // Max audience size for broadcast: 50, 100, 250, 500, 1000
+                HStack {
+                    Text("Max audience size")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Picker("Audience", selection: $maxAudience) {
+                        ForEach(Self.audienceOptions, id: \.self) { n in
+                            Text("\(n)").tag(n)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(minWidth: 80)
+                }
+                .padding()
+                .background(Color.platformTertiarySystemBackground)
+                .cornerRadius(12)
+                Text("One host streams; up to \(maxAudience) people can join as viewers.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                // Conference: max participants 2–50
+                HStack {
+                    Text("Max participants")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    HStack(spacing: 16) {
+                        Button(action: {
+                            if maxParticipants > 2 { maxParticipants -= 1 }
+                        }) {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundColor(maxParticipants > 2 ? themeManager.colors.primary : .gray)
+                                .font(.title3)
+                        }
+                        .disabled(maxParticipants <= 2)
+                        Text("\(maxParticipants)")
+                            .font(.title2)
+                            .font(.body.weight(.semibold))
+                            .foregroundColor(.primary)
+                            .frame(minWidth: 40)
+                        Button(action: {
+                            if maxParticipants < 50 { maxParticipants += 1 }
+                        }) {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundColor(maxParticipants < 50 ? themeManager.colors.primary : .gray)
+                                .font(.title3)
+                        }
+                        .disabled(maxParticipants >= 50)
+                    }
+                }
+                .padding()
+                .background(Color.platformTertiarySystemBackground)
+                .cornerRadius(12)
+            }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondarySystemBackground)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
@@ -1143,7 +1877,7 @@ struct CreateLiveSessionView: View {
                 }
                 .pickerStyle(.menu)
                 .padding()
-                .background(Color(.tertiarySystemBackground))
+                .background(Color.platformTertiarySystemBackground)
                 .cornerRadius(12)
                 
                 Toggle(isOn: $enableWaitingRoom) {
@@ -1163,7 +1897,7 @@ struct CreateLiveSessionView: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondarySystemBackground)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
@@ -1205,7 +1939,7 @@ struct CreateLiveSessionView: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondarySystemBackground)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
@@ -1242,13 +1976,13 @@ struct CreateLiveSessionView: View {
                     ), displayedComponents: [.date, .hourAndMinute])
                     .datePickerStyle(.compact)
                     .padding()
-                    .background(Color(.tertiarySystemBackground))
+                    .background(Color.platformTertiarySystemBackground)
                     .cornerRadius(12)
                 }
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondarySystemBackground)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
@@ -1284,7 +2018,7 @@ struct CreateLiveSessionView: View {
                     }
                     .pickerStyle(.menu)
                     .padding()
-                    .background(Color(.tertiarySystemBackground))
+                    .background(Color.platformTertiarySystemBackground)
                     .cornerRadius(12)
                     
                     Toggle(isOn: $addToCalendar) {
@@ -1300,7 +2034,7 @@ struct CreateLiveSessionView: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondarySystemBackground)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
@@ -1322,9 +2056,9 @@ struct CreateLiveSessionView: View {
                         Image(systemName: isPrivate ? "lock.fill" : "lock.open.fill")
                             .foregroundColor(themeManager.colors.primary)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Private Session")
+                            Text("Make session public or private")
                                 .foregroundColor(.primary)
-                            Text(isPrivate ? "Only invited users can join" : "Anyone with the link can join")
+                            Text(isPrivate ? "Private: only invited users can join" : "Public: anyone with the link can join")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -1339,7 +2073,7 @@ struct CreateLiveSessionView: View {
                         .foregroundColor(.primary)
                     
                     // Predefined tags selection
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(predefinedTags, id: \.self) { tag in
                                 Button(action: {
@@ -1381,7 +2115,7 @@ struct CreateLiveSessionView: View {
                             .font(.body)
                             .foregroundColor(.primary)
                             .padding()
-                            .background(Color(.tertiarySystemBackground))
+                            .background(Color.platformTertiarySystemBackground)
                             .cornerRadius(12)
                             .onSubmit {
                                 addManualTag()
@@ -1431,11 +2165,370 @@ struct CreateLiveSessionView: View {
             }
         }
         .padding()
-        .background(Color(.secondarySystemBackground))
+        .background(Color.platformSecondarySystemBackground)
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
     
+    private var recordingAndReplayCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "play.rectangle.fill")
+                    .foregroundColor(themeManager.colors.primary)
+                    .font(.title3)
+                Text("Recording & Replay")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            Text("Record this session and optionally save a replay so others can watch later.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            VStack(spacing: 12) {
+                Toggle(isOn: $recordNextSession) {
+                    HStack {
+                        Image(systemName: "record.circle")
+                            .foregroundColor(themeManager.colors.primary)
+                        Text("Record this session")
+                            .foregroundColor(.primary)
+                    }
+                }
+                .tint(themeManager.colors.primary)
+                Toggle(isOn: $uploadReplayToCloud) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Image(systemName: "cloud.fill")
+                                .foregroundColor(themeManager.colors.primary)
+                            Text("Upload replay (share with everyone)")
+                                .foregroundColor(.primary)
+                        }
+                        Text("Off = replay only on your device. On = anyone can watch later.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .tint(themeManager.colors.primary)
+            }
+        }
+        .padding()
+        .background(Color.platformSecondarySystemBackground)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+    
+    // MARK: – Feature 4: Stream Templates Card
+
+    private var streamTemplatesCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "square.grid.2x2.fill")
+                    .foregroundColor(themeManager.colors.primary)
+                    .font(.title3)
+                Text("Quick Start Templates")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                Spacer()
+                if selectedTemplate != nil {
+                    Button("Clear") { selectedTemplate = nil }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Text("Tap a template to pre-fill session details and build a segment agenda.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(LiveStreamTemplate.all) { template in
+                        Button {
+                            applyTemplate(template)
+                        } label: {
+                            VStack(spacing: 8) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(selectedTemplate?.id == template.id
+                                              ? template.color
+                                              : template.color.opacity(0.15))
+                                        .frame(width: 80, height: 64)
+                                    Image(systemName: template.icon)
+                                        .font(.title2)
+                                        .foregroundColor(selectedTemplate?.id == template.id ? .white : template.color)
+                                }
+                                Text(template.name)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundColor(.primary)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                    .frame(width: 80)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+        .padding()
+        .background(Color.platformSecondarySystemBackground)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    private func applyTemplate(_ template: LiveStreamTemplate) {
+        selectedTemplate = template
+        title = template.title
+        details = template.description
+        category = template.category
+        selectedTags = Set(template.tags)
+        updateTagsString()
+        segments = template.suggestedSegments
+    }
+
+    // MARK: – Feature 5: Schedule + Friend Notifications Card
+
+    private var scheduleAndNotifyCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundColor(themeManager.colors.primary)
+                    .font(.title3)
+                Text("Schedule & Notifications")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            VStack(spacing: 12) {
+                // Schedule toggle
+                Toggle(isOn: Binding(
+                    get: { scheduledDate != nil },
+                    set: { on in scheduledDate = on ? Calendar.current.date(byAdding: .hour, value: 1, to: Date()) : nil }
+                )) {
+                    HStack {
+                        Image(systemName: "calendar")
+                            .foregroundColor(themeManager.colors.primary)
+                        Text("Schedule for later")
+                            .foregroundColor(.primary)
+                    }
+                }
+                .tint(themeManager.colors.primary)
+
+                if let scheduled = scheduledDate {
+                    DatePicker("Start Time", selection: Binding(
+                        get: { scheduled },
+                        set: { scheduledDate = $0 }
+                    ), in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                    .datePickerStyle(.compact)
+                    .tint(themeManager.colors.primary)
+                }
+
+                Divider()
+
+                // Reminder toggle
+                Toggle(isOn: $enableReminders) {
+                    HStack {
+                        Image(systemName: "bell.fill")
+                            .foregroundColor(themeManager.colors.primary)
+                        Text("Remind me before it starts")
+                            .foregroundColor(.primary)
+                    }
+                }
+                .tint(themeManager.colors.primary)
+
+                if enableReminders {
+                    Picker("Remind me", selection: $reminderMinutes) {
+                        Text("5 min").tag(5)
+                        Text("10 min").tag(10)
+                        Text("15 min").tag(15)
+                        Text("30 min").tag(30)
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Divider()
+
+                // Friend notifications
+                Toggle(isOn: $notifyAllFriends) {
+                    HStack {
+                        Image(systemName: "person.wave.2.fill")
+                            .foregroundColor(themeManager.colors.primary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notify Faith Friends")
+                                .foregroundColor(.primary)
+                            Text("All connected friends get an alert when you go live")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .tint(themeManager.colors.primary)
+            }
+        }
+        .padding()
+        .background(Color.platformSecondarySystemBackground)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    // MARK: – Feature 6: Segment Agenda Card
+
+    private var segmentAgendaCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "list.number")
+                    .foregroundColor(themeManager.colors.primary)
+                    .font(.title3)
+                Text("Session Agenda")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                Spacer()
+                if !segments.isEmpty {
+                    Text("\(segments.count) segment\(segments.count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Text("Add named segments so viewers see a live \"Now:\" tracker during the stream.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            if !segments.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(segments) { seg in
+                        HStack(spacing: 10) {
+                            Image(systemName: "line.3.horizontal")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(seg.name)
+                                    .font(.subheadline.weight(.medium))
+                                if !seg.scriptureReference.isEmpty {
+                                    Text(seg.scriptureReference)
+                                        .font(.caption)
+                                        .foregroundColor(.purple)
+                                }
+                            }
+                            Spacer()
+                            if seg.durationMinutes > 0 {
+                                Text("\(seg.durationMinutes)m")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Button {
+                                segments.removeAll { $0.id == seg.id }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.platformTertiarySystemBackground)
+                        .cornerRadius(8)
+                    }
+                }
+            }
+
+            // Add segment row
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    TextField("Segment name (e.g. Worship)", text: $newSegmentName)
+                        .font(.subheadline)
+                        .padding(10)
+                        .background(Color.platformTertiarySystemBackground)
+                        .cornerRadius(8)
+                    Button {
+                        addSegment()
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(newSegmentName.trimmingCharacters(in: .whitespaces).isEmpty
+                                             ? .secondary : themeManager.colors.primary)
+                    }
+                    .disabled(newSegmentName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                TextField("Scripture (optional, e.g. Psalm 23)", text: $newSegmentRef)
+                    .font(.caption)
+                    .padding(10)
+                    .background(Color.platformTertiarySystemBackground)
+                    .cornerRadius(8)
+            }
+        }
+        .padding()
+        .background(Color.platformSecondarySystemBackground)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    // MARK: – Feature 6: Pre-Stream Checklist Card
+
+    private var preStreamChecklistCard: some View {
+        let items = ["Microphone", "Camera", "Internet", "Bible", "Notes"]
+        let doneCount = items.filter { checklistDone[$0] == true }.count
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundColor(doneCount == items.count ? .green : themeManager.colors.primary)
+                    .font(.title3)
+                Text("Pre-Stream Checklist")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                Spacer()
+                Text("\(doneCount)/\(items.count)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(doneCount == items.count ? .green : .secondary)
+            }
+            ForEach(items, id: \.self) { item in
+                Button {
+                    checklistDone[item] = !(checklistDone[item] ?? false)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: checklistDone[item] == true ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(checklistDone[item] == true ? .green : .secondary)
+                            .font(.title3)
+                        Text(checklistItem(item))
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            if doneCount == items.count {
+                HStack {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(.green)
+                    Text("You're all set to go live!")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.green)
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding()
+        .background(Color.platformSecondarySystemBackground)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    private func checklistItem(_ key: String) -> String {
+        switch key {
+        case "Microphone": return "Microphone is working"
+        case "Camera": return "Camera is working"
+        case "Internet": return "Internet connection is stable"
+        case "Bible": return "Bible is open / passage ready"
+        case "Notes": return "Notes / outline are prepared"
+        default: return key
+        }
+    }
+
+    private func addSegment() {
+        let name = newSegmentName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        segments.append(StreamSegment(name: name, scriptureReference: newSegmentRef.trimmingCharacters(in: .whitespaces)))
+        newSegmentName = ""
+        newSegmentRef = ""
+    }
+
     private func addManualTag() {
         let trimmedTag = manualTagInput.trimmingCharacters(in: .whitespaces)
         if !trimmedTag.isEmpty && !selectedTags.contains(trimmedTag) {
@@ -1450,29 +2543,41 @@ struct CreateLiveSessionView: View {
     }
     
     private func createSession() {
-        let tagArray = Array(selectedTags)
-        // Use CloudKit user ID for multi-user support
-        let userId = userService.userIdentifier
-        let userName = userService.getDisplayName(userProfile: userProfile)
+        isCreating = true
+        createErrorMessage = nil
         
+        let tagArray = Array(selectedTags)
+        let userId = userService.userIdentifier
+        // Prefer profile name; never persist device name (store "Host" if only device name available)
+        let pmName = ProfileManager.shared.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let profileName = (userProfile?.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate = !pmName.isEmpty ? pmName : (!profileName.isEmpty ? profileName : userService.getDisplayName(userProfile: userProfile))
+        let nameToStore = isDeviceName(candidate) ? "Host" : candidate
+        
+        // Broadcast: host + up to maxAudience viewers. Conference: up to maxParticipants (2–50).
+        let effectiveMax = createSessionType == .broadcast ? (1 + maxAudience) : maxParticipants
         let session = LiveSession(
             title: title,
             description: details,
             hostId: userId,
             category: category,
-            maxParticipants: maxParticipants,
+            maxParticipants: effectiveMax,
             tags: tagArray
         )
         session.isPrivate = isPrivate
-        session.hostName = userName
+        session.hostName = nameToStore
+        session.streamMode = (createSessionType == .broadcast ? StreamMode.broadcast : StreamMode.conference).rawValue
         session.durationLimitMinutes = durationLimitMinutes
         session.waitingRoomEnabled = enableWaitingRoom
         session.hasWaitingRoom = enableWaitingRoom
         session.isRecurring = isRecurring
         session.recurrencePattern = isRecurring ? recurrencePattern : ""
+        if !segments.isEmpty {
+            session.segmentsData = try? JSONEncoder().encode(segments)
+        }
         if let scheduled = scheduledDate {
             session.scheduledStartTime = scheduled
-            session.isActive = false // Scheduled sessions are not active until start time
+            session.isActive = false
         }
         
         modelContext.insert(session)
@@ -1481,18 +2586,78 @@ struct CreateLiveSessionView: View {
         let participant = LiveSessionParticipant(
             sessionId: session.id,
             userId: userId,
-            userName: userName,
+            userName: nameToStore,
             isHost: true
         )
+        participant.userAvatarURL = userProfile?.avatarPhotoURL ?? ProfileManager.shared.profileImageURL
         modelContext.insert(participant)
         
         do {
             try modelContext.save()
 
-            // Publish to Firebase so invite codes can resolve cross-device.
-            if !session.isPrivate {
-                Task {
+            // Create and sync invite code immediately so it's in Firebase before the host shares it.
+            let code = String(UUID().uuidString.prefix(8).uppercased())
+            let expirationDate = Calendar.current.date(byAdding: .day, value: 30, to: Date())
+            let invitation = SessionInvitation(
+                sessionId: session.id,
+                sessionTitle: session.title,
+                hostId: userId,
+                hostName: nameToStore,
+                inviteCode: code,
+                expiresAt: expirationDate
+            )
+            modelContext.insert(invitation)
+            try modelContext.save()
+
+            // Persist thumbnail to disk and to the session BEFORE dismiss so it survives app close. Then upload to Firebase in background.
+            let sessionId = session.id
+            let thumbImage = selectedThumbnailImage
+            let isPrivateSession = session.isPrivate
+            let ctx = modelContext
+            let canUseFirebase = FirebaseInitializer.shared.isConfigured
+            if let image = thumbImage, let localURL = ProfileManager.shared.saveLiveSessionThumbnailToLocalSync(sessionId: sessionId, image: image) {
+                session.thumbnailURL = localURL
+                try? ctx.save()
+                NotificationCenter.default.post(name: liveSessionThumbnailDidSaveNotification, object: nil)
+            }
+
+            // Dismiss immediately so the user sees the sheet close and the new session in the list.
+            isCreating = false
+            dismiss()
+
+            // Background: sync public session to Firebase, then upload thumbnail and update to https when done.
+            Task {
+                if !isPrivateSession {
                     await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+                    await FirebaseSyncService.shared.syncSessionInvitation(invitation)
+                }
+                var sessionToSync: LiveSession? = session
+                if let image = thumbImage, canUseFirebase, let jpegData = platformImageToJPEGData(image, quality: 0.85) {
+                    do {
+                        let httpsURL = try await FirebaseSyncService.shared.uploadLiveSessionThumbnail(sessionId: sessionId, imageData: jpegData)
+                        await MainActor.run {
+                            var descriptor = FetchDescriptor<LiveSession>()
+                            descriptor.predicate = #Predicate<LiveSession> { $0.id == sessionId }
+                            if let fetched = try? ctx.fetch(descriptor).first {
+                                fetched.thumbnailURL = httpsURL
+                                try? ctx.save()
+                                sessionToSync = fetched
+                            }
+                            FirebaseSyncService.shared.saveThumbnailURL(sessionId: sessionId, urlString: httpsURL)
+                            NotificationCenter.default.post(name: liveSessionThumbnailDidSaveNotification, object: nil)
+                        }
+                        print("✅ [LIVE SESSION] Thumbnail uploaded to Firebase: \(httpsURL.prefix(60))...")
+                    } catch {
+                        let ns = error as NSError
+                        if ns.domain == "FirebaseSyncService", ns.code == 401 {
+                            print("ℹ️ [LIVE SESSION] \(ns.localizedDescription)")
+                        } else {
+                            print("⚠️ [LIVE SESSION] Firebase thumbnail upload failed; local thumbnail already saved: \(FirebaseSyncService.formatFirebaseStorageError(error))")
+                        }
+                    }
+                }
+                if !isPrivateSession, let toSync = sessionToSync, toSync.thumbnailURL != nil, toSync.thumbnailURL?.hasPrefix("https") == true {
+                    await FirebaseSyncService.shared.syncLiveSessionPublic(toSync)
                 }
             }
             
@@ -1524,9 +2689,9 @@ struct CreateLiveSessionView: View {
                 }
             }
             */
-            
-            dismiss()
         } catch {
+            isCreating = false
+            createErrorMessage = error.localizedDescription
             print("Error creating session: \(error)")
         }
     }
@@ -1535,6 +2700,9 @@ struct CreateLiveSessionView: View {
 @available(iOS 17.0, *)
 struct LiveSessionDetailView: View {
     let session: LiveSession
+    /// Called before dismiss so parent can perform delete in sheet onDismiss (avoids accessing deleted session).
+    var onPrepareDelete: ((UUID, String, Bool) -> Void)? = nil
+    var onDeleted: ((UUID) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Query var participants: [LiveSessionParticipant]
@@ -1561,31 +2729,87 @@ struct LiveSessionDetailView: View {
     @State private var showingRecording = false
     @State private var showingDeleteConfirmation = false
     @State private var showingArchiveConfirmation = false
+    @State private var showingWaitingRoom = false
+    @State private var showingClips = false
     @Query var messages: [ChatMessage]
+
+    // Feature 1 – Prayer Wall
+    @State private var wallRequests: [WallPrayerRequest] = []
+    @State private var wallListener: Any? = nil
+    @State private var pinnedRequestId: String? = nil
+    @State private var showingPrayerWallSubmit = false
+    @State private var prayerWallText = ""
+
+    // Feature 2 – Scripture Overlay
+    @State private var scriptureOverlay: (reference: String, text: String)? = nil
+    @State private var scriptureListener: Any? = nil
+    @State private var showingScriptureOverlayPicker = false
+
+    // Feature 3 – Amen Moments + Reactions
+    @State private var amenMoments: [Date] = []
+    @State private var showingReactionBar = false
+    @State private var currentSegmentIndex: Int = 0
     
-    enum StreamMode {
-        case broadcast
-        case conference
-        case multiParticipant
+    private var streamModeDescription: String {
+        switch streamMode {
+        case .broadcast:
+            return "One host streams to viewers. Viewers watch and can chat; no video from participants."
+        case .conference:
+            return "Everyone can turn on camera and mic. See and hear all participants in real time."
+        case .multiParticipant:
+            return "Same as Conference: all participants can share video and audio in the session."
+        }
     }
     
     var shareText: String {
         """
         Join me for a live session: \(session.title)
-        
+
         \(session.details)
-        
+
         Category: \(session.category)
-        Participants: \(session.currentParticipants)/\(session.maxParticipants)
+        Participants: \(uniqueParticipantCount)/\(session.maxParticipants)
         """
+    }
+
+    /// Present chat sheet with a short delay so nested sheet-from-sheet works on macOS (and avoids flakiness on iOS).
+    private func presentChat() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.35))
+            showingChat = true
+        }
     }
     
     var sessionParticipants: [LiveSessionParticipant] {
         participants.filter { $0.sessionId == session.id && $0.isActive }
     }
     
+    /// Actual unique participant count (use for display so we never show 3 when only 2 people).
+    private var uniqueParticipantCount: Int {
+        Set(sessionParticipants.map { $0.userId }).count
+    }
+    
     var canJoin: Bool {
-        session.isActive && session.currentParticipants < session.maxParticipants
+        !session.isArchived && session.isActive && uniqueParticipantCount < session.maxParticipants
+    }
+    
+    private var sessionDetailThumbnailPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(
+                LinearGradient(
+                    colors: [themeManager.colors.primary.opacity(0.6), themeManager.colors.secondary.opacity(0.6)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(height: 160)
+            .overlay(
+                VStack(spacing: 8) {
+                    Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
+                        .font(.system(size: 36))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            )
     }
     
     var isHost: Bool {
@@ -1597,16 +2821,560 @@ struct LiveSessionDetailView: View {
     var sessionInvitations: [SessionInvitation] {
         invitations.filter { $0.sessionId == session.id }
     }
+
+    /// Display name for the host: when current user is host, use profile name; otherwise use stored hostName (never device name).
+    var hostDisplayName: String {
+        liveSessionHostDisplayName(session: session, isHost: isHost, userProfile: userProfile)
+    }
+    
+    /// Display name for a chat message author: profile name when it's the current user, otherwise stored name or "Participant".
+    private func messageAuthorDisplayName(_ message: ChatMessage) -> String {
+        if message.userId == userService.userIdentifier {
+            return profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService)
+        }
+        return isDeviceName(message.userName) ? "Participant" : message.userName
+    }
     
     var primaryInviteCode: String? {
         sessionInvitations.first(where: { $0.status == .pending })?.inviteCode ??
         sessionInvitations.first?.inviteCode
     }
-    
+
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+        detailViewContent
+    }
+
+    private var detailViewNavigation: some View {
+        NavigationStack {
+            Group {
+                #if os(macOS)
+                // On macOS, constrain ScrollView to available height so content actually scrolls in the sheet.
+                GeometryReader { geo in
+                    ScrollView {
+                        detailScrollContent
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #else
+                ScrollView {
+                    detailScrollContent
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #endif
+            }
+            .navigationTitle("Session Details")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Menu {
+                        Button(role: .destructive, action: {
+                            showingDeleteConfirmation = true
+                        }) {
+                            Label(isHost ? "Delete Session" : "Remove from My Sessions", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .alert(isHost ? "Delete Session" : "Remove Session", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button(isHost ? "Delete" : "Remove", role: .destructive) {
+                    deleteSession()
+                }
+            } message: {
+                Text(isHost
+                    ? "Are you sure you want to delete this session? This action cannot be undone. All participants, messages, and recordings associated with this session will be removed."
+                    : "Remove this session from your list? This will only remove it from your device and won't affect the host or other participants.")
+            }
+            .alert("Archive Session", isPresented: $showingArchiveConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Archive") {
+                    archiveSession()
+                }
+            } message: {
+                Text("Archive this session? Archived sessions will be moved to the Archived section and hidden from your main session list. You can unarchive it later if needed.")
+            }
+        }
+    }
+
+    // MARK: – Feature 1: Prayer Wall Section
+
+    private var prayerWallSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "hands.sparkles.fill")
+                    .foregroundColor(.orange)
+                Text("Prayer Wall")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    prayerWallText = ""
+                    showingPrayerWallSubmit = true
+                } label: {
+                    Label("Submit", systemImage: "plus.circle")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+
+            if wallRequests.isEmpty {
+                Text("No prayer requests yet. Be the first to share.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(wallRequests) { req in
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: req.isPinned ? "hands.sparkles.fill" : "person.crop.circle")
+                            .foregroundColor(req.isPinned ? .orange : .secondary)
+                            .font(req.isPinned ? .title3 : .body)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            if req.isPinned {
+                                Text("LIFTED UP")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundColor(.orange)
+                            }
+                            Text(req.text)
+                                .font(.subheadline)
+                            Text("— \(req.authorName)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        if isHost {
+                            Button {
+                                let newPinned = !req.isPinned
+                                pinnedRequestId = newPinned ? req.id : nil
+                                Task { await FirebaseSyncService.shared.setPrayerWallPinned(
+                                    sessionId: session.id, requestId: req.id, pinned: newPinned) }
+                            } label: {
+                                Image(systemName: req.isPinned ? "pin.slash" : "pin.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(req.isPinned
+                                ? Color.orange.opacity(0.1)
+                                : Color.platformSystemGray6)
+                    .cornerRadius(10)
+                    .overlay(
+                        req.isPinned
+                        ? RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                        : nil
+                    )
+                }
+            }
+        }
+        .padding()
+        .background(Color.platformSystemGray6)
+        .cornerRadius(12)
+        .sheet(isPresented: $showingPrayerWallSubmit) {
+            NavigationStack {
+                VStack(spacing: 20) {
+                    Text("Share what's on your heart and let the group intercede with you.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    TextEditor(text: $prayerWallText)
+                        .frame(height: 160)
+                        .padding(8)
+                        .background(Color.platformSystemGray6)
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                    Button {
+                        let name = profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService)
+                        Task { await FirebaseSyncService.shared.submitPrayerWallRequest(
+                            sessionId: session.id, text: prayerWallText, authorName: name) }
+                        showingPrayerWallSubmit = false
+                    } label: {
+                        Text("Submit Prayer Request")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .cornerRadius(12)
+                    }
+                    .disabled(prayerWallText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(.horizontal)
+                }
+                .navigationTitle("Prayer Request")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingPrayerWallSubmit = false } } }
+            }
+            .presentationDetents([.medium])
+        }
+    }
+
+    // MARK: – Feature 2: Scripture Overlay Card
+
+    @ViewBuilder
+    private func scriptureOverlayCard(_ overlay: (reference: String, text: String)) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "text.quote")
+                    .foregroundColor(.purple)
+                Text("Scripture")
+                    .font(.headline.weight(.bold))
+                    .foregroundColor(.purple)
+                Spacer()
+                if isHost {
+                    Button {
+                        Task { await FirebaseSyncService.shared.dismissScriptureOverlay(sessionId: session.id) }
+                        withAnimation { scriptureOverlay = nil }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            Text(overlay.reference)
+                .font(.title3.weight(.bold))
+                .foregroundColor(.purple)
+            Text(overlay.text)
+                .font(.body)
+                .lineSpacing(5)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.purple.opacity(0.08))
+                .cornerRadius(10)
+
+            Button {
+                let verse = BookmarkedVerse(
+                    verseReference: overlay.reference,
+                    verseText: overlay.text,
+                    translation: "KJV",
+                    sessionId: session.id,
+                    sessionTitle: session.title
+                )
+                modelContext.insert(verse)
+                try? modelContext.save()
+                Task { await FirebaseSyncService.shared.syncBookmarkedVerse(verse) }
+            } label: {
+                Label("Save to Bookmarks", systemImage: "bookmark.fill")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.purple)
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(colors: [Color.purple.opacity(0.12), Color.purple.opacity(0.05)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.purple.opacity(0.3), lineWidth: 1))
+        .sheet(isPresented: $showingScriptureOverlayPicker) {
+            BibleVerseChatPicker { reference, text in
+                Task { await FirebaseSyncService.shared.pushScriptureOverlay(
+                    sessionId: session.id, reference: reference, text: text) }
+                withAnimation { scriptureOverlay = (reference, text) }
+                showingScriptureOverlayPicker = false
+            }
+            .presentationDetents([.large])
+        }
+    }
+
+    // MARK: – Feature 3: Reactions + Amen Moments Section
+
+    private var reactionAndAmenSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Agenda tracker (current segment)
+            let sessionSegments: [StreamSegment] = {
+                guard let data = session.segmentsData else { return [] }
+                return (try? JSONDecoder().decode([StreamSegment].self, from: data)) ?? []
+            }()
+            if !sessionSegments.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "play.rectangle.fill")
+                        .foregroundColor(.purple)
+                    Text("Now: \(sessionSegments[min(currentSegmentIndex, sessionSegments.count - 1)].name)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.purple)
+                    Spacer()
+                    if isHost && currentSegmentIndex < sessionSegments.count - 1 {
+                        Button("Next →") {
+                            withAnimation { currentSegmentIndex += 1 }
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.purple)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(8)
+            }
+
+            // Reaction emoji row
+            HStack(spacing: 0) {
+                ForEach([("🙏", "Praying"), ("❤️", "Love"), ("✝️", "Amen"), ("🔥", "Fire")], id: \.0) { emoji, _ in
+                    Button {
+                        sendReaction(emoji)
+                    } label: {
+                        Text(emoji)
+                            .font(.title2)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.platformSystemGray6)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // Amen Moment button (host only)
+                if isHost {
+                    Button {
+                        recordAmenMoment()
+                    } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                            Text("Amen")
+                                .font(.caption2.weight(.bold))
+                                .foregroundColor(.yellow)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.yellow.opacity(0.15))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                // Scripture push (host only)
+                if isHost {
+                    Button {
+                        showingScriptureOverlayPicker = true
+                    } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "book.fill")
+                                .foregroundColor(.blue)
+                            Text("Verse")
+                                .font(.caption2.weight(.bold))
+                                .foregroundColor(.blue)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.blue.opacity(0.10))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.platformSeparator, lineWidth: 0.5))
+
+            // Amen moment history
+            if !amenMoments.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Amen Moments (\(amenMoments.count))")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(Array(amenMoments.enumerated()), id: \.offset) { idx, ts in
+                                Text("⭐ \(ts, style: .time)")
+                                    .font(.caption2)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.yellow.opacity(0.15))
+                                    .cornerRadius(8)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color.platformSystemGray6)
+        .cornerRadius(12)
+    }
+
+    private func removeStreamListeners() {
+        #if canImport(FirebaseFirestore)
+        FirebaseSyncService.shared.removeListener(wallListener)
+        FirebaseSyncService.shared.removeListener(scriptureListener)
+        #endif
+        wallListener = nil
+        scriptureListener = nil
+    }
+
+    private func sendReaction(_ emoji: String) {
+        session.reactionCount += 1
+        try? modelContext.save()
+    }
+
+    private func recordAmenMoment() {
+        amenMoments.append(Date())
+        let intervals = amenMoments.map { $0.timeIntervalSince1970 }
+        session.amenMomentsData = try? JSONEncoder().encode(intervals)
+        try? modelContext.save()
+    }
+
+    private var detailViewContent: some View {
+        detailViewNavigation
+            .sheet(isPresented: $showingChat) {
+                LiveSessionChatView(session: session, canSend: hasJoined || isHost)
+                    .macOSSheetFrameForm()
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                ActivityView(activityItems: [shareText])
+                    .macOSSheetFrameCompact()
+            }
+            .sheet(isPresented: $showingInviteUsers) {
+                InviteUsersView(session: session)
+                    .macOSSheetFrameStandard()
+            }
+            .sheet(isPresented: $showingInviteCode) {
+                InviteCodeView(session: session)
+                    .macOSSheetFrameCompact()
+            }
+            #if os(iOS)
+            .fullScreenCover(isPresented: $showingLiveStream) {
+                LiveStreamView(session: session)
+            }
+            .fullScreenCover(isPresented: $showingBroadcastStream) {
+                if #available(iOS 17.0, *) {
+                    BroadcastStreamView_HLS(session: session)
+                }
+            }
+            .fullScreenCover(isPresented: $showingMultiParticipantStream) {
+                if #available(iOS 17.0, *) {
+                    // .id(session.id helps prevent view replacement on re-render so connect isn’t cancelled (Code=100).
+                    MultiParticipantStreamView(session: session)
+                        .id(session.id)
+                }
+            }
+            #else
+            .sheet(isPresented: $showingLiveStream) {
+                LiveStreamView(session: session)
+                    .macOSSheetFrameForm()
+            }
+            .sheet(isPresented: $showingBroadcastStream) {
+                if #available(macOS 14.0, *) {
+                    BroadcastStreamView_HLS(session: session)
+                        .macOSSheetFrameForm()
+                }
+            }
+            .sheet(isPresented: $showingMultiParticipantStream) {
+                if #available(macOS 14.0, *) {
+                    MultiParticipantStreamView(session: session)
+                        .id(session.id)
+                        .macOSSheetFrameForm()
+                }
+            }
+            #endif
+            .sheet(isPresented: $showingHostProfile) {
+                HostProfileView(session: session, hostDisplayName: hostDisplayName)
+                    .macOSSheetFrameStandard()
+            }
+            .sheet(isPresented: $showingAgenda) {
+                AgendaView(agenda: session.agenda)
+                    .macOSSheetFrameStandard()
+            }
+            .sheet(isPresented: $showingAnalytics) {
+                SessionAnalyticsView(session: session)
+                    .macOSSheetFrameStandard()
+            }
+            .sheet(isPresented: $showingRecording) {
+                if let url = session.recordingURL, !url.isEmpty {
+                    RecordingPlayerView(recordingURL: url)
+                        .macOSSheetFrameForm()
+                }
+            }
+            .sheet(isPresented: $showingWaitingRoom) {
+                WaitingRoomView(session: session)
+                    .macOSSheetFrameForm()
+            }
+            .sheet(isPresented: $showingClips) {
+                SessionClipsView(session: session)
+                    .macOSSheetFrameStandard()
+            }
+            .onAppear {
+                checkJoinStatus()
+                streamMode = session.typedStreamMode
+                if isHost && primaryInviteCode == nil {
+                    generateInviteCodeIfNeeded()
+                }
+                reconcileParticipantCount()
+
+                // Restore amen moments from model
+                if let data = session.amenMomentsData,
+                   let intervals = try? JSONDecoder().decode([TimeInterval].self, from: data) {
+                    amenMoments = intervals.map { Date(timeIntervalSince1970: $0) }
+                }
+
+                // Feature 1 – live prayer wall listener
+                wallListener = FirebaseSyncService.shared.listenForPrayerWall(sessionId: session.id) { docs in
+                    wallRequests = docs.compactMap { d -> WallPrayerRequest? in
+                        guard let id = d["id"] as? String, let text = d["text"] as? String else { return nil }
+                        let author = d["authorName"] as? String ?? "Anonymous"
+                        let pinned = d["isPinned"] as? Bool ?? false
+                        return WallPrayerRequest(id: id, text: text, authorName: author, isPinned: pinned)
+                    }
+                    pinnedRequestId = wallRequests.first(where: { $0.isPinned })?.id
+                }
+
+                // Feature 2 – live scripture overlay listener
+                scriptureListener = FirebaseSyncService.shared.listenForScriptureOverlay(sessionId: session.id) { data in
+                    if let data, let ref = data["reference"] as? String, let text = data["text"] as? String {
+                        withAnimation { scriptureOverlay = (ref, text) }
+                    } else {
+                        withAnimation { scriptureOverlay = nil }
+                    }
+                }
+            }
+            .onDisappear {
+                removeStreamListeners()
+            }
+            .onChange(of: participants.count) { _, _ in
+                // Don’t run participant sync while the stream is open — it triggers modelContext.save() and parent re-renders that can replace the stream view and cancel the connection (Code 100).
+                if showingMultiParticipantStream { return }
+                checkJoinStatus()
+                reconcileParticipantCount()
+            }
+    }
+    
+    private var detailScrollContent: some View {
+        VStack(alignment: .leading, spacing: 24) {
+                    // Cover image (custom thumbnail or placeholder)
+                    Group {
+                        if let urlString = session.thumbnailURL, !urlString.isEmpty, let url = URL(string: urlString) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image.resizable().scaledToFill()
+                                case .failure, .empty:
+                                    sessionDetailThumbnailPlaceholder
+                                @unknown default:
+                                    sessionDetailThumbnailPlaceholder
+                                }
+                            }
+                            .frame(height: 160)
+                            .clipped()
+                        } else {
+                            sessionDetailThumbnailPlaceholder
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 160)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.platformSeparator, lineWidth: 0.5)
+                    )
+                    
                     // Header
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -1617,9 +3385,21 @@ struct LiveSessionDetailView: View {
                                 .background(Color.purple.opacity(0.2))
                                 .foregroundColor(.purple)
                                 .cornerRadius(8)
-                            
+                            if session.isPrivate == true {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "lock.fill")
+                                        .font(.caption2)
+                                    Text("Private")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                }
+                                .foregroundColor(.orange)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.orange.opacity(0.2))
+                                .cornerRadius(8)
+                            }
                             Spacer()
-                            
                             if session.isActive {
                                 HStack(spacing: 4) {
                                     Circle()
@@ -1650,7 +3430,7 @@ struct LiveSessionDetailView: View {
                                     .foregroundColor(.purple)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(session.hostName.isEmpty ? "Host" : session.hostName)
+                                    Text(hostDisplayName)
                                         .font(.headline)
                                         .foregroundColor(.primary)
                                     if !session.hostBio.isEmpty {
@@ -1668,7 +3448,7 @@ struct LiveSessionDetailView: View {
                                     .foregroundColor(.secondary)
                             }
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(12)
                         }
                     }
@@ -1693,7 +3473,7 @@ struct LiveSessionDetailView: View {
                                 .lineLimit(3)
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(12)
                     }
                     
@@ -1715,14 +3495,14 @@ struct LiveSessionDetailView: View {
                             }
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(12)
                     }
                     
                     // Participants with enhanced features
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("Participants (\(sessionParticipants.count)/\(session.maxParticipants))")
+                            Text("Participants (\(uniqueParticipantCount)/\(session.maxParticipants))")
                                 .font(.headline)
                             
                             Spacer()
@@ -1754,12 +3534,15 @@ struct LiveSessionDetailView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         } else {
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 12) {
                                     ForEach(sessionParticipants) { participant in
                                         EnhancedParticipantBadge(
                                             participant: participant,
                                             isHost: isHost,
+                                            displayNameOverride: participant.isHost ? hostDisplayName : nil,
+                                            currentUserId: userService.userIdentifier,
+                                            currentUserDisplayName: profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService),
                                             onRaiseHand: { raiseHand() },
                                             onMute: { muteParticipant(participant) },
                                             onRemove: { removeParticipant(participant) },
@@ -1780,7 +3563,7 @@ struct LiveSessionDetailView: View {
                                     Text("Recent Messages")
                                         .font(.headline)
                                     Spacer()
-                                    Button(action: { showingChat = true }) {
+                                    Button(action: presentChat) {
                                         Text("View All")
                                             .font(.caption)
                                             .foregroundColor(.purple)
@@ -1793,7 +3576,7 @@ struct LiveSessionDetailView: View {
                                             .foregroundColor(.purple)
                                         
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(message.userName)
+                                            Text(messageAuthorDisplayName(message))
                                                 .font(.caption)
                                                 .font(.body.weight(.semibold))
                                             Text(message.message)
@@ -1811,25 +3594,40 @@ struct LiveSessionDetailView: View {
                                 }
                             }
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(12)
                         }
                     }
                     
+                    // Feature 2 – Scripture Overlay Banner
+                    if let overlay = scriptureOverlay {
+                        scriptureOverlayCard(overlay)
+                    }
+
+                    // Feature 1 – Prayer Wall
+                    if session.isActive {
+                        prayerWallSection
+                    }
+
+                    // Feature 3 – Reactions + Amen Moments + Agenda Tracker
+                    if session.isActive && (hasJoined || isHost) {
+                        reactionAndAmenSection
+                    }
+
                     // Tags
                     if !session.tags.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Tags")
                                 .font(.headline)
                             
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 8) {
                                     ForEach(session.tags, id: \.self) { tag in
                                         Text("#\(tag)")
                                             .font(.caption)
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 4)
-                                            .background(Color(.systemGray5))
+                                            .background(Color.platformSystemGray5)
                                             .cornerRadius(8)
                                     }
                                 }
@@ -1865,7 +3663,7 @@ struct LiveSessionDetailView: View {
                                     Spacer()
                                     
                                     Button(action: {
-                                        UIPasteboard.general.string = code
+                                        PlatformPasteboard.setString(code)
                                     }) {
                                         Image(systemName: "doc.on.doc")
                                             .font(.title3)
@@ -1951,12 +3749,18 @@ struct LiveSessionDetailView: View {
                                     }
                                     
                                     // Stream Mode Picker
-                                    Picker("Stream Mode", selection: $streamMode) {
-                                        Text("Broadcast").tag(StreamMode.broadcast)
-                                        Text("Conference").tag(StreamMode.conference)
-                                        Text("Multi-Participant").tag(StreamMode.multiParticipant)
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Picker("Stream Mode", selection: $streamMode) {
+                                            Text("Broadcast").tag(StreamMode.broadcast)
+                                            Text("Conference").tag(StreamMode.conference)
+                                            Text("Multi-Participant").tag(StreamMode.multiParticipant)
+                                        }
+                                        .pickerStyle(.segmented)
+                                        Text(streamModeDescription)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
                                     }
-                                    .pickerStyle(.segmented)
                                 }
                             }
                             
@@ -1976,7 +3780,7 @@ struct LiveSessionDetailView: View {
                                 .cornerRadius(10)
                             }
                             
-                            Button(action: { showingChat = true }) {
+                            Button(action: presentChat) {
                                 HStack {
                                     Image(systemName: "message.fill")
                                     Text(hasJoined || isHost ? "Open Chat" : "View Chat")
@@ -1993,7 +3797,23 @@ struct LiveSessionDetailView: View {
                             }
                         } else {
                             // Non-host Actions
-                            if canJoin && !hasJoined {
+                            if (session.hasWaitingRoom || session.waitingRoomEnabled) && !session.isActive && !hasJoined {
+                                Button(action: { showingWaitingRoom = true }) {
+                                    HStack {
+                                        Image(systemName: "clock.fill")
+                                        Text("Join Waiting Room")
+                                    }
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 14)
+                                    .background(Color.orange)
+                                    .cornerRadius(10)
+                                }
+                            } else if canJoin && !hasJoined {
                                 Button(action: joinSession) {
                                     HStack {
                                         Image(systemName: "person.badge.plus")
@@ -2033,7 +3853,7 @@ struct LiveSessionDetailView: View {
                                     .cornerRadius(10)
                                 }
                                 
-                                Button(action: { showingChat = true }) {
+                                Button(action: presentChat) {
                                     HStack {
                                         Image(systemName: "message.fill")
                                         Text("Open Chat")
@@ -2119,7 +3939,6 @@ struct LiveSessionDetailView: View {
                                 Spacer()
                             }
                         }
-                    }
                     
                     // Post-Stream Features
                     if !session.isActive && session.endTime != nil {
@@ -2141,13 +3960,9 @@ struct LiveSessionDetailView: View {
                                         .font(.body.weight(.semibold))
                                         .foregroundColor(.primary)
                                     
-                                    if let endTime = session.endTime {
-                                        Text("Ended \(endTime, style: .relative)")
+                                    if session.endTime != nil {
+                                        Text("Lasted \(session.formattedDuration)")
                                             .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                        
-                                        Text("Duration: \(session.formattedDuration)")
-                                            .font(.caption)
                                             .foregroundColor(.secondary)
                                     }
                                 }
@@ -2157,7 +3972,7 @@ struct LiveSessionDetailView: View {
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemGray6))
+                                    .fill(Color.platformSystemGray6)
                             )
                             .padding(.bottom, 8)
                             
@@ -2207,8 +4022,25 @@ struct LiveSessionDetailView: View {
                                         .foregroundColor(.secondary)
                                 }
                                 .padding()
-                                .background(Color(.systemGray6))
+                                .background(Color.platformSystemGray6)
                                 .cornerRadius(12)
+                            }
+                            
+                            // View Clips (when recording available)
+                            if let recordingURL = session.recordingURL, !recordingURL.isEmpty {
+                                Button(action: { showingClips = true }) {
+                                    HStack {
+                                        Image(systemName: "scissors")
+                                        Text("View Clips")
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                    }
+                                    .font(.subheadline)
+                                    .foregroundColor(.purple)
+                                    .padding()
+                                    .background(Color.purple.opacity(0.1))
+                                    .cornerRadius(12)
+                                }
                             }
                             
                             // Analytics (for hosts)
@@ -2252,106 +4084,15 @@ struct LiveSessionDetailView: View {
                             }
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(12)
                     }
-                }
-                .padding()
-            }
-            .navigationTitle("Session Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if isHost {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Menu {
-                            Button(role: .destructive, action: {
-                                showingDeleteConfirmation = true
-                            }) {
-                                Label("Delete Session", systemImage: "trash")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
                     }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
-            .alert("Delete Session", isPresented: $showingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Delete", role: .destructive) {
-                    deleteSession()
-                }
-            } message: {
-                Text("Are you sure you want to delete this session? This action cannot be undone. All participants, messages, and recordings associated with this session will be removed.")
-            }
-            .alert("Archive Session", isPresented: $showingArchiveConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Archive") {
-                    archiveSession()
-                }
-            } message: {
-                Text("Archive this session? Archived sessions will be moved to the Archived section and hidden from your main session list. You can unarchive it later if needed.")
-            }
-            .sheet(isPresented: $showingChat) {
-                LiveSessionChatView(session: session, canSend: hasJoined || isHost)
-            }
-            .sheet(isPresented: $showingShareSheet) {
-                ActivityView(activityItems: [shareText])
-            }
-            .sheet(isPresented: $showingInviteUsers) {
-                InviteUsersView(session: session)
-            }
-            .sheet(isPresented: $showingInviteCode) {
-                InviteCodeView(session: session)
-            }
-            .fullScreenCover(isPresented: $showingLiveStream) {
-                LiveStreamView(session: session)
-            }
-            .fullScreenCover(isPresented: $showingBroadcastStream) {
-                if #available(iOS 17.0, *) {
-                    BroadcastStreamView_HLS(session: session)
-                }
-            }
-            .fullScreenCover(isPresented: $showingMultiParticipantStream) {
-                if #available(iOS 17.0, *) {
-                    MultiParticipantStreamView(session: session)
-                }
-            }
-            .sheet(isPresented: $showingHostProfile) {
-                HostProfileView(session: session)
-            }
-            .sheet(isPresented: $showingAgenda) {
-                AgendaView(agenda: session.agenda)
-            }
-            .sheet(isPresented: $showingAnalytics) {
-                SessionAnalyticsView(session: session)
-            }
-            .sheet(isPresented: $showingRecording) {
-                if let url = session.recordingURL, !url.isEmpty {
-                    RecordingPlayerView(recordingURL: url)
-                }
-            }
-            .onAppear {
-                // Initialize sync service safely
-                // CloudKitPublicSyncService removed - use Firebase for sync
-                // if syncService == nil {
-                //     syncService = CloudKitPublicSyncService.shared
-                // }
-                checkJoinStatus()
-                if isHost && primaryInviteCode == nil {
-                    generateInviteCodeIfNeeded()
-                }
-            }
-            .onChange(of: participants.count) { _, _ in
-                // Keep join state in sync once SwiftData @Query loads/updates
-                checkJoinStatus()
-            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
     }
-    
+
     private var connectionQualityColor: Color {
         switch session.connectionQuality {
         case "Good", "Excellent": return .green
@@ -2371,15 +4112,23 @@ struct LiveSessionDetailView: View {
     
     private func muteParticipant(_ participant: LiveSessionParticipant) {
         guard isHost else { return }
-        participant.isMuted = true
+        participant.isMuted.toggle()
         try? modelContext.save()
+        Task {
+            await FirebaseSyncService.shared.updateParticipantMuteState(sessionId: session.id, userId: participant.userId, isMuted: participant.isMuted)
+        }
     }
     
     private func removeParticipant(_ participant: LiveSessionParticipant) {
         guard isHost && !participant.isHost else { return }
         participant.isActive = false
-        session.currentParticipants = max(0, session.currentParticipants - 1)
         try? modelContext.save()
+        let newCount = uniqueParticipantCount
+        session.currentParticipants = newCount
+        try? modelContext.save()
+        Task {
+            await FirebaseSyncService.shared.updateSessionParticipantCount(session.id, count: newCount)
+        }
     }
     
     private func lockSession() {
@@ -2445,46 +4194,24 @@ struct LiveSessionDetailView: View {
     }
     
     private func deleteSession() {
-        guard isHost else { return }
-        
-        // Delete all associated participants
-        for participant in sessionParticipants {
-            modelContext.delete(participant)
-        }
-        
-        // Delete all associated messages
-        let sessionMessages = messages.filter { $0.sessionId == session.id }
-        for message in sessionMessages {
-            modelContext.delete(message)
-        }
-        
-        // Delete all associated invitations
-        let sessionInvitations = invitations.filter { $0.sessionId == session.id }
-        for invitation in sessionInvitations {
-            modelContext.delete(invitation)
-        }
-        
-        // Delete the session itself
-        modelContext.delete(session)
-        
-        do {
-            try modelContext.save()
-            
-            // CloudKitPublicSyncService removed - use Firebase for sync
-            // if userService.isAuthenticated, let sync = syncService {
-            //     Task {
-            //         do {
-            //             try await sync.deleteSession(session.id)
-            //         } catch {
-            //             print("Error deleting session from CloudKit: \(error)")
-            //         }
-            //     }
-            // }
-            
+        let sessionId = session.id
+        let hostId = session.hostId
+        let isHostDeletion = isHost
+
+        // If session is only in publicSessions (not in SwiftData), just remove from list and dismiss
+        var descriptor = FetchDescriptor<LiveSession>(predicate: #Predicate<LiveSession> { $0.id == sessionId })
+        descriptor.fetchLimit = 1
+        let inContext = (try? modelContext.fetch(descriptor))?.first != nil
+        if !inContext {
+            onDeleted?(sessionId)
             dismiss()
-        } catch {
-            print("Error deleting session: \(error)")
+            return
         }
+
+        // Schedule delete to run in parent's onDismiss so we never access session after it's deleted (avoids SwiftData fault crash)
+        onPrepareDelete?(sessionId, hostId, isHostDeletion)
+        onDeleted?(sessionId)
+        dismiss()
     }
     
     private func promoteToCoHost(_ participant: LiveSessionParticipant) {
@@ -2494,6 +4221,7 @@ struct LiveSessionDetailView: View {
     }
     
     private func startLiveStream() {
+        guard !session.isArchived else { return }
         // Ensure the session is marked live, and start time is anchored for countdowns/time limits.
         // Without this, scheduled sessions (isActive=false) never show a running countdown.
         if !session.isActive {
@@ -2503,40 +4231,25 @@ struct LiveSessionDetailView: View {
         }
 
         // Persist the selected mode on the session so non-hosts can join consistently.
-        switch streamMode {
-        case .broadcast:
-            session.streamMode = "broadcast"
-        case .conference:
-            session.streamMode = "conference"
-        case .multiParticipant:
-            session.streamMode = "multiParticipant"
-        }
+        session.typedStreamMode = streamMode
         try? modelContext.save()
 
         // Publish updated session state to Firebase (start time + active flag).
         if !session.isPrivate {
             Task {
                 await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+                // Notify friends only when the host actually starts the stream (not on create/thumbnail sync).
+                await FirebaseSyncService.shared.notifyFriendsOfNewSession(session: session)
             }
         }
 
-        // Use the multi-participant stream view as the unified experience.
+        // Use the multi-participant stream view as the unified experience (item-based so parent re-renders don’t recreate view → Code 100).
         showingMultiParticipantStream = true
     }
     
     private func joinLiveStream() {
-        // For non-hosts, join using the stream mode stored by the host.
-        switch session.streamMode {
-        case "broadcast":
-            streamMode = .broadcast
-        case "conference":
-            streamMode = .conference
-        case "multiParticipant":
-            streamMode = .multiParticipant
-        default:
-            // Backward compatibility for older sessions
-            streamMode = .conference
-        }
+        guard !session.isArchived else { return }
+        streamMode = session.typedStreamMode
 
         showingMultiParticipantStream = true
     }
@@ -2546,35 +4259,58 @@ struct LiveSessionDetailView: View {
         hasJoined = sessionParticipants.contains { $0.userId == userId }
     }
     
+    /// Keep stored count in sync with unique participants; remove duplicate records (same user twice) so count is accurate.
+    private func reconcileParticipantCount() {
+        let list = sessionParticipants
+
+        // Remove duplicate participant records (same user in session twice) so we have at most one per person
+        let byUser = Dictionary(grouping: list, by: { $0.userId })
+        for (_, group) in byUser where group.count > 1 {
+            let toKeep = group.first(where: { $0.isHost }) ?? group.max(by: { $0.joinedAt < $1.joinedAt }) ?? group[0]
+            for p in group where p.id != toKeep.id {
+                modelContext.delete(p)
+            }
+        }
+        try? modelContext.save()
+
+        // After deduping, count unique participants and update stored count
+        let actual = uniqueParticipantCount
+        if session.currentParticipants != actual {
+            session.currentParticipants = actual
+            try? modelContext.save()
+        }
+        Task {
+            await FirebaseSyncService.shared.updateSessionParticipantCount(session.id, count: actual)
+        }
+    }
+    
     private func joinSession() {
         let userId = userService.userIdentifier
-        let userName = userService.getDisplayName(userProfile: userProfile)
+        // Avoid duplicate participant (e.g. already joined via invite or double-tap)
+        if sessionParticipants.contains(where: { $0.userId == userId }) {
+            hasJoined = true
+            return
+        }
+        let nameToStore = profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService)
         
         let participant = LiveSessionParticipant(
             sessionId: session.id,
             userId: userId,
-            userName: userName,
+            userName: nameToStore,
             isHost: false
         )
+        participant.userAvatarURL = userProfile?.avatarPhotoURL ?? ProfileManager.shared.profileImageURL
         modelContext.insert(participant)
-        
-        session.currentParticipants += 1
         
         do {
             try modelContext.save()
-            
-            // CloudKitPublicSyncService removed - use Firebase for sync
-            // if userService.isAuthenticated && !session.isPrivate, let sync = syncService {
-            //     Task {
-            //         do {
-            //             try await sync.syncParticipantToPublic(participant)
-            //             try await sync.syncSessionToPublic(session)
-            //         } catch {
-            //             print("Error syncing participant to public database: \(error)")
-            //         }
-            //     }
-            // }
-            
+            // Set count from actual unique participants so we never show 3 when only 2 people
+            let newCount = uniqueParticipantCount
+            session.currentParticipants = newCount
+            try? modelContext.save()
+            Task {
+                await FirebaseSyncService.shared.updateSessionParticipantCount(session.id, count: newCount)
+            }
             hasJoined = true
             
             // Schedule notification for participant joined (if host)
@@ -2609,11 +4345,13 @@ struct LiveSessionDetailView: View {
         if primaryInviteCode == nil {
             let code = UUID().uuidString.prefix(8).uppercased()
             let expirationDate = Calendar.current.date(byAdding: .day, value: 30, to: Date())
+            let rawHost = profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService)
+            let hostNameToStore = (rawHost == "Participant" || isDeviceName(rawHost)) ? "Host" : rawHost
             let invitation = SessionInvitation(
                 sessionId: session.id,
                 sessionTitle: session.title,
                 hostId: session.hostId,
-                hostName: userService.getDisplayName(userProfile: userProfile),
+                hostName: hostNameToStore,
                 inviteCode: String(code),
                 expiresAt: expirationDate
             )
@@ -2637,6 +4375,13 @@ struct LiveSessionDetailView: View {
 @available(iOS 17.0, *)
 struct ParticipantBadge: View {
     let participant: LiveSessionParticipant
+    var currentUserId: String? = nil
+    var currentUserDisplayName: String? = nil
+    
+    private var displayName: String {
+        if participant.userId == currentUserId, let name = currentUserDisplayName, !name.isEmpty { return name }
+        return isDeviceName(participant.userName) ? "Participant" : participant.userName
+    }
     
     var body: some View {
         VStack(spacing: 4) {
@@ -2644,12 +4389,12 @@ struct ParticipantBadge: View {
                 .font(.title2)
                 .foregroundColor(participant.isHost ? .orange : .purple)
             
-            Text(participant.userName)
+            Text(displayName)
                 .font(.caption)
                 .lineLimit(1)
         }
         .padding(8)
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(8)
     }
 }
@@ -2658,17 +4403,26 @@ struct ParticipantBadge: View {
 struct EnhancedParticipantBadge: View {
     let participant: LiveSessionParticipant
     let isHost: Bool
+    /// When set (e.g. for host), use this instead of participant.userName so profile name is shown.
+    var displayNameOverride: String? = nil
+    /// When participant is current user, show this (profile name).
+    var currentUserId: String? = nil
+    var currentUserDisplayName: String? = nil
     let onRaiseHand: () -> Void
     let onMute: () -> Void
     let onRemove: () -> Void
     let onPromote: () -> Void
     
+    private var displayName: String {
+        if participant.userId == currentUserId, let name = currentUserDisplayName, !name.isEmpty { return name }
+        if let override = displayNameOverride, !override.isEmpty { return override }
+        return isDeviceName(participant.userName) ? "Participant" : participant.userName
+    }
+    
     var body: some View {
         VStack(spacing: 6) {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: participant.isHost ? "crown.fill" : "person.fill")
-                    .font(.title2)
-                    .foregroundColor(participant.isHost ? .orange : .purple)
+                participantAvatar
                 
                 // Speaking indicator
                 if participant.isSpeaking {
@@ -2687,7 +4441,7 @@ struct EnhancedParticipantBadge: View {
                 }
             }
             
-            Text(participant.userName)
+            Text(displayName)
                 .font(.caption)
                 .lineLimit(1)
             
@@ -2712,7 +4466,7 @@ struct EnhancedParticipantBadge: View {
             }
         }
         .padding(8)
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(8)
         .contextMenu {
             if !participant.isHost {
@@ -2739,6 +4493,34 @@ struct EnhancedParticipantBadge: View {
                 }
             }
         }
+    }
+    
+    @ViewBuilder
+    private var participantAvatar: some View {
+        let size: CGFloat = 44
+        if let urlString = participant.userAvatarURL, !urlString.isEmpty, let url = URL(string: urlString) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFill()
+                case .failure, .empty:
+                    fallbackIcon
+                @unknown default:
+                    fallbackIcon
+                }
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+        } else {
+            fallbackIcon
+        }
+    }
+    
+    private var fallbackIcon: some View {
+        Image(systemName: participant.isHost ? "crown.fill" : "person.fill")
+            .font(.title2)
+            .foregroundColor(participant.isHost ? .orange : .purple)
+            .frame(width: 44, height: 44)
     }
     
     private var qualityColor: Color {
@@ -2796,7 +4578,14 @@ struct CountdownTimerView: View {
 @available(iOS 17.0, *)
 struct HostProfileView: View {
     let session: LiveSession
+    /// When provided (e.g. from session detail), use this instead of session.hostName so profile name shows when logged in.
+    var hostDisplayName: String? = nil
     @Environment(\.dismiss) private var dismiss
+
+    private var displayedName: String {
+        if let name = hostDisplayName, !name.isEmpty { return name }
+        return session.hostName.isEmpty ? "Host" : session.hostName
+    }
     
     var body: some View {
         NavigationStack {
@@ -2808,7 +4597,7 @@ struct HostProfileView: View {
                             .font(.system(size: 80))
                             .foregroundColor(.purple)
                         
-                        Text(session.hostName.isEmpty ? "Host" : session.hostName)
+                        Text(displayedName)
                             .font(.title)
                             .font(.body.weight(.bold))
                     }
@@ -2842,9 +4631,11 @@ struct HostProfileView: View {
                 }
             }
             .navigationTitle("Host Profile")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -2885,9 +4676,11 @@ struct AgendaView: View {
                     .padding()
             }
             .navigationTitle("Session Agenda")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -2971,7 +4764,7 @@ struct SessionAnalyticsView: View {
                         RetentionGraphView(session: session)
                             .frame(height: 200)
                             .padding()
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(12)
                             .padding(.horizontal)
                     }
@@ -2979,9 +4772,11 @@ struct SessionAnalyticsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Session Analytics")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -3029,7 +4824,7 @@ struct EngagementMetricsCard: View {
             Spacer()
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(12)
     }
 }
@@ -3128,7 +4923,7 @@ struct AnalyticsCard: View {
             Spacer()
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(12)
     }
 }
@@ -3137,35 +4932,58 @@ struct AnalyticsCard: View {
 struct RecordingPlayerView: View {
     let recordingURL: String
     @Environment(\.dismiss) private var dismiss
+    @State private var player: AVPlayer?
+    @State private var errorMessage: String?
     
     var body: some View {
         NavigationStack {
-            VStack {
-                Text("Recording Player")
-                    .font(.headline)
-                Text("Recording URL: \(recordingURL)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding()
-                
-                // Placeholder for video player
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.black)
-                    .frame(height: 200)
-                    .overlay(
-                        Image(systemName: "play.circle.fill")
+            ZStack {
+                Color.black.ignoresSafeArea()
+                if let errorMessage = errorMessage {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 50))
+                            .foregroundColor(.orange)
+                        Text("Error Loading Recording")
+                            .font(.headline)
                             .foregroundColor(.white)
-                    )
-            }
-            .navigationTitle("Session Recording")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
+                        Text(errorMessage)
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                } else if let player = player {
+                    VideoPlayer(player: player)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 }
             }
+            .navigationTitle("Session Recording")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") {
+                        player?.pause()
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear { setupPlayer() }
+            .onDisappear { player?.pause() }
         }
+    }
+    
+    private func setupPlayer() {
+        guard let url = URL(string: recordingURL) else {
+            errorMessage = "Invalid recording URL"
+            return
+        }
+        player = AVPlayer(url: url)
     }
 }
 
@@ -3189,7 +5007,8 @@ struct LiveSessionChatView: View {
     @State private var showingEmojiPicker = false
     @State private var selectedMessageForReaction: ChatMessage?
     @State private var showingFilePicker = false
-    
+    @State private var chatMessageListener: Any? // ListenerRegistration from Firebase
+
     var sessionMessages: [ChatMessage] {
         var combined = messages.filter { $0.sessionId == session.id }
         // Add public messages that aren't already in local
@@ -3220,15 +5039,17 @@ struct LiveSessionChatView: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                 }
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 12) {
-                        ForEach(sessionMessages) { message in
+                        ForEach(sessionMessages, id: \.id) { message in
                             EnhancedChatBubble(
                                 message: message,
                                 onReaction: { selectedMessageForReaction = message },
-                                onAddReaction: { emoji in addReaction(emoji, to: message) }
+                                onAddReaction: { emoji in addReaction(emoji, to: message) },
+                                currentUserId: userService.userIdentifier,
+                                currentUserDisplayName: profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService)
                             )
                         }
                     }
@@ -3270,7 +5091,7 @@ struct LiveSessionChatView: View {
                                 .font(.caption)
                                 .foregroundColor(.gray)
                                 .padding(8)
-                                .background(Color(.systemGray5))
+                                .background(Color.platformSystemGray5)
                                 .clipShape(Circle())
                         }
                         
@@ -3306,20 +5127,23 @@ struct LiveSessionChatView: View {
                 }
             }
             .navigationTitle("Session Chat")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
             .onAppear {
-                // Initialize sync service safely
-                // CloudKitPublicSyncService removed - use Firebase for sync
-                // if syncService == nil {
-                //     syncService = CloudKitPublicSyncService.shared
-                // }
                 loadPublicMessages()
                 setupMessageSubscription()
+            }
+            .onDisappear {
+                if let listener = chatMessageListener {
+                    FirebaseSyncService.shared.removeChatMessageListener(listener)
+                    chatMessageListener = nil
+                }
             }
             .refreshable {
                 await refreshPublicMessages()
@@ -3329,24 +5153,28 @@ struct LiveSessionChatView: View {
                     sendPrayerRequest(prayerText)
                     showingPrayerRequest = false
                 })
+                .macOSSheetFrameCompact()
             }
             .sheet(isPresented: $showingBibleVersePicker) {
                 BibleVerseChatPicker(onSelect: { verse, reference in
                     sendBibleVerse(verse, reference: reference)
                     showingBibleVersePicker = false
                 })
+                .macOSSheetFrameStandard()
             }
             .sheet(item: $selectedMessageForReaction) { message in
                 EmojiReactionPicker { emoji in
                     addReaction(emoji, to: message)
                     selectedMessageForReaction = nil
                 }
+                .macOSSheetFrameCompact()
             }
             .sheet(isPresented: $showingEmojiPicker) {
                 ChatEmojiPickerView { emoji in
                     messageText += emoji
                     showingEmojiPicker = false
                 }
+                .macOSSheetFrameCompact()
             }
             .fileImporter(
                 isPresented: $showingFilePicker,
@@ -3387,18 +5215,36 @@ struct LiveSessionChatView: View {
     }
     
     private func setupMessageSubscription() {
-        // CloudKitPublicSyncService removed - use Firebase for sync
-        // guard userService.isAuthenticated, let sync = syncService else { return }
-        // Setup Firebase message listener
+        #if canImport(FirebaseFirestore)
+        guard chatMessageListener == nil else { return }
+        let ctx = modelContext
+        if let listener = FirebaseSyncService.shared.startListeningToChatMessages(sessionId: session.id, onMessageReceived: { message in
+            let messageId = message.id
+            Task { @MainActor in
+                do {
+                    var descriptor = FetchDescriptor<ChatMessage>(predicate: #Predicate<ChatMessage> { $0.id == messageId })
+                    descriptor.fetchLimit = 1
+                    let existing = try ctx.fetch(descriptor).first
+                    if let existing = existing {
+                        existing.reactions = message.reactions
+                        try? ctx.save()
+                    } else {
+                        ctx.insert(message)
+                        try? ctx.save()
+                    }
+                } catch { }
+            }
+        }) {
+            chatMessageListener = listener
+        }
+        #endif
     }
     
     private func sendMessage() {
         let userId = userService.userIdentifier
-        let userName = userService.getDisplayName(userProfile: userProfile)
-        
+        let userName = profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService)
         // Check for @mentions
         let mentionedUserIds = extractMentions(from: messageText)
-        
         let message = ChatMessage(
             sessionId: session.id,
             userId: userId,
@@ -3411,30 +5257,10 @@ struct LiveSessionChatView: View {
         
         do {
             try modelContext.save()
-            
-            // Sync to public CloudKit database for multi-user support
-            // CloudKitPublicSyncService removed - use Firebase for sync
-            // if userService.isAuthenticated && !session.isPrivate, let sync = syncService {
-            //     Task {
-            //         do {
-            //             try await sync.syncMessageToPublic(message)
-            //         } catch {
-            //             print("Error syncing message to public database: \(error)")
-            //         }
-            //     }
-            // }
-            
+            Task {
+                await FirebaseSyncService.shared.syncChatMessage(message)
+            }
             messageText = ""
-            
-            // Notify other participants (excluding sender)
-            // Note: Uncomment when SessionNotificationService.swift is added to Xcode project
-            /*
-            await notificationService.scheduleNewMessage(
-                session: session,
-                senderName: userName,
-                message: messageText
-            )
-            */
         } catch {
             print("Error sending message: \(error)")
         }
@@ -3442,8 +5268,7 @@ struct LiveSessionChatView: View {
     
     private func sendPrayerRequest(_ prayerText: String) {
         let userId = userService.userIdentifier
-        let userName = userService.getDisplayName(userProfile: userProfile)
-        
+        let userName = profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService)
         let message = ChatMessage(
             sessionId: session.id,
             userId: userId,
@@ -3455,17 +5280,7 @@ struct LiveSessionChatView: View {
         
         do {
             try modelContext.save()
-            
-            // CloudKitPublicSyncService removed - use Firebase for sync
-            // if userService.isAuthenticated && !session.isPrivate, let sync = syncService {
-            //     Task {
-            //         do {
-            //             try await sync.syncMessageToPublic(message)
-            //         } catch {
-            //             print("Error syncing message to public database: \(error)")
-            //         }
-            //     }
-            // }
+            Task { await FirebaseSyncService.shared.syncChatMessage(message) }
         } catch {
             print("Error sending prayer request: \(error)")
         }
@@ -3473,8 +5288,7 @@ struct LiveSessionChatView: View {
     
     private func sendBibleVerse(_ verse: String, reference: String) {
         let userId = userService.userIdentifier
-        let userName = userService.getDisplayName(userProfile: userProfile)
-        
+        let userName = profileDisplayNameForCurrentUser(userProfile: userProfile, userService: userService)
         let message = ChatMessage(
             sessionId: session.id,
             userId: userId,
@@ -3487,17 +5301,7 @@ struct LiveSessionChatView: View {
         
         do {
             try modelContext.save()
-            
-            // CloudKitPublicSyncService removed - use Firebase for sync
-            // if userService.isAuthenticated && !session.isPrivate, let sync = syncService {
-            //     Task {
-            //         do {
-            //             try await sync.syncMessageToPublic(message)
-            //         } catch {
-            //             print("Error syncing message to public database: \(error)")
-            //         }
-            //     }
-            // }
+            Task { await FirebaseSyncService.shared.syncChatMessage(message) }
         } catch {
             print("Error sending Bible verse: \(error)")
         }
@@ -3507,6 +5311,9 @@ struct LiveSessionChatView: View {
         if !message.reactions.contains(emoji) {
             message.reactions.append(emoji)
             try? modelContext.save()
+            Task {
+                await FirebaseSyncService.shared.syncChatMessage(message)
+            }
         }
     }
     
@@ -3520,6 +5327,16 @@ struct LiveSessionChatView: View {
 @available(iOS 17.0, *)
 struct ChatBubble: View {
     let message: ChatMessage
+    /// When message is from current user, show this instead of message.userName (profile name).
+    var currentUserId: String? = nil
+    var currentUserDisplayName: String? = nil
+    
+    private var authorDisplayName: String {
+        if let uid = currentUserId, let name = currentUserDisplayName, message.userId == uid, !name.isEmpty {
+            return name
+        }
+        return isDeviceName(message.userName) ? "Participant" : message.userName
+    }
     
     var body: some View {
         HStack {
@@ -3530,29 +5347,41 @@ struct ChatBubble: View {
                     .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(message.userName)
+                    Text(authorDisplayName)
                         .font(.caption)
                         .font(.body.weight(.semibold))
                         .foregroundColor(.secondary)
-                    
-                    Text(message.message)
-                        .font(.body)
-                        .padding(12)
-                        .background(message.messageType == .prayer ? Color.purple.opacity(0.1) : Color(.systemGray5))
-                        .cornerRadius(12)
-                    
-                    // Reactions
-                    if !message.reactions.isEmpty {
-                        HStack(spacing: 4) {
-                            ForEach(message.reactions, id: \.self) { emoji in
-                                Text(emoji)
-                                    .font(.caption)
+                    ZStack(alignment: .topLeading) {
+                        // Message body: add top/leading padding when reactions exist so text doesn't sit under the badge
+                        Text(message.message)
+                            .font(.body)
+                            .padding(.top, message.reactions.isEmpty ? 12 : 32)
+                            .padding(.leading, message.reactions.isEmpty ? 12 : 12)
+                            .padding(.trailing, 12)
+                            .padding(.bottom, 12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(message.messageType == .prayer ? Color.purple.opacity(0.1) : Color.platformSystemGray5)
+                            .cornerRadius(12)
+                        
+                        // Reactions: fixed in upper left corner of the bubble, separate from message text
+                        if !message.reactions.isEmpty {
+                            HStack(spacing: 2) {
+                                ForEach(message.reactions, id: \.self) { emoji in
+                                    Text(emoji)
+                                        .font(.caption)
+                                }
                             }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.platformSystemGray6.opacity(0.95))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.primary.opacity(0.15), lineWidth: 1)
+                            )
+                            .padding(.top, 6)
+                            .padding(.leading, 6)
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
                     }
                     
                     Text(message.timestamp, style: .time)
@@ -3571,10 +5400,12 @@ struct EnhancedChatBubble: View {
     let message: ChatMessage
     let onReaction: () -> Void
     let onAddReaction: (String) -> Void
+    var currentUserId: String? = nil
+    var currentUserDisplayName: String? = nil
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ChatBubble(message: message)
+            ChatBubble(message: message, currentUserId: currentUserId, currentUserDisplayName: currentUserDisplayName)
             
             // Reaction button
             Button(action: onReaction) {
@@ -3607,7 +5438,7 @@ struct PrayerRequestChatView: View {
                 TextEditor(text: $prayerText)
                     .frame(height: 200)
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
                     .padding()
                 
@@ -3626,9 +5457,11 @@ struct PrayerRequestChatView: View {
                 .padding()
             }
             .navigationTitle("Prayer Request")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Cancel") { dismiss() }
                 }
             }
@@ -3713,12 +5546,14 @@ struct BibleVerseChatPicker: View {
                 }
             }
             .navigationTitle("Share Bible Verse")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Send") {
                         if !selectedVerse.isEmpty && !selectedReference.isEmpty {
                             onSelect(selectedVerse, selectedReference)
@@ -3750,7 +5585,7 @@ struct EmojiReactionPicker: View {
                         Text(emoji)
                             .font(.system(size: 40))
                             .frame(width: 60, height: 60)
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(12)
                     }
                 }
@@ -3797,7 +5632,7 @@ struct ChatEmojiPickerView: View {
                                         Text(emoji)
                                             .font(.system(size: 40))
                                             .frame(width: 50, height: 50)
-                                            .background(Color(.systemGray6))
+                                            .background(Color.platformSystemGray6)
                                             .cornerRadius(12)
                                     }
                                 }
@@ -3810,9 +5645,11 @@ struct ChatEmojiPickerView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Emoji Picker")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         dismiss()
                     }
@@ -3824,6 +5661,4 @@ struct ChatEmojiPickerView: View {
 
 @available(iOS 17.0, *)
 extension LiveSession: Identifiable {}
-
-
 

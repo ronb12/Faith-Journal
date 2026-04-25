@@ -6,6 +6,7 @@ struct BibleView: View {
     // Observe singletons to get updates when their @Published properties change
     private let bibleService = BibleService.shared
     @ObservedObject private var verseManager = BibleVerseOfTheDayManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var nav: AppNavigation
@@ -130,17 +131,24 @@ struct BibleView: View {
                     // Search view
                     enhancedSearchView
                 } else if showingChapterView, let book = selectedBook, let chapter = selectedChapter {
-                    // Chapter reading view
+                    #if os(iOS)
+                    // On iOS: fullScreenCover replaces view, so show chapter inline in ZStack
                     chapterReadingView(book: book, chapter: chapter)
+                    #elseif os(macOS)
+                    // On macOS: chapter opens in sheet modal; keep main view in background (avoid duplicate)
+                    mainBibleView
+                    #endif
                 } else {
                     // Main Bible view
                     mainBibleView
                 }
             }
             .navigationTitle("Bible")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .automatic) {
                     // Translation button
                     Button(action: { showingTranslationPicker = true }) {
                         HStack(spacing: 4) {
@@ -156,7 +164,7 @@ struct BibleView: View {
                     }
                 }
                 
-                ToolbarItemGroup(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .automatic) {
                     // Organization buttons
                     Menu {
                         Button(action: { showingBookmarks = true }) {
@@ -178,17 +186,22 @@ struct BibleView: View {
             }
             .sheet(isPresented: $showingBookSelector) {
                 bookSelectorView
+                    .macOSSheetFrameStandard()
             }
             .sheet(isPresented: $showingTranslationPicker) {
                 translationPickerView
+                    .macOSSheetFrameCompact()
             }
             .sheet(isPresented: $showingSettings) {
                 bibleSettingsView
+                    .macOSSheetFrameStandard()
             }
             .sheet(item: $selectedVerse) { verse in
                 verseDetailView(verse: verse)
+                    .macOSSheetFrameStandard()
             }
             .sheet(isPresented: $showingHighlightPicker) {
+                Group {
                 if let verseRef = verseToHighlight, !verseRef.isEmpty {
                     highlightPickerView(verseReference: verseRef)
                 } else {
@@ -206,9 +219,11 @@ struct BibleView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .navigationTitle("Highlight")
-                        .navigationBarTitleDisplayMode(.inline)
+                        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
                         .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
+                            ToolbarItem(placement: .automatic) {
                                 Button("Done") {
                                     showingHighlightPicker = false
                                     verseToHighlight = nil
@@ -217,6 +232,8 @@ struct BibleView: View {
                         }
                     }
                 }
+                }
+                .macOSSheetFrameStandard()
             }
             .onChange(of: showingHighlightPicker) { oldValue, newValue in
                 if !newValue {
@@ -227,20 +244,26 @@ struct BibleView: View {
             .sheet(isPresented: $showingNoteEditor) {
                 if let verseRef = verseToNote {
                     noteEditorView(verseReference: verseRef)
+                        .macOSSheetFrameForm()
                 }
             }
             .sheet(isPresented: $showingBookmarks) {
                 bookmarksListView
+                    .macOSSheetFrameStandard()
             }
             .sheet(isPresented: $showingHighlights) {
                 highlightsListView
+                    .macOSSheetFrameStandard()
             }
             .sheet(isPresented: $showingNotes) {
                 notesListView
+                    .macOSSheetFrameStandard()
             }
             .sheet(isPresented: $showingHistory) {
                 readingHistoryView
+                    .macOSSheetFrameStandard()
             }
+            #if os(iOS)
             .fullScreenCover(isPresented: $showingChapterView) {
                 if let book = selectedBook, let chapter = selectedChapter {
                     chapterReadingView(book: book, chapter: chapter)
@@ -251,6 +274,20 @@ struct BibleView: View {
                     chapterRangeReadingView(book: book, startChapter: startChapter, endChapter: endChapter)
                 }
             }
+            #elseif os(macOS)
+            .sheet(isPresented: $showingChapterView) {
+                if let book = selectedBook, let chapter = selectedChapter {
+                    chapterReadingView(book: book, chapter: chapter)
+                        .macOSSheetFrameForm()
+                }
+            }
+            .sheet(isPresented: $showingChapterRangeView) {
+                if let book = selectedBook, let startChapter = rangeStartChapter, let endChapter = rangeEndChapter {
+                    chapterRangeReadingView(book: book, startChapter: startChapter, endChapter: endChapter)
+                        .macOSSheetFrameForm()
+                }
+            }
+            #endif
             .onChange(of: selectedTranslation) { oldValue, newValue in
                 // Update Verse of the Day when version changes
                 if oldValue != newValue, let version = BibleVersion(rawValue: newValue) {
@@ -422,7 +459,7 @@ struct BibleView: View {
                     Text(verse.reference)
                         .font(.title3)
                         .font(.body.weight(.bold))
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                     
                     Text(verse.text)
                         .font(.body)
@@ -464,12 +501,12 @@ struct BibleView: View {
                         showingNoteEditor = true
                     }) {
                         Image(systemName: "note.text")
-                            .foregroundColor(.blue)
+                            .foregroundColor(themeManager.colors.secondary)
                     }
                     
                     ShareLink(item: "\(verse.reference)\n\n\(verse.text)") {
                         Image(systemName: "square.and.arrow.up")
-                            .foregroundColor(.purple)
+                            .foregroundColor(themeManager.colors.primary)
                     }
                 }
             }
@@ -477,7 +514,7 @@ struct BibleView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
+                .fill(Color.platformSystemBackground)
                 .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
     }
@@ -536,18 +573,18 @@ struct BibleView: View {
                         .foregroundColor(.primary)
                     if history.readingProgress > 0 {
                         ProgressView(value: history.readingProgress)
-                            .tint(.purple)
+                            .tint(themeManager.colors.primary)
                     }
                 }
                 Spacer()
                 Image(systemName: "arrow.right.circle.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                     .font(.title2)
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemGray6))
+                    .fill(Color.platformSystemGray6)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -563,7 +600,7 @@ struct BibleView: View {
                     .padding(.horizontal)
                 
                 // Search filters
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 8) {
                         ForEach(SearchFilter.allCases, id: \.self) { filter in
                             Button(action: {
@@ -577,8 +614,8 @@ struct BibleView: View {
                                     .padding(.vertical, 6)
                                     .background(
                                         searchFilter == filter ?
-                                        LinearGradient(colors: [Color.purple, Color.blue], startPoint: .leading, endPoint: .trailing) :
-                                        LinearGradient(colors: [Color(.systemGray5)], startPoint: .leading, endPoint: .trailing)
+                                        LinearGradient(colors: [themeManager.colors.primary, themeManager.colors.secondary], startPoint: .leading, endPoint: .trailing) :
+                                        LinearGradient(colors: [Color.platformSystemGray5], startPoint: .leading, endPoint: .trailing)
                                     )
                                     .cornerRadius(12)
                             }
@@ -594,7 +631,7 @@ struct BibleView: View {
                             .font(.caption)
                             .foregroundColor(.primary)
                             .padding(.horizontal)
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(recentSearches.prefix(5), id: \.self) { search in
                                     Button(action: {
@@ -604,7 +641,7 @@ struct BibleView: View {
                                             .font(.caption)
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 6)
-                                            .background(Color(.systemGray5))
+                                            .background(Color.platformSystemGray5)
                                             .foregroundColor(.primary)
                                             .cornerRadius(8)
                                     }
@@ -616,7 +653,7 @@ struct BibleView: View {
                 }
             }
             .padding(.vertical)
-            .background(Color(.systemBackground))
+            .background(Color.platformSystemBackground)
             
             // Search results
             BibleSearchResultsView(
@@ -651,15 +688,17 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("\(book) \(chapter)")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     Button("Close") {
                         showingChapterView = false
                     }
                 }
                 
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .automatic) {
                     // Previous chapter
                     if chapter > 1 {
                         Button(action: {
@@ -667,6 +706,10 @@ struct BibleView: View {
                         }) {
                             Image(systemName: "chevron.left")
                         }
+                        #if os(macOS)
+                        .keyboardShortcut("[", modifiers: .command)
+                        .help("Previous chapter (⌘[)")
+                        #endif
                     }
                     
                     // Next chapter
@@ -676,6 +719,10 @@ struct BibleView: View {
                         }) {
                             Image(systemName: "chevron.right")
                         }
+                        #if os(macOS)
+                        .keyboardShortcut("]", modifiers: .command)
+                        .help("Next chapter (⌘])")
+                        #endif
                     }
                     
                     // Settings button (Aa)
@@ -709,6 +756,7 @@ struct BibleView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 bibleSettingsView
+                    .macOSSheetFrameStandard()
             }
         }
     }
@@ -770,7 +818,7 @@ struct BibleView: View {
                                         .foregroundColor(.white)
                                         .padding()
                                         .frame(maxWidth: .infinity)
-                                        .background(Color.purple)
+                                        .background(themeManager.colors.primary)
                                         .cornerRadius(12)
                                     }
                                 }
@@ -789,7 +837,7 @@ struct BibleView: View {
                                         .foregroundColor(.white)
                                         .padding()
                                         .frame(maxWidth: .infinity)
-                                        .background(Color.purple)
+                                        .background(themeManager.colors.primary)
                                         .cornerRadius(12)
                                     }
                                 } else {
@@ -809,15 +857,17 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("\(book) \(currentChapterInRange)")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     Button("Close") {
                         showingChapterRangeView = false
                     }
                 }
                 
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .automatic) {
                     // Previous chapter button
                     if currentChapterInRange > startChapter {
                         Button(action: {
@@ -866,6 +916,7 @@ struct BibleView: View {
             }
             .sheet(isPresented: $showingSettings) {
                 bibleSettingsView
+                    .macOSSheetFrameStandard()
             }
         }
     }
@@ -880,13 +931,13 @@ struct BibleView: View {
                 .foregroundColor(.secondary)
             Text(selectedTranslation)
                 .font(.caption)
-                .foregroundColor(.purple)
+                .foregroundColor(themeManager.colors.primary)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
+                .fill(Color.platformSystemGray6)
         )
     }
     
@@ -930,10 +981,14 @@ struct BibleView: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
                         .foregroundColor(.orange)
-                    Text("Unable to load chapter")
+                    Text("We couldn’t load this chapter")
                         .font(.headline)
                     Text(error)
                         .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    Text("Check your connection, then tap Retry. You can also try another translation in settings (Aa).")
+                        .font(.caption2)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                     Button("Retry") {
@@ -987,7 +1042,7 @@ struct BibleView: View {
                     Text("\(verseNumber)")
                         .font(.system(size: fontSize - 2))
                         .font(.body.weight(.bold))
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                         .baselineOffset(2) // Slightly superscript
                 }
                 
@@ -1025,7 +1080,7 @@ struct BibleView: View {
                 }) {
                     Image(systemName: "note.text")
                         .font(.system(size: 11))
-                        .foregroundColor(hasNote(reference: reference) ? .blue : .secondary.opacity(0.6))
+                        .foregroundColor(hasNote(reference: reference) ? themeManager.colors.secondary : .secondary.opacity(0.6))
                 }
                 
                 ShareLink(item: "\(reference)\n\n\(verseText)") {
@@ -1097,9 +1152,11 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("Select Book")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         showingBookSelector = false
                     }
@@ -1129,16 +1186,18 @@ struct BibleView: View {
                             Spacer()
                             if selectedTranslation == code {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(themeManager.colors.primary)
                             }
                         }
                     }
                 }
             }
             .navigationTitle("Select Translation")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         showingTranslationPicker = false
                     }
@@ -1203,9 +1262,11 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("Bible Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         showingSettings = false
                     }
@@ -1223,7 +1284,7 @@ struct BibleView: View {
                     Text(verse.reference)
                         .font(.title)
                         .font(.body.weight(.bold))
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                     
                     Text(verse.text)
                         .font(.body)
@@ -1276,7 +1337,7 @@ struct BibleView: View {
                                 Text("Note")
                                     .font(.caption)
                             }
-                            .foregroundColor(.blue)
+                            .foregroundColor(themeManager.colors.secondary)
                         }
                         
                         ShareLink(item: "\(verse.reference)\n\n\(verse.text)") {
@@ -1286,7 +1347,7 @@ struct BibleView: View {
                                 Text("Share")
                                     .font(.caption)
                             }
-                            .foregroundColor(.purple)
+                            .foregroundColor(themeManager.colors.primary)
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -1302,16 +1363,18 @@ struct BibleView: View {
                                 .foregroundColor(.secondary)
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(12)
                     }
                 }
                 .padding()
             }
             .navigationTitle("Verse")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         selectedVerse = nil
                     }
@@ -1361,9 +1424,11 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("Highlight")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Cancel") {
                         showingHighlightPicker = false
                     }
@@ -1379,26 +1444,28 @@ struct BibleView: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text(verseReference)
                     .font(.headline)
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 
                 TextEditor(text: $noteText)
                     .frame(minHeight: 200)
                     .padding(8)
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
                 
                 Spacer()
             }
             .padding()
             .navigationTitle("Add Note")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     Button("Cancel") {
                         showingNoteEditor = false
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Save") {
                         saveNote(verseReference: verseReference, noteText: noteText)
                         showingNoteEditor = false
@@ -1431,7 +1498,7 @@ struct BibleView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(bookmark.verseReference)
                                     .font(.headline)
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(themeManager.colors.primary)
                                 Text(bookmark.verseText)
                                     .font(.body)
                                     .foregroundColor(.secondary)
@@ -1443,9 +1510,11 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("Bookmarks")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         showingBookmarks = false
                     }
@@ -1479,7 +1548,7 @@ struct BibleView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(highlight.verseReference)
                                         .font(.headline)
-                                        .foregroundColor(.purple)
+                                        .foregroundColor(themeManager.colors.primary)
                                     Text(highlight.verseText)
                                         .font(.body)
                                         .foregroundColor(.secondary)
@@ -1492,9 +1561,11 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("Highlights")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         showingHighlights = false
                     }
@@ -1519,7 +1590,7 @@ struct BibleView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(note.verseReference)
                                     .font(.headline)
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(themeManager.colors.primary)
                                 Text(note.noteText)
                                     .font(.body)
                                     .foregroundColor(.secondary)
@@ -1531,9 +1602,11 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("Notes")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         showingNotes = false
                     }
@@ -1568,7 +1641,7 @@ struct BibleView: View {
                                         .foregroundColor(.secondary)
                                     if history.readingProgress > 0 {
                                         ProgressView(value: history.readingProgress)
-                                            .tint(.purple)
+                                            .tint(themeManager.colors.primary)
                                     }
                                 }
                                 Spacer()
@@ -1582,9 +1655,11 @@ struct BibleView: View {
                 }
             }
             .navigationTitle("Reading History")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         showingHistory = false
                     }
@@ -1607,7 +1682,7 @@ struct BibleView: View {
             case "Night":
                 Color(red: 0.1, green: 0.1, blue: 0.15)
             default:
-                Color(.systemGroupedBackground)
+                Color.platformSystemGroupedBackground
             }
         }
     }
@@ -1934,7 +2009,8 @@ struct BibleView: View {
         
         // Format reference for bible-api.com (e.g., "John 3" or "John 3:1-21")
         let reference = "\(book) \(chapter)"
-        
+        let translationForLog = selectedTranslation
+
         Task {
             do {
                 // Use bible-api.com to fetch the chapter with selected translation
@@ -1993,7 +2069,8 @@ struct BibleView: View {
                     chapterErrorMap[chapterKey] = errorMessage
                     isLoadingChapter = false
                     chapterLoadingMap[chapterKey] = false
-                    
+                    FaithJournalLog.bible.error("loadChapter failed \(book, privacy: .public) ch \(chapter, privacy: .public) [\(translationForLog, privacy: .public)]: \(errorMessage, privacy: .public)")
+
                     // Remove from in-progress set
                     inProgressRequests.remove(cacheKey)
                 }
@@ -2283,7 +2360,7 @@ struct BibleView: View {
                 // Add verse number as inline element with better spacing
                 var verseNumber = AttributedString("\(verseData.number) ")
                 verseNumber.font = .system(size: fontSize - 2, weight: .bold)
-                verseNumber.foregroundColor = hasHighlight(reference: verseData.verse.reference) ? .white : .purple
+                verseNumber.foregroundColor = hasHighlight(reference: verseData.verse.reference) ? .white : themeManager.colors.primary
                 verseNumber.baselineOffset = 2 // Slightly superscript for better appearance
                 attributedString.append(verseNumber)
             }
@@ -2316,7 +2393,7 @@ struct BibleView: View {
                 // Add verse number
                 var verseNumber = AttributedString("\(verseData.number) ")
                 verseNumber.font = .system(size: fontSize - 2, weight: .bold)
-                verseNumber.foregroundColor = .purple
+                verseNumber.foregroundColor = themeManager.colors.primary
                 attributedString.append(verseNumber)
             }
             
@@ -2427,7 +2504,7 @@ struct PopularVerseRow: View {
                     .font(.caption)
             }
             .padding()
-            .background(Color(.systemGray6))
+            .background(Color.platformSystemGray6)
             .cornerRadius(8)
         }
         .onAppear {
@@ -2455,6 +2532,7 @@ struct PopularVerseRow: View {
 
 @available(iOS 17.0, *)
 struct BibleSearchResultsView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     let searchText: String
     @ObservedObject var bibleService: BibleService
     let translation: String
@@ -2495,7 +2573,7 @@ struct BibleSearchResultsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(verse.reference)
                                 .font(.headline)
-                                .foregroundColor(.purple)
+                                .foregroundColor(themeManager.colors.primary)
                             Text(verse.text)
                                 .font(.body)
                                 .foregroundColor(.primary)
@@ -2600,7 +2678,7 @@ struct SearchBar: View {
                 .focused($isFocused)
         }
         .padding(8)
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(10)
     }
 }

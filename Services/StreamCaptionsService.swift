@@ -10,7 +10,7 @@ import AVFoundation
 import Speech
 
 @MainActor
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 class StreamCaptionsService: ObservableObject {
     static let shared = StreamCaptionsService()
     
@@ -71,10 +71,16 @@ class StreamCaptionsService: ObservableObject {
         // Stop any existing recognition
         stopTranscription()
         
+        #if os(iOS)
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
         try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        #elseif os(macOS)
+        // Audio capture for speech recognition on macOS would require different setup
+        throw CaptionError.recognizerUnavailable
+        #endif
         
+        #if os(iOS)
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest = recognitionRequest else {
             throw CaptionError.failedToCreateRequest
@@ -114,8 +120,8 @@ class StreamCaptionsService: ObservableObject {
                 self.stopTranscription()
             }
         }
-        
         isTranscribing = true
+        #endif
     }
     
     func stopTranscription() {

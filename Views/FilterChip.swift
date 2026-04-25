@@ -20,7 +20,7 @@ struct FilterChip: View {
                 .font(.body.weight(.medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(isSelected ? selectedColor : Color(UIColor.systemGray5))
+                .background(isSelected ? selectedColor : Color.platformSystemGray5)
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(16)
         }

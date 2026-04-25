@@ -59,7 +59,7 @@ struct MoodSettingsView: View {
                     
                     Button(action: {
                         // Show Privacy Policy view
-                        if let url = URL(string: "https://ronb12.github.io/Faith-Journal/PRIVACY_POLICY.md") {
+                        if let url = URL(string: "https://faith-journal.web.app/privacy") {
                             UIApplication.shared.open(url)
                         }
                     }) {
@@ -68,7 +68,7 @@ struct MoodSettingsView: View {
                     
                     Button(action: {
                         // Show Terms of Service view
-                        if let url = URL(string: "https://ronb12.github.io/Faith-Journal/TERMS_OF_SERVICE.md") {
+                        if let url = URL(string: "https://faith-journal.web.app/terms") {
                             UIApplication.shared.open(url)
                         }
                     }) {

@@ -8,6 +8,9 @@
 
 import Foundation
 import Combine
+#if os(iOS)
+import AVFoundation
+#endif
 
 #if canImport(AgoraRtcKit)
 import AgoraRtcKit
@@ -286,21 +289,29 @@ class AgoraService: NSObject, ObservableObject {
         #endif
     }
     
-    /// Leave the conference
+    /// Leave the conference (deactivate audio first and delay destroy to avoid AVFAudio _auv3 != nil crash)
     func leaveChannel() {
         #if canImport(AgoraRtcKit)
-        agoraKit?.leaveChannel { [weak self] stats in
-            guard let self = self else { return }
+        guard let kit = agoraKit else {
+            channelName = nil
+            return
+        }
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
+        kit.stopPreview()
+        kit.leaveChannel { [weak self] _ in
             Task { @MainActor in
+                guard let self = self else { return }
                 self.isConnected = false
                 self.remoteUsers.removeAll()
                 self.participantCount = 0
                 print("✅ [AGORA] Left channel")
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                AgoraRtcEngineKit.destroy()
+            }
         }
-        
-        agoraKit?.stopPreview()
-        AgoraRtcEngineKit.destroy()
         agoraKit = nil
         #endif
         

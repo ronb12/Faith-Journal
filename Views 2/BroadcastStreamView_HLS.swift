@@ -871,7 +871,7 @@ struct BroadcastStreamView_HLS: View {
     }
     
     private var streamStatsView: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 // Timer
                 HStack(spacing: 4) {
@@ -1342,7 +1342,7 @@ struct BroadcastStreamView_HLS: View {
                                 .foregroundColor(.primary)
                         }
                         
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 12) {
                                 ForEach(VideoFilter.allCases, id: \.self) { filter in
                                     Button(action: { selectedFilter = filter }) {

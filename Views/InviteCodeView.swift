@@ -8,8 +8,13 @@
 import SwiftUI
 import SwiftData
 import CoreImage.CIFilterBuiltins
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct InviteCodeView: View {
     let session: LiveSession
     @Environment(\.dismiss) private var dismiss
@@ -31,24 +36,34 @@ struct InviteCodeView: View {
         sessionInvitation?.inviteCode ?? ""
     }
     
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // QR Code
-                    if !inviteCode.isEmpty {
+    private func qrCodeImage(_ image: PlatformImage) -> some View {
+        let img: Image
+        #if os(iOS)
+        img = Image(uiImage: image)
+        #else
+        img = Image(nsImage: image)
+        #endif
+        return img
+            #if os(iOS)
+            .interpolation(.none)
+            #endif
+            .resizable()
+            .scaledToFit()
+            .frame(width: 200, height: 200)
+            .padding()
+            .background(Color.white)
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.1), radius: 10)
+    }
+    
+    private var scrollContent: some View {
+        VStack(spacing: 24) {
+            // QR Code
+            if !inviteCode.isEmpty {
                         VStack(spacing: 16) {
                             // Generate QR code with deep link URL so it opens the app when scanned
                             if let qrImage = generateQRCode(from: "faithjournal://invite/\(inviteCode)") {
-                                Image(uiImage: qrImage)
-                                    .interpolation(.none)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 200, height: 200)
-                                    .padding()
-                                    .background(Color.white)
-                                    .cornerRadius(16)
-                                    .shadow(color: .black.opacity(0.1), radius: 10)
+                                qrCodeImage(qrImage)
                             }
                             Text("Scan to Join")
                                 .font(.subheadline)
@@ -58,10 +73,10 @@ struct InviteCodeView: View {
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
                         }
-                        .padding(.top)
-                    }
-                    
-                    // Invite Code Display
+                .padding(.top)
+            }
+            
+            // Invite Code Display
                     VStack(spacing: 12) {
                         Text("Invite Code")
                             .font(.headline)
@@ -137,7 +152,7 @@ struct InviteCodeView: View {
                         .padding(.top, 8)
                     }
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
                     
                     // Share Button
@@ -169,20 +184,41 @@ struct InviteCodeView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(Color.platformSystemGray6)
                     .cornerRadius(12)
-                }
-                .padding()
+        }
+        .padding()
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                scrollContent
             }
             .navigationTitle("Invite Code")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
             .sheet(isPresented: $showingShareSheet) {
+                Group {
+                #if os(iOS)
                 InviteCodeActivityView(activityItems: [shareText])
+                #else
+                VStack(spacing: 16) {
+                    Text("Invite code copied to clipboard")
+                        .font(.headline)
+                    Button("Done") { showingShareSheet = false }
+                }
+                .frame(width: 300, height: 120)
+                .onAppear { PlatformPasteboard.setString(shareText) }
+                #endif
+                }
+                .macOSSheetFrameCompact()
             }
             .alert("Error", isPresented: $showingError) {
                 Button("OK") { }
@@ -231,7 +267,7 @@ struct InviteCodeView: View {
         """
     }
     
-    func generateQRCode(from string: String) -> UIImage? {
+    func generateQRCode(from string: String) -> PlatformImage? {
         let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(string.utf8)
@@ -243,7 +279,11 @@ struct InviteCodeView: View {
         guard let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) else {
             return nil
         }
+        #if os(iOS)
         return UIImage(cgImage: cgImage)
+        #else
+        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        #endif
     }
     
     func generateInviteCode() {
@@ -304,7 +344,7 @@ struct InviteCodeView: View {
     }
     
     func copyCode() {
-        UIPasteboard.general.string = inviteCode
+        PlatformPasteboard.setString(inviteCode)
     }
 }
 
@@ -345,7 +385,8 @@ struct InviteCodeView_Previews: PreviewProvider {
     }
 }
 
-// MARK: - ActivityView Helper
+// MARK: - ActivityView Helper (iOS only)
+#if os(iOS)
 struct InviteCodeActivityView: UIViewControllerRepresentable {
     let activityItems: [Any]
     let applicationActivities: [UIActivity]? = nil
@@ -356,4 +397,5 @@ struct InviteCodeActivityView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif
 

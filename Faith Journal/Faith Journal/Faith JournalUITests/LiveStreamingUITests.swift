@@ -134,7 +134,7 @@ final class LiveStreamingUITests: XCTestCase {
             let broadcastView = app.otherElements["BroadcastStreamView"]
             if broadcastView.waitForExistence(timeout: 5) {
                 // Test broadcast controls
-                testBroadcastControls()
+                try testBroadcastControls()
             }
         }
     }
@@ -180,7 +180,7 @@ final class LiveStreamingUITests: XCTestCase {
             let conferenceView = app.otherElements["LiveStreamView"]
             if conferenceView.waitForExistence(timeout: 5) {
                 // Test conference controls
-                testConferenceControls()
+                try testConferenceControls()
             }
         } else {
             // Try to find stream mode picker
@@ -196,7 +196,7 @@ final class LiveStreamingUITests: XCTestCase {
                     if startButton.exists {
                         startButton.tap()
                         handlePermissions()
-                        testConferenceControls()
+                        try testConferenceControls()
                     }
                 }
             }

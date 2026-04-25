@@ -1,6 +1,19 @@
 import Foundation
 import SwiftData
 
+struct StreamSegment: Codable, Identifiable {
+    var id: UUID = UUID()
+    var name: String
+    var scriptureReference: String = ""
+    var durationMinutes: Int = 0
+}
+
+enum StreamMode: String, CaseIterable {
+    case broadcast = "broadcast"
+    case conference = "conference"
+    case multiParticipant = "multiParticipant"
+}
+
 @available(iOS 17.0, *)
 @Model
 final class LiveSession {
@@ -20,13 +33,37 @@ final class LiveSession {
     var viewerCount: Int = 0 // For broadcast mode
     var peakViewerCount: Int = 0
     var category: String = ""
-    var tags: [String] = []
+    /// Stored as JSON array string to avoid Core Data "could not materialize Objective-C class Array" for [String].
+    private var tagsJSON: String = "[]"
+    /// Backed by tagsJSON for SwiftData/Core Data compatibility.
+    var tags: [String] {
+        get {
+            guard let data = tagsJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set {
+            tagsJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        }
+    }
     var isPrivate: Bool = false
     var isFavorite: Bool = false
     var isArchived: Bool = false
     var createdAt: Date = Date()
     var agenda: String = "" // Session outline/agenda
-    var relatedResources: [String] = [] // Bible verses, prayer topics, etc.
+    /// Stored as JSON array string to avoid Core Data "could not materialize Objective-C class Array" for [String].
+    private var relatedResourcesJSON: String = "[]"
+    /// Bible verses, prayer topics, etc. Backed by relatedResourcesJSON for SwiftData/Core Data compatibility.
+    var relatedResources: [String] {
+        get {
+            guard let data = relatedResourcesJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set {
+            relatedResourcesJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        }
+    }
     var recordingURL: String? // URL to session recording
     var transcriptURL: String? // URL to transcript
     var summary: String = "" // Post-session summary
@@ -37,7 +74,12 @@ final class LiveSession {
     var messageCount: Int = 0 // Total messages in chat
     var reactionCount: Int = 0 // Total reactions received
     // Stream mode: "broadcast", "conference", or "multiParticipant"
-    var streamMode: String = "conference" // Default to conference (all can participate)
+    var streamMode: String = StreamMode.conference.rawValue
+
+    var typedStreamMode: StreamMode {
+        get { StreamMode(rawValue: streamMode) ?? .conference }
+        set { streamMode = newValue.rawValue }
+    }
 
     // Session controls / scheduling enhancements
     var durationLimitMinutes: Int = 30
@@ -52,8 +94,27 @@ final class LiveSession {
     // Waiting room fields
     var hasWaitingRoom: Bool = false
     var waitingRoomEnabled: Bool = false
-    var allowParticipantsBeforeStart: Bool = true // Allow participants to join before host starts
-    
+    var allowParticipantsBeforeStart: Bool = true
+
+    // Segment agenda (Feature 6)
+    var segmentsData: Data?
+
+    // Amen moment timestamps since session start (Feature 3)
+    var amenMomentsData: Data?
+
+    // Friend notification list (Feature 5) — stores friend userIds to notify on schedule
+    private var notifyFriendIdsJSON: String = "[]"
+    var notifyFriendIds: [String] {
+        get {
+            guard let data = notifyFriendIdsJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set {
+            notifyFriendIdsJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        }
+    }
+
     init(title: String, description: String, hostId: String, category: String, maxParticipants: Int = 10, tags: [String] = []) {
         self.id = UUID()
         self.title = title
@@ -70,7 +131,7 @@ final class LiveSession {
         self.viewerCount = 0
         self.peakViewerCount = 0
         self.category = category
-        self.tags = tags
+        self.tagsJSON = (try? JSONEncoder().encode(tags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         self.isPrivate = false
         self.isFavorite = false
         self.createdAt = Date()
@@ -79,7 +140,7 @@ final class LiveSession {
         self.connectionQuality = "Good"
         self.isLocked = false
         self.isRecording = false
-        self.streamMode = "conference"
+        self.streamMode = StreamMode.conference.rawValue
         self.durationLimitMinutes = 30
         self.isRecurring = false
         self.recurrencePattern = ""
@@ -89,6 +150,9 @@ final class LiveSession {
         self.hasWaitingRoom = false
         self.waitingRoomEnabled = false
         self.allowParticipantsBeforeStart = true
+        self.segmentsData = nil
+        self.amenMomentsData = nil
+        self.notifyFriendIdsJSON = "[]"
     }
     
     // Computed properties

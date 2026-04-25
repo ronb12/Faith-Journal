@@ -186,7 +186,7 @@ struct BibleStudyView: View {
     }
     
     private var filterModeBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 ForEach(FilterMode.allCases, id: \.self) { mode in
                     FilterModeChip(
@@ -233,7 +233,7 @@ struct BibleStudyView: View {
     }
     
     private var categoryFilter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 // All Categories
                 BibleStudyCategoryChip(
@@ -702,7 +702,7 @@ struct TopicDetailView: View {
                                 .font(.headline)
                                 .font(.body.weight(.semibold))
                             
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 12) {
                                     ForEach(relatedTopics, id: \.id) { relatedTopic in
                                         RelatedTopicCard(topic: relatedTopic)

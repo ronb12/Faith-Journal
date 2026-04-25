@@ -1,3 +1,20 @@
+# Firebase service account key (for scripts like delete-test-live-sessions, remove_firebase_duplicates)
+service-account-key.json
+serviceAccountKey.json
+
+# LiveKit secret (copy from LiveKitSecret-template.plist and add your real secret; add LiveKitSecret.plist to Xcode target Copy Bundle Resources)
+Faith Journal/LiveKitSecret.plist
+LiveKitSecret.plist
+
+# Pexels API key (copy PexelsSecrets-template.plist to PexelsSecrets.plist and add your key; add to Copy Bundle Resources)
+PexelsSecrets.plist
+Faith Journal/PexelsSecrets.plist
+
+# Local secrets (never commit)
+AgoraSecrets.plist
+Faith Journal/AgoraSecrets.plist
+AgoraSecrets*.plist
+
 # Xcode
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
@@ -50,6 +67,9 @@ playground.xcworkspace
 .swiftpm/
 
 .build/
+
+# Agora macOS repackaged binary (large; generate with repackage_agora_macos.sh after clone)
+AgoraRtcEngine_macOS_1/AgoraRtcKit1.xcframework/
 
 # CocoaPods
 #
@@ -157,7 +177,7 @@ Faith Journal/Faith Journal/firestore.indexes.json
 Faith Journal/Faith Journal/firestore.rules
 Faith Journal/Faith Journal/firestore_indexes_required.json
 Faith Journal/Faith Journal/Sources/
-Faith Journal/Faith Journal/Faith Journal/
+# Faith Journal/Faith Journal/Faith Journal/  — un-ignored so project files show in Cursor
 
 # Common local env / firebase artifacts (at any level)
 .env
@@ -165,3 +185,4 @@ Faith Journal/Faith Journal/Faith Journal/
 **/.firebase/
 **/.logs/
 
+node_modules

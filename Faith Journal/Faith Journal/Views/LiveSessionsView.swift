@@ -126,8 +126,13 @@ struct LiveSessionsView: View {
         }
     }
     
+    private static let filterCategories = ["All", "Bible Study", "Devotional", "Fellowship", "Other", "Prayer", "Testimony", "Worship"]
+    
     var categories: [String] {
         var cats = Set(allActiveSessions.map { $0.category })
+        for name in Self.filterCategories where name != "All" {
+            cats.insert(name)
+        }
         cats.insert("All")
         return Array(cats).sorted()
     }
@@ -213,7 +218,7 @@ struct LiveSessionsView: View {
                     .padding(.horizontal)
                     
                     // Filter Picker
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(SessionFilter.allCases, id: \.self) { filter in
                                 SessionFilterChip(
@@ -231,7 +236,7 @@ struct LiveSessionsView: View {
                     
                     // Category Filter
                     if !categories.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(categories, id: \.self) { category in
                                     CategoryChip(
@@ -358,7 +363,7 @@ struct LiveSessionsView: View {
                                 }
                                 .padding(.horizontal)
                                 
-                                ScrollView(.horizontal, showsIndicators: false) {
+                                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                     HStack(spacing: 12) {
                                         ForEach(recommendations.prefix(5)) { session in
                                             EnhancedLiveSessionCard(session: session) {
@@ -557,6 +562,7 @@ struct SessionFilterChip: View {
                     .fill(isSelected ? themeManager.colors.primary : Color(.systemGray5))
             )
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -646,28 +652,55 @@ struct EnhancedLiveSessionCard: View {
         session.isRecurring
     }
     
+    private var sessionThumbnailPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [themeManager.colors.primary.opacity(0.6), themeManager.colors.secondary.opacity(0.6)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(height: 180)
+            .overlay(
+                VStack {
+                    Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            )
+    }
+    
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 12) {
                 // Thumbnail/Preview Area
                 ZStack(alignment: .topTrailing) {
-                    // Thumbnail placeholder
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [themeManager.colors.primary.opacity(0.6), themeManager.colors.secondary.opacity(0.6)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(height: 180)
-                        .overlay(
-                            VStack {
-                                Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.white.opacity(0.8))
+                    Group {
+                        if let urlString = session.thumbnailURL, !urlString.isEmpty, let url = URL(string: urlString) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                case .failure:
+                                    sessionThumbnailPlaceholder
+                                case .empty:
+                                    sessionThumbnailPlaceholder
+                                        .overlay(ProgressView())
+                                @unknown default:
+                                    sessionThumbnailPlaceholder
+                                }
                             }
-                        )
+                            .id(urlString)
+                            .frame(height: 180)
+                            .clipped()
+                        } else {
+                            sessionThumbnailPlaceholder
+                        }
+                    }
+                    .cornerRadius(12)
                     
                     // Status badges
                     HStack {
@@ -1087,7 +1120,7 @@ struct CategoryChip: View {
                         .fill(isSelected ? color : Color(.systemGray5))
                 )
         }
-        .animation(.spring(response: 0.3), value: isSelected)
+        .buttonStyle(.plain)
     }
 }
 
@@ -1118,6 +1151,8 @@ struct CreateLiveSessionView: View {
     @State private var reminderMinutes: Int = 5
     @State private var addToCalendar = false
     @State private var enableWaitingRoom = false
+    @State private var selectedThumbnailImage: PlatformImage?
+    @State private var showingThumbnailPicker = false
     @State private var isRecurring = false
     @State private var recurrencePattern = "weekly"
     @State private var showingCalendarError = false
@@ -1125,7 +1160,7 @@ struct CreateLiveSessionView: View {
     @State private var errorMessage: String?
     @State private var showingErrorAlert = false
     
-    let categories = ["Prayer", "Bible Study", "Devotional", "Testimony", "Fellowship", "Other"]
+    let categories = ["Prayer", "Bible Study", "Devotional", "Testimony", "Fellowship", "Worship", "Other"]
     let predefinedTags = ["Prayer", "Bible Study", "Fellowship", "Worship", "Testimony", "Encouragement", "Healing", "Praise", "Intercession", "Community"]
     private let durationOptions = [15, 30, 45, 60]
     
@@ -1142,6 +1177,9 @@ struct CreateLiveSessionView: View {
                         
                         // Session Details Card
                         sessionDetailsCard
+                        
+                        // Thumbnail Card (optional cover image)
+                        thumbnailCard
                         
                         // Category Selection Card
                         categoryCard
@@ -1304,6 +1342,70 @@ struct CreateLiveSessionView: View {
         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
     }
     
+    private var thumbnailCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Image(systemName: "photo.fill")
+                    .foregroundColor(themeManager.colors.primary)
+                    .font(.title3)
+                Text("Thumbnail (optional)")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            }
+            Text("Add a cover image for your live session, like YouTube Live.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Button(action: { showingThumbnailPicker = true }) {
+                Group {
+                    if let img = selectedThumbnailImage {
+                        platformImage(img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(height: 160)
+                            .clipped()
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.tertiarySystemBackground))
+                            .frame(height: 160)
+                            .overlay(
+                                VStack(spacing: 8) {
+                                    Image(systemName: "photo.badge.plus")
+                                        .font(.title)
+                                    Text("Tap to add thumbnail")
+                                        .font(.subheadline)
+                                }
+                                .foregroundColor(.secondary)
+                            )
+                    }
+                }
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color(.separator), lineWidth: 0.5)
+                )
+            }
+            .buttonStyle(.plain)
+            if selectedThumbnailImage != nil {
+                Button("Remove thumbnail") {
+                    selectedThumbnailImage = nil
+                }
+                .font(.subheadline)
+                .foregroundColor(themeManager.colors.primary)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .sheet(isPresented: $showingThumbnailPicker) {
+            #if os(iOS)
+            ImagePicker(image: $selectedThumbnailImage)
+            #elseif os(macOS)
+            MacImagePicker(image: $selectedThumbnailImage)
+            #endif
+        }
+    }
+    
     private var categoryCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
@@ -1315,7 +1417,7 @@ struct CreateLiveSessionView: View {
                     .foregroundColor(.primary)
             }
             
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(categories, id: \.self) { cat in
                         CategoryChip(
@@ -1600,7 +1702,7 @@ struct CreateLiveSessionView: View {
                         .foregroundColor(.primary)
                     
                     // Predefined tags selection
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(predefinedTags, id: \.self) { tag in
                                 Button(action: {
@@ -1898,7 +2000,23 @@ struct CreateLiveSessionView: View {
                 }
             }
             
+            let sessionId = session.id
+            let thumbImage = selectedThumbnailImage
             dismiss()
+            
+            // Upload thumbnail and save URL to session (so list shows custom thumbnail)
+            if let image = thumbImage, let jpegData = platformImageToJPEGData(image, quality: 0.85) {
+                Task {
+                    do {
+                        let urlString = try await FirebaseSyncService.shared.uploadLiveSessionThumbnail(sessionId: sessionId, imageData: jpegData)
+                        await MainActor.run {
+                            FirebaseSyncService.shared.saveThumbnailURL(sessionId: sessionId, urlString: urlString)
+                        }
+                    } catch {
+                        print("⚠️ [LIVE SESSION] Thumbnail upload failed: \(error.localizedDescription)")
+                    }
+                }
+            }
         } catch {
             print("Error creating session: \(error)")
         }
@@ -1951,6 +2069,9 @@ struct LiveSessionDetailView: View {
     @State private var participantListener: Any? // ListenerRegistration
     @State private var errorMessage: String?
     @State private var showingErrorAlert = false
+    @State private var showingThumbnailPicker = false
+    @State private var selectedThumbnailImage: PlatformImage?
+    @State private var isUploadingThumbnail = false
     
     enum StreamMode {
         case broadcast
@@ -2457,6 +2578,49 @@ struct LiveSessionDetailView: View {
         return session.hostId == userId
     }
     
+    private var sessionDetailThumbnailPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(
+                LinearGradient(
+                    colors: [themeManager.colors.primary.opacity(0.6), themeManager.colors.secondary.opacity(0.6)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(height: 160)
+            .overlay(
+                VStack(spacing: 8) {
+                    Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
+                        .font(.system(size: 36))
+                        .foregroundColor(.white.opacity(0.8))
+                    Text("Tap to set cover image")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            )
+    }
+    
+    private func uploadTestThumbnail() {
+        guard let image = platformImageTestThumbnail(), let jpegData = platformImageToJPEGData(image, quality: 0.85) else { return }
+        let sessionId = session.id
+        isUploadingThumbnail = true
+        Task {
+            do {
+                let urlString = try await FirebaseSyncService.shared.uploadLiveSessionThumbnail(sessionId: sessionId, imageData: jpegData)
+                await MainActor.run {
+                    FirebaseSyncService.shared.saveThumbnailURL(sessionId: sessionId, urlString: urlString)
+                    isUploadingThumbnail = false
+                }
+            } catch {
+                await MainActor.run {
+                    isUploadingThumbnail = false
+                    errorMessage = error.localizedDescription
+                    showingErrorAlert = true
+                }
+            }
+        }
+    }
+    
     // Get display name for host - prioritize host participant's userName if available
     var hostDisplayName: String {
         // First check if host has a participant record with a valid userName
@@ -2870,6 +3034,98 @@ struct LiveSessionDetailView: View {
     @ViewBuilder
     private var detailContent: some View {
         VStack(alignment: .leading, spacing: 24) {
+            // Cover image / Thumbnail (host can change)
+            if isHost {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Cover image")
+                            .font(.headline)
+                        Spacer()
+                        Button(action: { showingThumbnailPicker = true }) {
+                            if isUploadingThumbnail {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else {
+                                Label("Change", systemImage: "photo.badge.plus")
+                                    .font(.subheadline)
+                            }
+                        }
+                        .disabled(isUploadingThumbnail)
+                        .foregroundColor(themeManager.colors.primary)
+                        Button("Test thumbnail") {
+                            uploadTestThumbnail()
+                        }
+                        .font(.caption)
+                        .disabled(isUploadingThumbnail)
+                        .foregroundColor(themeManager.colors.primary.opacity(0.8))
+                    }
+                    Button(action: { showingThumbnailPicker = true }) {
+                        Group {
+                            if let urlString = session.thumbnailURL, !urlString.isEmpty, let url = URL(string: urlString) {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image.resizable().scaledToFill()
+                                    case .failure, .empty:
+                                        sessionDetailThumbnailPlaceholder
+                                    @unknown default:
+                                        sessionDetailThumbnailPlaceholder
+                                    }
+                                }
+                                .frame(height: 160)
+                                .clipped()
+                            } else if let img = selectedThumbnailImage {
+                                platformImage(img)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(height: 160)
+                                    .clipped()
+                            } else {
+                                sessionDetailThumbnailPlaceholder
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 160)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color(.separator), lineWidth: 0.5)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUploadingThumbnail)
+                }
+                .sheet(isPresented: $showingThumbnailPicker) {
+                    #if os(iOS)
+                    ImagePicker(image: $selectedThumbnailImage)
+                    #elseif os(macOS)
+                    MacImagePicker(image: $selectedThumbnailImage)
+                    #endif
+                }
+                .onChange(of: selectedThumbnailImage) { _, newImage in
+                    guard let image = newImage, let jpegData = platformImageToJPEGData(image, quality: 0.85) else { return }
+                    let sessionId = session.id
+                    isUploadingThumbnail = true
+                    Task {
+                        do {
+                            let urlString = try await FirebaseSyncService.shared.uploadLiveSessionThumbnail(sessionId: sessionId, imageData: jpegData)
+                            await MainActor.run {
+                                FirebaseSyncService.shared.saveThumbnailURL(sessionId: sessionId, urlString: urlString)
+                                isUploadingThumbnail = false
+                                selectedThumbnailImage = nil
+                            }
+                        } catch {
+                            await MainActor.run {
+                                isUploadingThumbnail = false
+                                selectedThumbnailImage = nil
+                                errorMessage = error.localizedDescription
+                                showingErrorAlert = true
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Header
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
@@ -3028,7 +3284,7 @@ struct LiveSessionDetailView: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 12) {
                             // Filter to unique userIds to prevent duplicates from showing even if they exist in DB
                             // Use userId as the key to ensure only one per user is shown
@@ -3140,7 +3396,7 @@ struct LiveSessionDetailView: View {
                     Text("Tags")
                         .font(.headline)
                     
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(session.tags, id: \.self) { tag in
                                 Text("#\(tag)")

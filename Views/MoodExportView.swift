@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct MoodExportView: View {
     @Query(sort: [SortDescriptor(\MoodEntry.date, order: .reverse)]) var entries: [MoodEntry]
     // Use regular property for singleton, not @StateObject
@@ -64,11 +64,20 @@ struct MoodExportView: View {
                 }
             }
             .navigationTitle("Export Data")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .sheet(isPresented: $showingShareSheet) {
+                Group {
                 if let exportFileURL = exportFileURL {
+                    #if os(iOS)
                     MoodExportShareSheet(items: [exportFileURL])
+                    #elseif os(macOS)
+                    MacShareSheet(shareItems: [exportFileURL])
+                    #endif
                 }
+                }
+                .macOSSheetFrameCompact()
             }
         }
     }
@@ -107,6 +116,8 @@ struct MoodExportView: View {
     }
 }
 
+#if os(iOS)
+import UIKit
 struct MoodExportShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     
@@ -117,3 +128,4 @@ struct MoodExportShareSheet: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif

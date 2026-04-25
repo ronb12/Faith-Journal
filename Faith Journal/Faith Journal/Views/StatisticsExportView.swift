@@ -55,6 +55,7 @@ struct StatisticsExportView: View {
                 }
             }
             .navigationTitle("Export Statistics")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -63,6 +64,15 @@ struct StatisticsExportView: View {
                     }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+            #endif
             .sheet(isPresented: $showingShareSheet) {
                 if let data = exportData {
                     StatisticsShareSheet(data: data, format: exportFormat)

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 #if canImport(FirebaseAuth)
 import FirebaseAuth
@@ -19,15 +20,14 @@ import FirebaseFirestore
 import FirebaseStorage
 #endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct ProfileEditView: View {
-    // Accept optional profile parameter for compatibility, but use Firebase instead
-    let profile: UserProfile? = nil
+    let profile: UserProfile?
     
     @StateObject private var profileManager = ProfileManager.shared
     
     @State private var userName: String = ""
-    @State private var profileImage: UIImage?
+    @State private var profileImage: PlatformImage?
     @State private var showingImagePicker = false
     @State private var showingError = false
     @State private var errorMessage: String = ""
@@ -35,11 +35,10 @@ struct ProfileEditView: View {
     @State private var showSuccessAlert = false
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     
-    // Compatibility initializer - profile is ignored, Firebase is used instead
     init(profile: UserProfile? = nil) {
-        // Profile parameter accepted for compatibility but not used
-        // All data comes from Firebase via ProfileManager
+        self.profile = profile
     }
     
     var body: some View {
@@ -47,13 +46,16 @@ struct ProfileEditView: View {
             Form {
                 Section {
                     TextField("Name", text: $userName)
+                        #if os(iOS)
                         .textInputAutocapitalization(.words)
+                        #endif
                 } header: {
                     Text("Profile Information")
                 }
                 
                 Section {
                     if let image = profileImage {
+                        #if os(iOS)
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
@@ -61,6 +63,15 @@ struct ProfileEditView: View {
                             .clipShape(Circle())
                             .overlay(Circle().stroke(Color.gray, lineWidth: 2))
                             .padding()
+                        #else
+                        Image(nsImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 200, height: 200)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray, lineWidth: 2))
+                            .padding()
+                        #endif
                     } else {
                         ZStack {
                             Circle()
@@ -104,6 +115,7 @@ struct ProfileEditView: View {
                 }
             }
             .navigationTitle("Edit Profile")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -114,7 +126,21 @@ struct ProfileEditView: View {
             }
             .sheet(isPresented: $showingImagePicker) {
                 ImagePicker(image: $profileImage)
+                    .macOSSheetFrameCompact()
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+            .sheet(isPresented: $showingImagePicker) {
+                MacImagePicker(image: $profileImage)
+                    .macOSSheetFrameCompact()
+            }
+            #endif
             .alert("Error", isPresented: $showingError) {
                 Button("OK", role: .cancel) { }
             } message: {
@@ -164,16 +190,31 @@ struct ProfileEditView: View {
     }
     
     private func saveProfile() async {
-        isLoading = true
-        errorMessage = ""
-        
+        await MainActor.run { isLoading = true; errorMessage = "" }
+        let nameToSave = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+
         do {
-            try await profileManager.saveProfile(
-                name: userName.trimmingCharacters(in: .whitespacesAndNewlines),
-                image: profileImage
-            )
-            
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    try await profileManager.saveProfile(
+                        name: nameToSave.isEmpty ? nil : nameToSave,
+                        image: profileImage
+                    )
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 15_000_000_000)  // 15 second timeout
+                    throw NSError(domain: "ProfileEditView", code: -1, userInfo: [NSLocalizedDescriptionKey: "Save timed out. Check your network connection and try again."])
+                }
+                _ = try await group.next()!
+                group.cancelAll()
+            }
+
             await MainActor.run {
+                if let profile = profile {
+                    if !nameToSave.isEmpty { profile.name = nameToSave }
+                    profile.avatarPhotoURL = profileManager.profileImageURL
+                    try? modelContext.save()
+                }
                 isLoading = false
                 showSuccessAlert = true
             }
@@ -189,8 +230,10 @@ struct ProfileEditView: View {
 
 // MARK: - Image Picker
 
+#if os(iOS)
+import UIKit
 struct ImagePicker: UIViewControllerRepresentable {
-    @Binding var image: UIImage?
+    @Binding var image: PlatformImage?
     @Environment(\.dismiss) private var dismiss
     
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -228,3 +271,31 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
     }
 }
+#elseif os(macOS)
+import AppKit
+struct MacImagePicker: View {
+    @Binding var image: PlatformImage?
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Select Profile Image")
+                .font(.headline)
+            Button("Choose File...") {
+                let panel = NSOpenPanel()
+                panel.allowedContentTypes = [.image]
+                panel.allowsMultipleSelection = false
+                panel.begin { response in
+                    if response == .OK, let url = panel.url, let data = try? Data(contentsOf: url) {
+                        image = platformImageFromData(data)
+                    }
+                    dismiss()
+                }
+            }
+            Button("Cancel") { dismiss() }
+        }
+        .padding(40)
+        .frame(minWidth: 300)
+    }
+}
+#endif

@@ -38,7 +38,7 @@ struct TopicPickerView: View {
         NavigationView {
             VStack(spacing: 0) {
                 // Category Filter
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         Button(action: { selectedCategory = nil }) {
                             Text("All")
@@ -49,7 +49,7 @@ struct TopicPickerView: View {
                                 .padding(.vertical, 8)
                                 .background(
                                     RoundedRectangle(cornerRadius: 20)
-                                        .fill(selectedCategory == nil ? Color.purple : Color(.systemGray5))
+                                        .fill(selectedCategory == nil ? Color.purple : Color.platformSystemGray5)
                                 )
                         }
                         
@@ -63,7 +63,7 @@ struct TopicPickerView: View {
                                     .padding(.vertical, 8)
                                     .background(
                                         RoundedRectangle(cornerRadius: 20)
-                                            .fill(selectedCategory == category ? Color.purple : Color(.systemGray5))
+                                            .fill(selectedCategory == category ? Color.purple : Color.platformSystemGray5)
                                     )
                             }
                         }
@@ -71,7 +71,7 @@ struct TopicPickerView: View {
                     .padding(.horizontal)
                 }
                 .padding(.vertical, 8)
-                .background(Color(.systemGray6))
+                .background(Color.platformSystemGray6)
                 
                 // Topics List
                 if filteredTopics.isEmpty {
@@ -100,10 +100,12 @@ struct TopicPickerView: View {
                 }
             }
             .navigationTitle("Select Topic")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .searchable(text: $searchText, prompt: "Search topics...")
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Cancel") { dismiss() }
                 }
             }

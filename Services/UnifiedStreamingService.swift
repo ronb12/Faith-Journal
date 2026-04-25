@@ -10,7 +10,7 @@ import Foundation
 import Combine
 
 @MainActor
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 class UnifiedStreamingService: ObservableObject {
     static let shared = UnifiedStreamingService()
     

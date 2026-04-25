@@ -209,8 +209,8 @@ struct AppRootView: View {
                 print("🔗 [DEEP LINK] Extracted invite code (no host): \(extractedCode ?? "nil")")
             }
         }
-        // Also handle https://faithjournal.app/invite/CODE format (for universal links)
-        else if url.scheme == "https" && url.host == "faithjournal.app" {
+        // Also handle https://faith-journal.web.app/invite/CODE format (for universal links)
+        else if url.scheme == "https" && url.host == "faith-journal.web.app" {
             let pathComponents = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
             if pathComponents.first == "invite", let code = pathComponents.dropFirst().first {
                 extractedCode = code

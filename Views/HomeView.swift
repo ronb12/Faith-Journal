@@ -1,5 +1,10 @@
 import SwiftUI
 import SwiftData
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 // MARK: - Activity Item Types
 
@@ -61,8 +66,7 @@ extension Date {
     }
 }
 
-@available(iOS 17.0, *)
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct HomeView: View {
     @Binding var selectedTab: Int
     @Binding var showingNewJournalEntry: Bool
@@ -76,11 +80,28 @@ struct HomeView: View {
     private let devotionalManager = DevotionalManager.shared
     // Observe ProfileManager to get Firebase profile updates
     @ObservedObject private var profileManager = ProfileManager.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
     
     // State for avatar image to handle async loading
-    @State private var avatarImage: UIImage?
+    @State private var avatarImage: PlatformImage?
+    
+    private func avatarImageDisplay(_ img: PlatformImage) -> some View {
+        let image: Image
+        #if os(iOS)
+        image = Image(uiImage: img)
+        #else
+        image = Image(nsImage: img)
+        #endif
+        return image
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: 50, height: 50)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+    }
     
     @Query(sort: [SortDescriptor(\JournalEntry.createdAt, order: .reverse)]) private var allJournalEntries: [JournalEntry]
     @Query(sort: [SortDescriptor(\PrayerRequest.createdAt, order: .reverse)]) private var allPrayerRequests: [PrayerRequest]
@@ -111,81 +132,82 @@ struct HomeView: View {
 
     // Detect if running on iPad
     private var isIPad: Bool {
+        #if os(iOS)
         UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
+    }
+    
+    private var homeScrollContent: some View {
+        LazyVStack(alignment: .leading, spacing: 16) {
+            welcomeHeader
+            bibleVerseCard
+            if let devotional = todayDevotional {
+                devotionalCard(devotional: devotional)
+            }
+            QuickActionsView(
+                showingNewJournalEntry: $showingNewJournalEntry,
+                showingNewPrayerRequest: $showingNewPrayerRequest,
+                showingMoodCheckin: $showingMoodCheckin,
+                selectedTab: $selectedTab
+            )
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Recent Activity")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                if !combinedRecentActivity.isEmpty {
+                    ForEach(combinedRecentActivity) { activity in
+                        HStack(spacing: 12) {
+                            Image(systemName: activity.icon)
+                                .foregroundColor(activity.color)
+                                .font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(activity.title)
+                                    .font(.subheadline)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(2)
+                                Text(activity.subtitle)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(Color.platformSystemGray6)
+                        .cornerRadius(10)
+                    }
+                } else {
+                    Text("No recent activity yet. Start your faith journey by creating a journal entry or checking in on your mood!")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.platformSystemGray6)
+                        .cornerRadius(10)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, isIPad ? 40 : 16)
+        .padding(.top, 8)
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
+                Color.platformSystemGroupedBackground
                     .ignoresSafeArea(.all, edges: .all)
                 
                 ScrollView(.vertical, showsIndicators: true) {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        // Welcome Header
-                        welcomeHeader
-                        
-                        // Bible Verse of the Day
-                        bibleVerseCard
-                        
-                        // Today's Devotional
-                        if let devotional = todayDevotional {
-                            devotionalCard(devotional: devotional)
-                        }
-                        
-                        // Quick Actions - Always show
-                        QuickActionsView(
-                            showingNewJournalEntry: $showingNewJournalEntry,
-                            showingNewPrayerRequest: $showingNewPrayerRequest,
-                            showingMoodCheckin: $showingMoodCheckin,
-                            selectedTab: $selectedTab
-                        )
-                        
-                        // Recent Activity - Show journal entries and mood check-ins
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Recent Activity")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                            if !combinedRecentActivity.isEmpty {
-                                ForEach(combinedRecentActivity) { activity in
-                                    HStack(spacing: 12) {
-                                        Image(systemName: activity.icon)
-                                            .foregroundColor(activity.color)
-                                            .font(.title3)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(activity.title)
-                                                .font(.subheadline)
-                                                .font(.body.weight(.semibold))
-                                                .foregroundColor(.primary)
-                                                .lineLimit(2)
-                                            Text(activity.subtitle)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                    }
-                                    .padding(12)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(10)
-                                }
-                            } else {
-                                Text("No recent activity yet. Start your faith journey by creating a journal entry or checking in on your mood!")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .padding()
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(10)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, isIPad ? 40 : 16)
-                    .padding(.top, 8)
+                    homeScrollContent
                 }
                 .frame(maxWidth: .infinity)
             }
+            #if os(iOS)
             .navigationBarTitleDisplayMode(isIPad ? .large : .inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     EmptyView()
@@ -216,7 +238,11 @@ struct HomeView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(macOS)
+        .ignoresSafeArea(.all, edges: [.bottom, .leading, .trailing])
+        #else
         .ignoresSafeArea(.all, edges: .all)
+        #endif
     }
     
     // MARK: - View Components
@@ -240,7 +266,7 @@ struct HomeView: View {
                 Text("Welcome Back, \(displayName)!")
                     .font(.title2)
                     .font(.body.weight(.bold))
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("Grow in faith, one day at a time")
@@ -249,22 +275,13 @@ struct HomeView: View {
             }
             Spacer()
             // Profile avatar - shows photo if available, otherwise shows initial
-            if let avatarImage = avatarImage {
-                Image(uiImage: avatarImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 50, height: 50)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(Color.white, lineWidth: 2)
-                    )
-                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            if let img = avatarImage {
+                avatarImageDisplay(img)
             } else {
                 Circle()
                     .fill(
                         LinearGradient(
-                            colors: [.purple, .blue],
+                            colors: [themeManager.colors.primary, themeManager.colors.secondary],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -317,7 +334,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "book.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Bible Verse of the Day")
                     .font(.headline)
                     .foregroundColor(.primary)
@@ -344,7 +361,7 @@ struct HomeView: View {
                     Text(verse.reference)
                         .font(.subheadline)
                         .font(.body.weight(.semibold))
-                        .foregroundColor(.purple)
+                        .foregroundColor(themeManager.colors.primary)
                     Text(verse.text)
                         .font(.body)
                         .foregroundColor(.primary)
@@ -371,7 +388,7 @@ struct HomeView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(12)
         .onChange(of: verseManager.selectedVersion) { oldVersion, newVersion in
             // When version changes, reload the verse to get the new translation
@@ -391,23 +408,23 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "heart.fill")
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text("Today's Devotional")
                     .font(.headline)
-                    .foregroundColor(colorScheme == .dark ? .white : .black)
+                    .foregroundColor(colorScheme == .dark ? .white : Color.primary)
             }
             
             VStack(alignment: .leading, spacing: 8) {
                 Text(devotional.title)
                     .font(.title3)
                     .font(.body.weight(.bold))
-                    .foregroundColor(colorScheme == .dark ? .white : .black)
+                    .foregroundColor(colorScheme == .dark ? .white : Color.primary)
                 Text(devotional.scripture)
                     .font(.subheadline)
-                    .foregroundColor(.purple)
+                    .foregroundColor(themeManager.colors.primary)
                 Text(devotional.content)
                     .font(.body)
-                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.8))
+                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.9) : Color.primary.opacity(0.8))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -423,13 +440,13 @@ struct HomeView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 8)
-                        .background(Color.red)
+                        .background(themeManager.colors.primary)
                         .cornerRadius(8)
                 }
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(12)
     }
 

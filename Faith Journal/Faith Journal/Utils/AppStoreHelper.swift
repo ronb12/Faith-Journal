@@ -6,7 +6,11 @@
 //
 
 import Foundation
+#if os(iOS)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct AppStoreHelper {
     // App Store ID from App Store Connect
@@ -25,7 +29,11 @@ struct AppStoreHelper {
     /// Opens the App Store page for Faith Journal
     static func openAppStore() {
         if let url = URL(string: appStoreURL) {
+            #if os(iOS)
             UIApplication.shared.open(url)
+            #elseif os(macOS)
+            NSWorkspace.shared.open(url)
+            #endif
         }
     }
     

@@ -111,7 +111,7 @@ struct BibleStudyView: View {
                     }
                 }
                 .sheet(item: $selectedTopic) { topic in
-                    TopicDetailView(topic: topic)
+                    TopicDetailView(topic: topic, onDismiss: { selectedTopic = nil })
                 }
                 .sheet(isPresented: $showingProgress) {
                     BibleStudyProgressView()
@@ -185,7 +185,7 @@ struct BibleStudyView: View {
     }
     
     private var filterModeBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 ForEach(FilterMode.allCases, id: \.self) { mode in
                     FilterModeChip(
@@ -232,7 +232,7 @@ struct BibleStudyView: View {
     }
     
     private var categoryFilter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
             HStack(spacing: 12) {
                 // All Categories
                 BibleStudyCategoryChip(
@@ -525,6 +525,7 @@ struct DailyTopicCard: View {
 @available(iOS 17.0, *)
 struct TopicDetailView: View {
     let topic: BibleStudyTopic
+    var onDismiss: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     // Use regular property for singleton, not @StateObject
@@ -703,7 +704,7 @@ struct TopicDetailView: View {
                                 .font(.headline)
                                 .font(.body.weight(.semibold))
                             
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 12) {
                                     ForEach(relatedTopics, id: \.id) { relatedTopic in
                                         RelatedTopicCard(topic: relatedTopic)
@@ -733,13 +734,20 @@ struct TopicDetailView: View {
             .navigationTitle("Topic Study")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        onDismiss?()
+                        dismiss()
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         topic.notes = notes
                         topic.lastViewedDate = Date()
+                        onDismiss?()
+                        dismiss()
                         do {
                             try modelContext.save()
-                            dismiss()
                         } catch {
                             print("❌ Error saving topic notes: \(error.localizedDescription)")
                             ErrorHandler.shared.handle(.saveFailed)
@@ -1363,14 +1371,35 @@ struct TopicRow: View {
     }
 }
 
+// MARK: - Bible Game Constants
+private let kBasePointsPerCorrect = 100
+private let kStreakBonusPerLevel = 25
+private let kHighScoreKey = "BibleStudyGameHighScore"
+private let kTotalGamesKey = "BibleStudyGameTotalGames"
+private let kTotalCorrectKey = "BibleStudyGameTotalCorrect"
+
 @available(iOS 17.0, *)
 struct BibleStudyGameView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var questions: [GameQuestion] = []
     @State private var currentIndex: Int = 0
     @State private var selectedOption: String?
-    @State private var score: Int = 0
+    @State private var score: Int = 0           // correct count
+    @State private var points: Int = 0          // total points this game
+    @State private var currentStreak: Int = 0
+    @State private var bestStreak: Int = 0
     @State private var isComplete: Bool = false
+
+    private var highScore: Int {
+        UserDefaults.standard.integer(forKey: kHighScoreKey)
+    }
+    private var totalGamesPlayed: Int {
+        UserDefaults.standard.integer(forKey: kTotalGamesKey)
+    }
+    private var totalCorrectAllTime: Int {
+        UserDefaults.standard.integer(forKey: kTotalCorrectKey)
+    }
 
     private var currentQuestion: GameQuestion? {
         guard questions.indices.contains(currentIndex) else { return nil }
@@ -1383,39 +1412,22 @@ struct BibleStudyGameView: View {
                 if questions.isEmpty {
                     Text("No questions are ready yet. Please try again in a bit.")
                         .multilineTextAlignment(.center)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.colors.textSecondary)
                         .padding()
                     Spacer()
                 } else if isComplete {
-                    Spacer()
-                    Text("Final Score")
-                        .font(.title)
-                        .fontWeight(.semibold)
-                    Text("\(score)/\(questions.count)")
-                        .font(.system(size: 48, weight: .bold))
-                        .foregroundColor(.purple)
-                    Text("Great job! Keep exploring more topics.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                    Spacer()
-                    Button("Play Again") {
-                        resetGame()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Spacer()
+                    resultsView
                 } else if let question = currentQuestion {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Question \(currentIndex + 1) of \(questions.count)")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(themeManager.colors.textSecondary)
                         Text(question.prompt)
                             .font(.headline)
                         if let verseText = question.verseText, !verseText.isEmpty {
                             Text("“\(verseText)”")
                                 .font(.body)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(themeManager.colors.textSecondary)
                                 .italic()
                         }
 
@@ -1430,7 +1442,7 @@ struct BibleStudyGameView: View {
                                     Spacer()
                                     if let selected = selectedOption, selected == option {
                                         Image(systemName: option == question.correctAnswer ? "checkmark.circle.fill" : "x.circle.fill")
-                                            .foregroundColor(option == question.correctAnswer ? .green : .red)
+                                            .foregroundColor(option == question.correctAnswer ? themeManager.colors.primary : .red)
                                     }
                                 }
                                 .padding()
@@ -1444,10 +1456,10 @@ struct BibleStudyGameView: View {
                             Text(selected == question.correctAnswer ? "Correct! \(question.correctAnswer)" : "Correct Answer: \(question.correctAnswer)")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                                .foregroundColor(selected == question.correctAnswer ? .green : .red)
+                                .foregroundColor(selected == question.correctAnswer ? themeManager.colors.primary : .red)
                             Text(question.explanation)
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(themeManager.colors.textSecondary)
                         }
                     }
                     Spacer()
@@ -1457,6 +1469,7 @@ struct BibleStudyGameView: View {
                     }
                     .disabled(selectedOption == nil)
                     .buttonStyle(.borderedProminent)
+                    .tint(themeManager.colors.primary)
                 }
             }
             .padding()
@@ -1468,9 +1481,80 @@ struct BibleStudyGameView: View {
                         dismiss()
                     }
                 }
+                if !questions.isEmpty && !isComplete {
+                    ToolbarItem(placement: .principal) {
+                        HStack(spacing: 16) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "star.fill")
+                                    .font(.caption)
+                                Text("\(points)")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .foregroundColor(themeManager.colors.primary)
+                            HStack(spacing: 4) {
+                                Image(systemName: "flame.fill")
+                                    .font(.caption)
+                                Text("\(currentStreak)")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .foregroundColor(currentStreak >= 3 ? .orange : themeManager.colors.textSecondary)
+                        }
+                    }
+                }
             }
         }
         .onAppear(perform: resetGame)
+    }
+
+    @ViewBuilder
+    private var resultsView: some View {
+        let percentage = questions.isEmpty ? 0 : Int((Double(score) / Double(questions.count)) * 100)
+        let letterGrade = Self.letterGrade(for: percentage)
+        let message = Self.encouragingMessage(percentage: percentage, score: score, total: questions.count)
+
+        VStack(spacing: 24) {
+            Spacer()
+            Text("Game Complete!")
+                .font(.title2)
+                .fontWeight(.semibold)
+            Text(letterGrade)
+                .font(.system(size: 56, weight: .bold))
+                .foregroundColor(themeManager.colors.primary)
+            Text("\(score)/\(questions.count) correct • \(points) pts")
+                .font(.title3)
+                .foregroundColor(themeManager.colors.textSecondary)
+            if bestStreak >= 3 {
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                        .foregroundColor(.orange)
+                    Text("Best streak: \(bestStreak)")
+                        .font(.subheadline)
+                        .foregroundColor(themeManager.colors.textSecondary)
+                }
+            }
+            if points >= highScore && points > 0 {
+                Text("New high score!")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(themeManager.colors.primary)
+            } else if highScore > 0 {
+                Text("High score: \(highScore) pts")
+                    .font(.caption)
+                    .foregroundColor(themeManager.colors.textSecondary)
+            }
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(themeManager.colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+            Spacer()
+            Button("Play Again") {
+                resetGame()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(themeManager.colors.primary)
+            Spacer()
+        }
     }
 
     private func selectOption(_ option: String) {
@@ -1478,6 +1562,11 @@ struct BibleStudyGameView: View {
         selectedOption = option
         if option == question.correctAnswer {
             score += 1
+            currentStreak += 1
+            bestStreak = max(bestStreak, currentStreak)
+            points += kBasePointsPerCorrect + (currentStreak - 1) * kStreakBonusPerLevel
+        } else {
+            currentStreak = 0
         }
     }
 
@@ -1488,8 +1577,17 @@ struct BibleStudyGameView: View {
         if currentIndex < questions.count - 1 {
             currentIndex += 1
         } else {
+            saveGameStats()
             isComplete = true
         }
+    }
+
+    private func saveGameStats() {
+        if points > highScore {
+            UserDefaults.standard.set(points, forKey: kHighScoreKey)
+        }
+        UserDefaults.standard.set(totalGamesPlayed + 1, forKey: kTotalGamesKey)
+        UserDefaults.standard.set(totalCorrectAllTime + score, forKey: kTotalCorrectKey)
     }
 
     private func resetGame() {
@@ -1498,23 +1596,47 @@ struct BibleStudyGameView: View {
         currentIndex = 0
         selectedOption = nil
         score = 0
+        points = 0
+        currentStreak = 0
+        bestStreak = 0
         isComplete = questions.isEmpty
+    }
+
+    private static func letterGrade(for percentage: Int) -> String {
+        switch percentage {
+        case 90...100: return "A"
+        case 80..<90:  return "B"
+        case 70..<80:  return "C"
+        case 60..<70:  return "D"
+        default:       return percentage == 0 ? "—" : "F"
+        }
+    }
+
+    private static func encouragingMessage(percentage: Int, score: Int, total: Int) -> String {
+        switch percentage {
+        case 95...100: return "Outstanding! You really know your Scripture. 🌟"
+        case 85..<95:  return "Excellent work! Keep studying and growing."
+        case 75..<85:  return "Great job! You're building a solid foundation."
+        case 60..<75:  return "Good effort! Review the topics and try again."
+        case 1..<60:   return "Keep exploring! Each round helps you learn."
+        default:       return "No questions available. Try again in a bit."
+        }
     }
 
     private func optionBackground(_ option: String, correct: String) -> Color {
         guard let selected = selectedOption else {
-            return Color(.systemGray6)
+            return Color.platformSystemGray6
         }
         if option == selected {
-            return option == correct ? Color.green.opacity(0.2) : Color.red.opacity(0.2)
+            return option == correct ? themeManager.colors.primary.opacity(0.2) : Color.red.opacity(0.2)
         }
         if option == correct {
-            return Color.green.opacity(0.15)
+            return themeManager.colors.primary.opacity(0.15)
         }
-        return Color(.systemGray6)
+        return Color.platformSystemGray6
     }
 
-    private static func generateQuestions(from topics: [BibleStudyTopic], count: Int = 6) -> [GameQuestion] {
+    private static func generateQuestions(from topics: [BibleStudyTopic], count: Int = 30) -> [GameQuestion] {
         let candidates = topics.filter { !$0.keyVerses.isEmpty }
         var questions: [GameQuestion] = []
         let shuffledTopics = candidates.shuffled()

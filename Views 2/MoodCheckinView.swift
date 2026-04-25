@@ -57,42 +57,95 @@ struct MoodCheckinView: View {
     
     let availableActivities = ["Prayer", "Bible Reading", "Meditation", "Worship", "Journaling", "Exercise", "Rest", "Social", "Work", "Study"]
     
+    private var moodEmojiPickerView: some View {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
+            HStack(spacing: 16) {
+                ForEach(Array(moodEmojis.keys.sorted()), id: \.self) { mood in
+                    Button(action: {
+                        selectedMood = mood
+                        selectedEmoji = moodEmojis[mood] ?? "😊"
+                        updateMoodCategory()
+                    }) {
+                        VStack(spacing: 8) {
+                            Text(moodEmojis[mood] ?? "😊")
+                                .font(.system(size: 40))
+                            Text(mood)
+                                .font(.caption)
+                                .foregroundColor(.primary)
+                        }
+                        .frame(width: 80, height: 100)
+                        .background(selectedMood == mood ? themeManager.colors.primary.opacity(0.2) : Color(.systemGray6))
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(selectedMood == mood ? themeManager.colors.primary : Color.clear, lineWidth: 2)
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal)
+        }
+        .frame(height: 120)
+    }
+    
+    private var moodDropdownView: some View {
+        Picker("How are you feeling?", selection: $selectedMood) {
+            ForEach(Array(moodEmojis.keys.sorted()), id: \.self) { mood in
+                Text("\(moodEmojis[mood] ?? "😊") \(mood)")
+                    .tag(mood)
+            }
+        }
+        .pickerStyle(.menu)
+        .onChange(of: selectedMood) { _, newValue in
+            selectedEmoji = moodEmojis[newValue] ?? "😊"
+            updateMoodCategory()
+        }
+    }
+    
+    private var moodSectionRest: some View {
+        Section(header: Text("How are you feeling?")) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Intensity")
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(intensity)/10")
+                        .font(.headline)
+                        .foregroundColor(themeManager.colors.primary)
+                }
+                Slider(value: Binding(
+                    get: { Double(intensity) },
+                    set: { intensity = Int($0) }
+                ), in: 1...10, step: 1)
+                .tint(themeManager.colors.primary)
+            }
+            Picker("Category", selection: $moodCategory) {
+                Text("Positive").tag("Positive")
+                Text("Neutral").tag("Neutral")
+                Text("Challenging").tag("Challenging")
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
+            #if os(macOS)
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 8) {
+                    moodDropdownView
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+            #endif
             Form {
-                // Mood Selection with Emoji
+                #if os(macOS)
+                moodSectionRest
+                #else
                 Section(header: Text("How are you feeling?")) {
-                    // Emoji Picker
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(Array(moodEmojis.keys.sorted()), id: \.self) { mood in
-                                Button(action: {
-                                    selectedMood = mood
-                                    selectedEmoji = moodEmojis[mood] ?? "😊"
-                                    updateMoodCategory()
-                                }) {
-                                    VStack(spacing: 8) {
-                                        Text(moodEmojis[mood] ?? "😊")
-                                            .font(.system(size: 40))
-                                        Text(mood)
-                                            .font(.caption)
-                                            .foregroundColor(.primary)
-                                    }
-                                    .frame(width: 80, height: 100)
-                                    .background(selectedMood == mood ? themeManager.colors.primary.opacity(0.2) : Color(.systemGray6))
-                                    .cornerRadius(12)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(selectedMood == mood ? themeManager.colors.primary : Color.clear, lineWidth: 2)
-                                    )
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    .listRowInsets(EdgeInsets())
-                    
-                    // Intensity Slider
+                    moodEmojiPickerView
+                        .listRowInsets(EdgeInsets())
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("Intensity")
@@ -116,6 +169,7 @@ struct MoodCheckinView: View {
                         Text("Challenging").tag("Challenging")
                     }
                 }
+                #endif
                 
                 // Activities
                 Section(header: Text("What were you doing?")) {
@@ -302,6 +356,9 @@ struct MoodCheckinView: View {
                     ))
                 }
             }
+            #if os(macOS)
+            }
+            #endif
             .navigationTitle("Mood Check-in")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

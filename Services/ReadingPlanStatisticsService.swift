@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 class ReadingPlanStatisticsService {
     static let shared = ReadingPlanStatisticsService()
     

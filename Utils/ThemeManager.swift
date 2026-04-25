@@ -1,8 +1,13 @@
 import SwiftUI
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 class ThemeManager: ObservableObject {
-    @Published var currentTheme: Theme = .default
+    @AppStorage("selectedTheme") private var storedTheme: String = Theme.default.rawValue
+    
+    var currentTheme: Theme {
+        get { Theme(rawValue: storedTheme) ?? .default }
+        set { storedTheme = newValue.rawValue; objectWillChange.send() }
+    }
     
     static let shared = ThemeManager()
     
@@ -15,6 +20,7 @@ class ThemeManager: ObservableObject {
         case golden = "Golden"
         case midnight = "Midnight"
         case spring = "Spring"
+        case pink = "Pink"
     }
     
     var colors: ThemeColors {
@@ -106,6 +112,16 @@ class ThemeManager: ObservableObject {
                 cardBackground: Color.white,
                 text: Color(red: 0.3, green: 0.2, blue: 0.3),
                 textSecondary: Color(red: 0.5, green: 0.4, blue: 0.5)
+            )
+        case .pink:
+            return ThemeColors(
+                primary: Color(red: 1.0, green: 0.4, blue: 0.7),
+                secondary: Color(red: 1.0, green: 0.6, blue: 0.8),
+                accent: Color(red: 0.9, green: 0.3, blue: 0.6),
+                background: Color(red: 1.0, green: 0.98, blue: 0.99),
+                cardBackground: Color.white,
+                text: Color(red: 0.3, green: 0.1, blue: 0.2),
+                textSecondary: Color(red: 0.6, green: 0.4, blue: 0.5)
             )
         }
     }

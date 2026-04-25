@@ -396,7 +396,7 @@ struct InviteUsersView: View {
 
     private var emailInvitationBody: String {
         let code = sessionInviteCode.isEmpty ? getOrCreateCode() : sessionInviteCode
-        let clickableLink = inviteLink.isEmpty ? "https://faithjournal.app/invite/\(code)" : inviteLink
+        let clickableLink = inviteLink.isEmpty ? "https://faith-journal.web.app/invite/\(code)" : inviteLink
         let appStoreURL = AppStoreHelper.appStoreURL
         
         return """

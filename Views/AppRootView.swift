@@ -7,8 +7,20 @@
 
 import SwiftUI
 import SwiftData
+#if os(iOS)
+import UIKit
+import AVFoundation
+#elseif os(macOS)
+import AppKit
+#endif
+#if canImport(FirebaseAuth)
+import FirebaseAuth
+#endif
+#if canImport(FirebaseFirestore)
+import FirebaseFirestore
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct AppRootView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("hasLoggedIn") private var hasLoggedIn = false
@@ -25,6 +37,7 @@ struct AppRootView: View {
     
     // Firebase sync service - use @ObservedObject for shared singleton
     @ObservedObject private var firebaseSync = FirebaseSyncService.shared
+    @ObservedObject private var themeManager = ThemeManager.shared
     
     var selectedColorScheme: ColorScheme? {
         guard let mode = AppearanceMode(rawValue: appearanceMode) else { return nil }
@@ -33,8 +46,8 @@ struct AppRootView: View {
     
     var body: some View {
         ZStack {
-            // Base background to prevent any black from showing - extends under all safe areas
-            Color.purple.opacity(0.8)
+            // Base background uses selected color theme so it updates when user changes theme
+            themeManager.colors.primary.opacity(0.8)
                 .ignoresSafeArea(.all, edges: [.top, .bottom, .leading, .trailing])
             
             #if targetEnvironment(simulator)
@@ -67,11 +80,16 @@ struct AppRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(selectedColorScheme)
+        #if os(macOS)
+        .ignoresSafeArea(.all, edges: [.bottom, .leading, .trailing])
+        #else
         .ignoresSafeArea(.all, edges: [.top, .bottom, .leading, .trailing])
+        #endif
         .onAppear {
             print("🚀 [LAUNCH] AppRootView.onAppear started")
             showOnboarding = !hasCompletedOnboarding
             print("🚀 [LAUNCH] Onboarding state: \(hasCompletedOnboarding)")
+            requestCameraAndMicrophonePermissionIfNeeded()
             // Clear badge when app opens - do this safely on main actor
             Task { @MainActor in
                 NotificationService.shared.clearBadge()
@@ -140,6 +158,25 @@ struct AppRootView: View {
                     UserDefaults.standard.removeObject(forKey: "pendingUsername")
                     UserDefaults.standard.removeObject(forKey: "pendingEmail")
                     print("✅ [USER PROFILE] Created/updated profile for email sign-up: \(pendingUsername)")
+                    // Sync to Firestore and userSearchProfiles for Faith Friends search
+                    #if canImport(FirebaseAuth) && canImport(FirebaseFirestore)
+                    if FirebaseInitializer.shared.isConfigured,
+                       let userId = Auth.auth().currentUser?.uid {
+                        do {
+                            try await Firestore.firestore().collection("users").document(userId).setData([
+                                "name": pendingUsername,
+                                "nameLower": pendingUsername.lowercased(),
+                                "email": pendingEmail,
+                                "emailLower": pendingEmail.lowercased(),
+                                "updatedAt": Timestamp(date: Date())
+                            ], merge: true)
+                            FirebaseSyncService.shared.upsertUserSearchProfile(userId: userId, displayName: pendingUsername, email: pendingEmail)
+                            print("✅ [FAITH FRIENDS] Synced email sign-up profile to search index")
+                        } catch {
+                            print("⚠️ [FAITH FRIENDS] Failed to sync profile: \(error.localizedDescription)")
+                        }
+                    }
+                    #endif
                 }
                 
                 // Check for pending invite code from URL when app appears
@@ -153,34 +190,63 @@ struct AppRootView: View {
                 }
             }
         }
+        #if os(iOS)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            // Restart Firebase listener when app becomes active to catch changes from other devices
-            // This ensures cross-device sync works even if the app was in background
-            Task { @MainActor in
-                if FirebaseInitializer.shared.isConfigured {
-                    // Ensure modelContext is set
-                    FirebaseSyncService.shared.configure(modelContext: modelContext)
-                    FirebaseSyncService.shared.restartListening()
-                    print("🔄 [FIREBASE] Restarted listener on app becoming active")
-                    
-                    // If user is authenticated, sync all existing data to ensure nothing is missed
-                    if hasLoggedIn {
-                        print("🔄 [FIREBASE] User is authenticated, syncing all existing data...")
-                        await FirebaseSyncService.shared.syncAllData()
-                    }
-                }
-            }
+            restartFirebaseListener()
         }
+        #elseif os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            restartFirebaseListener()
+        }
+        #endif
         .onOpenURL { url in
             handleInvitationURL(url)
         }
         .sheet(isPresented: $showingJoinByCode) {
             if let code = pendingInviteCode {
                 JoinByCodeView(initialCode: code)
+                    .macOSSheetFrameCompact()
             }
         }
     }
     
+    private func restartFirebaseListener() {
+        Task { @MainActor in
+            if FirebaseInitializer.shared.isConfigured {
+                FirebaseSyncService.shared.configure(modelContext: modelContext)
+                FirebaseSyncService.shared.restartListening()
+                print("🔄 [FIREBASE] Restarted listener on app becoming active")
+                if hasLoggedIn {
+                    print("🔄 [FIREBASE] User is authenticated, syncing all existing data...")
+                    await FirebaseSyncService.shared.syncAllData()
+                    await FirebaseSyncService.shared.refreshPendingFriendRequestCount()
+                    let count = FirebaseSyncService.shared.pendingFriendRequestCount
+                    if count > 0 {
+                        NotificationService.shared.scheduleFriendRequestReminderIfNeeded(count: count)
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Request camera and microphone permission when the app opens so live sessions and recording work without delay.
+    #if os(iOS)
+    private func requestCameraAndMicrophonePermissionIfNeeded() {
+        Task {
+            let cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+            if cameraStatus == .notDetermined {
+                _ = await AVCaptureDevice.requestAccess(for: .video)
+            }
+            let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+            if micStatus == .notDetermined {
+                _ = await AVCaptureDevice.requestAccess(for: .audio)
+            }
+        }
+    }
+    #else
+    private func requestCameraAndMicrophonePermissionIfNeeded() {}
+    #endif
+
     private func handleInvitationURL(_ url: URL) {
         print("🔗 [DEEP LINK] Received URL: \(url.absoluteString)")
         print("🔗 [DEEP LINK] Scheme: \(url.scheme ?? "nil")")
@@ -209,8 +275,8 @@ struct AppRootView: View {
                 print("🔗 [DEEP LINK] Extracted invite code (no host): \(extractedCode ?? "nil")")
             }
         }
-        // Also handle https://faithjournal.app/invite/CODE format (for universal links)
-        else if url.scheme == "https" && url.host == "faithjournal.app" {
+        // Also handle https://faith-journal.web.app/invite/CODE format (for universal links)
+        else if url.scheme == "https" && url.host == "faith-journal.web.app" {
             let pathComponents = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
             if pathComponents.first == "invite", let code = pathComponents.dropFirst().first {
                 extractedCode = code

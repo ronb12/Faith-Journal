@@ -17,6 +17,15 @@ import JitsiMeetSDK
 class JitsiService: NSObject, ObservableObject {
     static let shared = JitsiService()
     
+    /// True when the Jitsi Meet SDK is linked (compile-time). Used to fall back when Agora isn’t configured.
+    static var isMeetSDKAvailable: Bool {
+        #if canImport(JitsiMeetSDK)
+        return true
+        #else
+        return false
+        #endif
+    }
+    
     // MARK: - Published Properties
     @Published var isConnected = false
     @Published var participantCount = 0

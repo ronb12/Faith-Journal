@@ -33,7 +33,7 @@ struct SessionClipsView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground).ignoresSafeArea()
+                Color.platformSystemGroupedBackground.ignoresSafeArea()
                 
                 if sessionClips.isEmpty {
                     VStack(spacing: 24) {
@@ -104,12 +104,20 @@ struct SessionClipsView: View {
                 }
             }
             .navigationTitle("Session Clips")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            #endif
             .sheet(isPresented: $showingCreateClip) {
                 if let recordingURL = session.recordingURL, !recordingURL.isEmpty {
                     CreateClipView(session: session, recordingURL: recordingURL)
@@ -199,7 +207,7 @@ struct ClipCard: View {
                 }
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color.platformSystemBackground)
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
         }
@@ -272,8 +280,11 @@ struct CreateClipView: View {
                 }
             }
             .navigationTitle("Create Clip")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
@@ -283,6 +294,17 @@ struct CreateClipView: View {
                     }
                     .disabled(clipTitle.isEmpty || isCreating)
                 }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        createClip()
+                    }
+                    .disabled(clipTitle.isEmpty || isCreating)
+                }
+                #endif
             }
             .alert("Error", isPresented: .constant(errorMessage != nil)) {
                 Button("OK") { errorMessage = nil }
@@ -405,8 +427,11 @@ struct ClipPlayerView: View {
                 }
             }
             .navigationTitle(clip.title)
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     ShareLink(item: shareableURL) {
                         Image(systemName: "square.and.arrow.up")
@@ -418,6 +443,19 @@ struct ClipPlayerView: View {
                         dismiss()
                     }
                 }
+                #else
+                ToolbarItem(placement: .confirmationAction) {
+                    ShareLink(item: shareableURL) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        player?.pause()
+                        dismiss()
+                    }
+                }
+                #endif
             }
             .onAppear {
                 setupPlayer()
@@ -441,7 +479,7 @@ struct ClipPlayerView: View {
             }
         }
         // Fallback for clips without URL (shouldn't happen in normal flow)
-        return URL(string: "https://faithjournal.app/clips/\(clip.id)") ?? URL(string: "https://faithjournal.app")!
+        return URL(string: "https://faith-journal.web.app/clips/\(clip.id)") ?? URL(string: "https://faith-journal.web.app")!
     }
     
     private func setupPlayer() {

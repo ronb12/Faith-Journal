@@ -111,8 +111,13 @@ struct LiveSessionsView: View {
         }
     }
     
+    private static let filterCategories = ["All", "Bible Study", "Devotional", "Fellowship", "Other", "Prayer", "Testimony", "Worship"]
+    
     var categories: [String] {
         var cats = Set(allActiveSessions.map { $0.category })
+        for name in Self.filterCategories where name != "All" {
+            cats.insert(name)
+        }
         cats.insert("All")
         return Array(cats).sorted()
     }
@@ -175,7 +180,7 @@ struct LiveSessionsView: View {
                     .padding(.horizontal)
                     
                     // Filter Picker
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(SessionFilter.allCases, id: \.self) { filter in
                                 SessionFilterChip(
@@ -193,7 +198,7 @@ struct LiveSessionsView: View {
                     
                     // Category Filter
                     if !categories.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                             HStack(spacing: 8) {
                                 ForEach(categories, id: \.self) { category in
                                     CategoryChip(
@@ -478,6 +483,7 @@ struct SessionFilterChip: View {
                     .fill(isSelected ? Color.purple : Color(.systemGray5))
             )
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -493,28 +499,52 @@ struct EnhancedLiveSessionCard: View {
         session.hostId == userService.userIdentifier
     }
     
+    private var thumbnailPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(height: 180)
+            .overlay(
+                VStack {
+                    Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            )
+    }
+    
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 12) {
                 // Thumbnail/Preview Area
                 ZStack(alignment: .topTrailing) {
-                    // Thumbnail placeholder
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(height: 180)
-                        .overlay(
-                            VStack {
-                                Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.white.opacity(0.8))
+                    Group {
+                        if let urlString = session.thumbnailURL, !urlString.isEmpty, let url = URL(string: urlString) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image.resizable().scaledToFill()
+                                case .failure:
+                                    thumbnailPlaceholder
+                                case .empty:
+                                    thumbnailPlaceholder.overlay(ProgressView())
+                                @unknown default:
+                                    thumbnailPlaceholder
+                                }
                             }
-                        )
+                            .id(urlString)
+                            .frame(height: 180)
+                            .clipped()
+                        } else {
+                            thumbnailPlaceholder
+                        }
+                    }
+                    .cornerRadius(12)
                     
                     // Status badges
                     HStack {
@@ -820,11 +850,11 @@ struct CategoryChip: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(isSelected ? color : Color(.systemGray5))
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(isSelected ? color : Color(.systemGray5))
                 )
         }
-        .animation(.spring(response: 0.3), value: isSelected)
+        .buttonStyle(.plain)
     }
 }
 
@@ -855,7 +885,7 @@ struct CreateLiveSessionView: View {
     @State private var reminderMinutes: Int = 5
     @State private var addToCalendar = false
     
-    let categories = ["Prayer", "Bible Study", "Devotional", "Testimony", "Fellowship", "Other"]
+    let categories = ["Prayer", "Bible Study", "Devotional", "Testimony", "Fellowship", "Worship", "Other"]
     let predefinedTags = ["Prayer", "Bible Study", "Fellowship", "Worship", "Testimony", "Encouragement", "Healing", "Praise", "Intercession", "Community"]
     
     var body: some View {
@@ -1021,7 +1051,7 @@ struct CreateLiveSessionView: View {
                     .foregroundColor(.primary)
             }
             
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(categories, id: \.self) { cat in
                         CategoryChip(
@@ -1226,7 +1256,7 @@ struct CreateLiveSessionView: View {
                         .foregroundColor(.primary)
                     
                     // Predefined tags selection
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(predefinedTags, id: \.self) { tag in
                                 Button(action: {
@@ -1628,7 +1658,7 @@ struct LiveSessionDetailView: View {
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         } else {
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 12) {
                                     ForEach(sessionParticipants) { participant in
                                         EnhancedParticipantBadge(
@@ -1696,7 +1726,7 @@ struct LiveSessionDetailView: View {
                             Text("Tags")
                                 .font(.headline)
                             
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 8) {
                                     ForEach(session.tags, id: \.self) { tag in
                                         Text("#\(tag)")

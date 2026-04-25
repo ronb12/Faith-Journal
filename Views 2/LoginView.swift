@@ -1,6 +1,12 @@
 import SwiftUI
 import LocalAuthentication
 import AuthenticationServices
+import CryptoKit
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 // Try to import Firebase - if it fails, we'll handle it at runtime
 #if canImport(FirebaseAuth)
@@ -30,6 +36,8 @@ struct LoginView: View {
     @State private var username = ""
     @State private var showPasswordResetSent = false
     @State private var showPasswordResetAlert = false
+    @State private var currentNonce: String?
+    @State private var appleSignInCoordinator: AppleSignInCoordinator?
     
     init(hasLoggedIn: Binding<Bool> = .constant(false)) {
         _hasLoggedIn = hasLoggedIn
@@ -115,24 +123,29 @@ struct LoginView: View {
                                 // The form will show appropriate errors if Firebase isn't available
                                 emailPasswordAuthView
                             } else {
-                                // Sign in with Apple Button (primary authentication method)
-                                SignInWithAppleButton(
-                                    onRequest: { request in
-                                        request.requestedScopes = [.fullName, .email]
-                                        print("🔍 [APPLE SIGN IN] Button tapped, requesting authorization...")
-                                    },
-                                    onCompletion: { result in
-                                        print("🔍 [APPLE SIGN IN] Authorization completed")
-                                        handleAppleSignIn(result: result)
+                                // Sign in with Apple — same design as Email and Demo (per App Store guideline)
+                                Button(action: { performAppleSignIn() }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "apple.logo")
+                                        Text("Sign in with Apple")
                                     }
-                                )
-                                .signInWithAppleButtonStyle(.white)
-                                .frame(height: 50)
-                                .cornerRadius(16)
-                                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .frame(width: 300, height: 44)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color.black, Color.black.opacity(0.85)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .cornerRadius(16)
+                                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                                }
+                                .buttonStyle(.plain)
                                 .disabled(isAuthenticating)
                                 
-                                // Toggle to email/password
+                                // Sign in with Email — same size as Sign in with Apple (300×44)
                                 Button(action: {
                                     withAnimation {
                                         showEmailPasswordAuth = true
@@ -142,8 +155,7 @@ struct LoginView: View {
                                         .font(.headline)
                                         .font(.body.weight(.semibold))
                                         .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
+                                        .frame(width: 300, height: 44)
                                         .background(
                                             LinearGradient(
                                                 colors: [Color.purple, Color.purple.opacity(0.8)],
@@ -216,8 +228,7 @@ struct LoginView: View {
                                 }
                                 .font(.headline)
                                 .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                                .frame(width: 300, height: 44)
                                 .background(
                                     LinearGradient(
                                         colors: [Color.orange, Color.orange.opacity(0.8)],
@@ -230,6 +241,7 @@ struct LoginView: View {
                             }
                             .disabled(isAuthenticating)
                         }
+                        .frame(maxWidth: .infinity)
                         .padding(28)
                         .background(
                             RoundedRectangle(cornerRadius: 28)
@@ -467,6 +479,47 @@ struct LoginView: View {
                 }
             }
         }
+    }
+    
+    private func performAppleSignIn() {
+        let nonce = randomNonceString()
+        currentNonce = nonce
+        let provider = ASAuthorizationAppleIDProvider()
+        let request = provider.createRequest()
+        request.nonce = sha256(nonce)
+        request.requestedScopes = [.fullName, .email]
+        print("🔍 [APPLE SIGN IN] Button tapped, requesting authorization...")
+        let coordinator = AppleSignInCoordinator { [self] result in
+            handleAppleSignIn(result: result)
+            Task { @MainActor in appleSignInCoordinator = nil }
+        }
+        appleSignInCoordinator = coordinator
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = coordinator
+        controller.presentationContextProvider = coordinator
+        controller.performRequests()
+    }
+    
+    private func randomNonceString(length: Int = 32) -> String {
+        precondition(length > 0)
+        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        var result = ""
+        var remainingLength = length
+        while remainingLength > 0 {
+            var randomBytes = [UInt8](repeating: 0, count: 16)
+            let status = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+            if status != errSecSuccess { return UUID().uuidString.replacingOccurrences(of: "-", with: "") }
+            randomBytes.forEach { byte in
+                if remainingLength > 0, byte < charset.count { result.append(charset[Int(byte)]); remainingLength -= 1 }
+            }
+        }
+        return result
+    }
+    
+    private func sha256(_ input: String) -> String {
+        let inputData = Data(input.utf8)
+        let hashed = SHA256.hash(data: inputData)
+        return hashed.map { String(format: "%02x", $0) }.joined()
     }
     
     private func signInToFirebaseWithApple(appleIDCredential: ASAuthorizationAppleIDCredential) async {
@@ -1152,6 +1205,24 @@ struct LoginView: View {
         }
         print("❌ [FIREBASE AUTH] FirebaseAuth cannot be imported at compile time")
         print("❌ [FIREBASE AUTH] Solution: Link packages in Xcode → Clean build (⇧⌘K) → Rebuild (⌘B)")
+        #endif
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+private final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    private let completion: (Result<ASAuthorization, Error>) -> Void
+    init(completion: @escaping (Result<ASAuthorization, Error>) -> Void) { self.completion = completion }
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) { completion(.success(authorization)) }
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) { completion(.failure(error)) }
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        #if os(iOS)
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first { $0.activationState == .foregroundActive }
+        return scene?.windows.first { $0.isKeyWindow } ?? scene?.windows.first ?? (UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }.first)!
+        #elseif os(macOS)
+        return NSApplication.shared.keyWindow ?? NSApplication.shared.windows.first!
+        #else
+        fatalError("Unsupported platform")
         #endif
     }
 }

@@ -121,6 +121,7 @@ struct StatisticsView_Enhanced: View {
                             case .mood:
                                 MoodTab(
                                     moods: filteredMoods,
+                                    statsTimeframe: convertTimeframe(selectedTimeframe),
                                     statsService: statsService,
                                     themeManager: themeManager
                                 )
@@ -162,6 +163,9 @@ struct StatisticsView_Enhanced: View {
                             }
                             Button(action: { showingExport = true }) {
                                 Label("Export Report", systemImage: "square.and.arrow.up")
+                            }
+                            Button(action: { showingMoodAnalytics = true }) {
+                                Label("Mood Analytics", systemImage: "chart.bar.fill")
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -554,8 +558,20 @@ struct PrayerTab: View {
 
 struct MoodTab: View {
     let moods: [MoodEntry]
+    /// Must match the Statistics screen’s timeframe so charts and the consistency card match the range picker.
+    let statsTimeframe: StatisticsService.Timeframe
     let statsService: StatisticsService
     let themeManager: ThemeManager
+
+    private var statsTimeframeSubtitle: String {
+        switch statsTimeframe {
+        case .week: return "This week"
+        case .month: return "This month"
+        case .year: return "This year"
+        case .all: return "All time"
+        case .custom: return "Selected range"
+        }
+    }
     
     var body: some View {
         VStack(spacing: 24) {
@@ -567,7 +583,7 @@ struct MoodTab: View {
                 )
             } else {
                 let avgMood = Double(moods.reduce(0) { $0 + $1.intensity }) / Double(moods.count)
-                let consistency = statsService.getMoodConsistency(entries: moods, timeframe: .month)
+                let consistency = statsService.getMoodConsistency(entries: moods, timeframe: statsTimeframe)
                 
                 HStack(spacing: 16) {
                     StatCard(
@@ -582,13 +598,13 @@ struct MoodTab: View {
                         value: "\(Int(consistency))%",
                         icon: "chart.line.uptrend.xyaxis",
                         color: .cyan,
-                        subtitle: "This month"
+                        subtitle: statsTimeframeSubtitle
                     )
                 }
                 .padding(.horizontal)
                 
                 // Mood Trend Chart
-                let moodTrend = statsService.getMoodTrend(entries: moods, timeframe: .month)
+                let moodTrend = statsService.getMoodTrend(entries: moods, timeframe: statsTimeframe)
                 if !moodTrend.isEmpty {
                     MoodTrendChart(moodTrend: moodTrend, themeManager: themeManager)
                 }

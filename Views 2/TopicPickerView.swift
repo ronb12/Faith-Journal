@@ -38,7 +38,7 @@ struct TopicPickerView: View {
         NavigationView {
             VStack(spacing: 0) {
                 // Category Filter
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         Button(action: { selectedCategory = nil }) {
                             Text("All")

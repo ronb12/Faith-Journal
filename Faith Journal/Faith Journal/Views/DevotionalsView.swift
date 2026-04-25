@@ -65,7 +65,9 @@ private struct DevotionalsContentView: View {
                 }
             }
             .navigationTitle("Devotionals")
-            .navigationBarTitleDisplayMode(isIPad ? .large : .inline)
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarBackground(Color(.systemGroupedBackground), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .onAppear {
                 // Ensure modelContext is set before loading
                 if manager.modelContext == nil {
@@ -186,7 +188,7 @@ private struct DevotionalsContentView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
             
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(manager.categories, id: \.self) { category in
                         Button(action: {
@@ -449,7 +451,7 @@ struct DevotionalDetailView: View {
                             .foregroundColor(isFavorite ? .purple : themeManager.colors.primary)
                     }
                     Button("Done") {
-                        dismiss()
+                        RewardedInterstitialManager.shared.tryShowAd { dismiss() }
                     }
                 }
             }

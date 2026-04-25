@@ -13,6 +13,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var themeManager = ThemeManager.shared
     @ObservedObject private var profileManager = ProfileManager.shared
+    @ObservedObject private var firebaseSync = FirebaseSyncService.shared
     @Query var userProfiles: [UserProfile]
     private var userProfile: UserProfile? { userProfiles.first }
     @AppStorage("selectedTheme") private var selectedTheme: String = "System"
@@ -47,15 +48,22 @@ struct SettingsView: View {
     @State private var showingProfileEdit = false
     @State private var showingTermsOfService = false
     @State private var showingPrivacyPolicy = false
-    @State private var showingBibleStudy = false
-    @State private var showingBibleView = false
-    @State private var showingLiveSessions = false
-    @State private var showingMoodAnalytics = false
-    @State private var showingReadingPlans = false
-    @State private var showingStatistics = false
-    @State private var showingGlobalSearch = false
     @State private var syncStatusText: String = "Checking..."
     @State private var syncStatusIconColor: Color = .secondary
+    /// Derived from FirebaseSyncService so status always matches (avoids stale @State)
+    private var syncStatusDisplay: (text: String, color: Color, icon: String) {
+        if firebaseSync.isSyncing {
+            return ("Syncing...", .blue, "arrow.clockwise")
+        }
+        if let lastSync = firebaseSync.lastSyncDate {
+            return ("Synced \(lastSyncTimeString(from: lastSync))", .green, "checkmark.circle.fill")
+        }
+        if let err = firebaseSync.syncError {
+            let isAuth = err.contains("authenticated") || err.contains("Sign in")
+            return (err, isAuth ? .orange : .red, "exclamationmark.triangle.fill")
+        }
+        return ("Ready", .green, "checkmark.circle.fill")
+    }
     @State private var showingContactSupport = false
     @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
     @AppStorage("hasLoggedIn") private var hasLoggedIn = false
@@ -230,14 +238,20 @@ struct SettingsView: View {
                         HStack {
                             // Use ProfileManager (Firebase) for name, fallback to local UserProfile
                             if !profileManager.userName.isEmpty {
-                                // Profile Avatar - use Firebase profile image if available
+                                // Profile Avatar - use ProfileManager so it updates when picture is saved
                                 profileAvatarViewFirebase()
-                                
-                                // Profile Info - use Firebase name
+                                    .id(profileManager.profileImageURL ?? "no-avatar")
                                 profileInfoViewFirebase()
                             } else if let profile = userProfile, !profile.name.isEmpty {
-                                // Fallback to local UserProfile if Firebase doesn't have name
-                                profileAvatarView(profile: profile)
+                                // Fallback: still prefer ProfileManager avatar if set (e.g. just saved picture)
+                                Group {
+                                    if profileManager.profileImageURL != nil {
+                                        profileAvatarViewFirebase()
+                                    } else {
+                                        profileAvatarView(profile: profile)
+                                    }
+                                }
+                                .id(profileManager.profileImageURL ?? "no-avatar")
                                 profileInfoView(profile: profile)
                             } else {
                                 noProfileView()
@@ -551,28 +565,22 @@ struct SettingsView: View {
                         
                         // CloudKit Sync Section - Simple and user-friendly
                         if #available(iOS 17.0, *) {
-                            // Simple sync status indicator
-                            HStack {
+                            // Sync status: derived from firebaseSync; shows actual error message when present
+                            HStack(alignment: .top) {
                                 Label("Sync Status", systemImage: "cloud.fill")
                                 Spacer()
                                 HStack(spacing: 4) {
-                                    Image(systemName: syncStatusText == "Synced" ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                        .foregroundColor(syncStatusIconColor)
+                                    Image(systemName: syncStatusDisplay.icon)
+                                        .foregroundColor(syncStatusDisplay.color)
                                         .font(.caption)
-                                    Text(syncStatusText)
+                                    Text(syncStatusDisplay.text)
                                         .font(.caption)
-                                        .foregroundColor(syncStatusIconColor)
+                                        .foregroundColor(syncStatusDisplay.color)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.trailing)
                                 }
                             }
-                            .task {
-                                // Using Firebase for sync - check sync status
-                                await MainActor.run {
-                                    updateSyncStatus()
-                                }
-                            }
-                            .onChange(of: FirebaseSyncService.shared.isSyncing) { _, _ in
-                                updateSyncStatus()
-                            }
+                            .id("\(firebaseSync.isSyncing)-\(firebaseSync.lastSyncDate?.timeIntervalSince1970 ?? 0)-\(firebaseSync.syncError ?? "")")
                             
                             // Manual sync button
                             Button(action: {
@@ -585,7 +593,7 @@ struct SettingsView: View {
                                     Text("Sync Now")
                                 }
                             }
-                            .disabled(FirebaseSyncService.shared.isSyncing)
+                            .disabled(firebaseSync.isSyncing)
                             
                             Divider()
                         }
@@ -786,7 +794,7 @@ struct SettingsView: View {
     
     // Helper to get color for sync status
     private var syncStatusColor: Color {
-        if FirebaseSyncService.shared.isSyncing {
+        if firebaseSync.isSyncing {
             return .blue
         } else {
             return .green
@@ -795,13 +803,13 @@ struct SettingsView: View {
     
     // Update sync status display
     private func updateSyncStatus() {
-        if FirebaseSyncService.shared.isSyncing {
+        if firebaseSync.isSyncing {
             syncStatusText = "Syncing..."
             syncStatusIconColor = .blue
-        } else if let lastSync = FirebaseSyncService.shared.lastSyncDate {
+        } else if let lastSync = firebaseSync.lastSyncDate {
             syncStatusText = "Synced \(lastSyncTimeString(from: lastSync))"
             syncStatusIconColor = .green
-        } else if FirebaseSyncService.shared.syncError != nil {
+        } else if firebaseSync.syncError != nil {
             syncStatusText = "Error"
             syncStatusIconColor = .red
         } else {
@@ -816,10 +824,10 @@ struct SettingsView: View {
         syncStatusIconColor = .blue
         
         // Restart listener to catch any missed updates
-        FirebaseSyncService.shared.restartListening()
+        firebaseSync.restartListening()
         
         // Sync all data
-        await FirebaseSyncService.shared.syncAllData()
+        await firebaseSync.syncAllData()
         
         // Update status
         await MainActor.run {
@@ -1145,3 +1153,10 @@ struct ShareSheet: UIViewControllerRepresentable {
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+}
+
+
+
+
+
+

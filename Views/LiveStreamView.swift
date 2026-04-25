@@ -2,7 +2,8 @@
 //  LiveStreamView.swift
 //  Faith Journal
 //
-//  Live video/audio streaming view
+//  Full-screen live stream view.
+//  Video fills the entire screen; all controls are overlaid.
 //
 
 import SwiftUI
@@ -13,31 +14,52 @@ import AVFoundation
 import WebRTC
 #endif
 
+// MARK: - Main view
+
 @available(iOS 17.0, *)
 struct LiveStreamView: View {
+
     let session: LiveSession?
-    // Observe UnifiedStreamingService to get real-time updates for video/audio state
+
     @ObservedObject private var streamingService = UnifiedStreamingService.shared
-    // Use regular property for singleton, not @StateObject
     private let userService = LocalUserService.shared
     @Environment(\.dismiss) private var dismiss
     @Query var userProfiles: [UserProfile]
     private var userProfile: UserProfile? { userProfiles.first }
 
-    @State private var isStreaming = false
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    @State private var remoteVideoView: AnyView?
-    @State private var localVideoView: AnyView?
+    // Stream state
+    @State private var isStreaming       = false
+    @State private var isHost            = false
+    @State private var isScreenSharing   = false
+    @State private var screenShareError  : String?
+
+    // Host control toggles
+    @State private var isMuted           = false
+    @State private var isCameraOff       = false
+    @State private var isCameraFront     = true
+
+    // Overlay visibility
+    @State private var controlsVisible   = true
+    @State private var showChat          = false
+    @State private var showReactions     = false
+    @State private var showPolls         = false
+    @State private var showQnA           = false
+    @State private var theaterMode       = false
+    @State private var showParticipants  = false
+
+    // Error
+    @State private var showingError      = false
+    @State private var errorMessage      = ""
+
+    // Chat
+    @State private var chatMessages: [LiveChatMessage] = []
+    @State private var chatInputText = ""
+    @State private var chatListener: Any?
+
+    // Participants (for host strip)
     @State private var participants: [ParticipantInfo] = []
-    @State private var spotlightedParticipant: String?
-    @State private var showingParticipantGrid = false
-    @State private var showingWaitingRoom = false
-    @State private var isHost = false
-    @State private var isScreenSharing = false
-    @State private var screenShareError: String?
-    @State private var showingPresentation = false
-    
+    @State private var spotlightedId: String?
+
     struct ParticipantInfo: Identifiable {
         let id: String
         let name: String
@@ -48,456 +70,535 @@ struct LiveStreamView: View {
 
     var body: some View {
         if #available(iOS 17.0, *), session != nil {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                VStack(spacing: 0) {
-                    // Remote video (main view)
-                    remoteVideoArea
-                    // Local video (picture-in-picture)
-                    localVideoPIP
-                    // Controls
-                    controlsSection
+            streamContent
+                .ignoresSafeArea()
+                .statusBarHidden(theaterMode)
+                .onAppear(perform: startStreaming)
+                .onDisappear(perform: cleanup)
+                .onChange(of: streamingService.isVideoEnabled) { _, on in
+                    if !on { isCameraOff = true }
                 }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        leaveStream()
-                    }
+                .onChange(of: streamingService.errorMessage) { _, msg in
+                    if let msg { errorMessage = msg; showingError = true }
                 }
-            }
-            .onAppear {
-                startStreaming()
-            }
-            .onDisappear {
-                if isScreenSharing {
-                    HLSStreamingService.shared.stopScreenBroadcast()
-                    isScreenSharing = false
-                }
-                leaveStream()
-            }
-            .onChange(of: streamingService.isVideoEnabled) { _, newValue in
-                // Update local video view when video is toggled
-                if newValue {
-                    Task {
-                        await setupLocalVideoView()
-                    }
-                } else {
-                    localVideoView = nil
-                }
-            }
-            .onChange(of: HLSStreamingService.shared.previewLayer) { _, newValue in
-                // Refresh camera preview when it becomes available
-                if newValue != nil && isStreaming {
-                    Task {
-                        await setupLocalVideoView()
-                    }
-                }
-            }
-            .onChange(of: streamingService.isConnected) { _, newValue in
-                // When connected, ensure camera preview is set up
-                if newValue && isStreaming {
-                    Task {
-                        await setupLocalVideoView()
-                    }
-                }
-            }
-            .alert("Error", isPresented: $showingError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(errorMessage)
-            }
-            .alert("Screen Sharing", isPresented: Binding(get: { screenShareError != nil }, set: { if !$0 { screenShareError = nil } })) {
-                Button("OK", role: .cancel) {
-                    screenShareError = nil
-                }
-            } message: {
-                Text(screenShareError ?? "Unable to share your screen.")
-            }
-            .onChange(of: streamingService.errorMessage) { _, newValue in
-                if let error = newValue {
-                    errorMessage = error
-                    showingError = true
-                }
-            }
+                .alert("Error", isPresented: $showingError) {
+                    Button("OK", role: .cancel) { }
+                } message: { Text(errorMessage) }
+                .alert("Screen Sharing",
+                       isPresented: Binding(get: { screenShareError != nil },
+                                            set: { if !$0 { screenShareError = nil } })) {
+                    Button("OK", role: .cancel) { screenShareError = nil }
+                } message: { Text(screenShareError ?? "") }
+                .sheet(isPresented: $showChat) { chatSheet }
+                .sheet(isPresented: $showParticipants) { participantSheet }
         } else {
-            Text("Live streaming is only available on iOS 17+")
+            ContentUnavailableView(
+                "iOS 17+ Required",
+                systemImage: "video.slash",
+                description: Text("Live streaming requires iOS 17 or later.")
+            )
         }
     }
-    
-    // MARK: - View Components
-    
-    private var remoteVideoArea: some View {
-        ZStack {
-            // Use native AVFoundation-based streaming (HLS) which doesn't require WebRTC
-            // For host, show local camera preview in main area
-            if isHost, let previewLayer = HLSStreamingService.shared.getPreviewLayer() {
-                VideoPreviewLayerView(previewLayer: previewLayer)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let hlsService = HLSStreamingService.shared.getPreviewLayer() {
-                VideoPreviewLayerView(previewLayer: hlsService)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let remoteView = remoteVideoView {
-                AnyView(remoteView)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                Color.black
-                    .overlay(
-                        VStack {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 60))
-                                .foregroundColor(.white.opacity(0.5))
-                            Text("Waiting for participants...")
-                                .foregroundColor(.white.opacity(0.7))
-                                .padding(.top)
-                            if !streamingService.isConnected {
-                                Text("Connecting to stream...")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.5))
-                                    .padding(.top, 4)
-                            }
-                        }
-                    )
+
+    // MARK: - Stream content (full-screen ZStack)
+
+    @available(iOS 17.0, *)
+    private var streamContent: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .topTrailing) {
+
+                // 1 — Black canvas
+                Color(red: 0.059, green: 0.059, blue: 0.059).ignoresSafeArea()
+
+                // 2 — Main video
+                mainVideo
+                    .frame(width: geo.size.width, height: geo.size.height)
+
+                // 3 — Live stream controls overlay
+                LiveStreamOverlay(
+                    session:          session,
+                    isHost:           isHost,
+                    showChatOverlay:  $showChat,
+                    showingReactions: $showReactions,
+                    showingPolls:     $showPolls,
+                    showingQnA:       $showQnA,
+                    controlsVisible:  $controlsVisible,
+                    theaterMode:      $theaterMode,
+                    chatMessages:     $chatMessages,
+                    viewerCount:      session?.viewerCount ?? 0,
+                    onReaction:       { },
+                    onToggleChat:     { showChat.toggle() },
+                    onToggleTheater:  { withAnimation { theaterMode.toggle() } },
+                    onShare:          shareStream
+                )
+
+                // 4 — Host-only bottom control bar
+                if isHost {
+                    hostControlBar(geo: geo)
+                }
+
+                // 5 — PIP (non-host sees own camera; host sees nothing extra)
+                if !isHost {
+                    pipView(geo: geo)
+                }
+
+                // 6 — Top-left back / close button
+                closeButton(geo: geo)
             }
-            
-            // Connection status overlay
-            connectionStatusOverlay
         }
     }
-    
-    private var connectionStatusOverlay: some View {
-        VStack {
-            HStack {
-                ConnectionStatusView(state: getConnectionStatus())
+
+    // MARK: - Main video area
+
+    @ViewBuilder
+    private var mainVideo: some View {
+        if isHost, let layer = HLSStreamingService.shared.getPreviewLayer() {
+            VideoPreviewLayerView(previewLayer: layer)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let layer = HLSStreamingService.shared.getPreviewLayer() {
+            VideoPreviewLayerView(previewLayer: layer)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            waitingPlaceholder
+        }
+    }
+
+    private var waitingPlaceholder: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "video.fill")
+                .font(.system(size: 52, weight: .light))
+                .foregroundStyle(.white.opacity(0.25))
+            Text(isStreaming ? "Connecting…" : "Starting stream…")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.5))
+            if isStreaming {
+                ProgressView().tint(.white.opacity(0.4))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Host bottom control bar
+
+    @ViewBuilder
+    private func hostControlBar(geo: GeometryProxy) -> some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            // Thin participant strip (scrollable, shown only when participants exist)
+            if !participants.isEmpty {
+                participantStrip
+                    .padding(.bottom, 4)
+            }
+
+            // Control buttons row
+            HStack(spacing: 0) {
+                Spacer()
+
+                // Mic
+                hostButton(
+                    icon: isMuted ? "mic.slash.fill" : "mic.fill",
+                    label: isMuted ? "Unmute" : "Mute",
+                    tint: isMuted ? .red : .white,
+                    bg: Color.white.opacity(0.12)
+                ) { toggleMute() }
+
+                Spacer()
+
+                // Camera on/off
+                hostButton(
+                    icon: isCameraOff ? "video.slash.fill" : "video.fill",
+                    label: isCameraOff ? "Camera On" : "Camera Off",
+                    tint: isCameraOff ? .red : .white,
+                    bg: Color.white.opacity(0.12)
+                ) { toggleCamera() }
+
+                Spacer()
+
+                // Flip camera
+                hostButton(
+                    icon: "arrow.triangle.2.circlepath.camera.fill",
+                    label: "Flip camera",
+                    tint: .white,
+                    bg: Color.white.opacity(0.12)
+                ) { flipCamera() }
+
+                Spacer()
+
+                // Screen share
+                hostButton(
+                    icon: isScreenSharing ? "rectangle.slash.fill" : "rectangle.on.rectangle.fill",
+                    label: isScreenSharing ? "Stop sharing" : "Share screen",
+                    tint: isScreenSharing ? .green : .white,
+                    bg: isScreenSharing ? .green.opacity(0.2) : .white.opacity(0.12)
+                ) { toggleScreenSharing() }
+
+                Spacer()
+
+                // Participants
+                hostButton(
+                    icon: "person.2.fill",
+                    label: "Participants",
+                    tint: .white,
+                    bg: Color.white.opacity(0.12)
+                ) { showParticipants = true }
+
+                Spacer()
+
+                // End stream
+                hostButton(
+                    icon: "xmark",
+                    label: "End stream",
+                    tint: .white,
+                    bg: .red
+                ) { leaveStream() }
+
                 Spacer()
             }
-            .padding()
+            .padding(.vertical, 14)
+            .padding(.bottom, geo.safeAreaInsets.bottom)
+            .background(
+                LinearGradient(
+                    colors: [.clear, Color(red: 0.059, green: 0.059, blue: 0.059).opacity(0.96)],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    private func hostButton(
+        icon: String, label: String, tint: Color, bg: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 52, height: 52)
+                    .background(bg)
+                    .clipShape(Circle())
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+        .accessibilityLabel(label)
+    }
+
+    // MARK: - Participant strip
+
+    private var participantStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(participants) { p in
+                    participantChip(p)
+                        .onTapGesture { spotlightedId = spotlightedId == p.id ? nil : p.id }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .frame(height: 72)
+    }
+
+    private func participantChip(_ p: ParticipantInfo) -> some View {
+        VStack(spacing: 4) {
+            ZStack(alignment: .topLeading) {
+                Circle()
+                    .fill(spotlightedId == p.id ? Color.orange.opacity(0.35) : Color.white.opacity(0.1))
+                    .frame(width: 46, height: 46)
+                Image(systemName: "person.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white.opacity(0.8))
+                    .frame(width: 46, height: 46)
+
+                if p.isMuted {
+                    Image(systemName: "mic.slash.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white)
+                        .padding(3)
+                        .background(Color.red)
+                        .clipShape(Circle())
+                        .offset(x: -2, y: -2)
+                }
+            }
+
+            Text(p.name)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white.opacity(0.75))
+                .lineLimit(1)
+
+            if p.isSpeaking {
+                Capsule()
+                    .fill(Color.green)
+                    .frame(width: 20, height: 3)
+            }
+        }
+        .frame(width: 54)
+        .accessibilityLabel("\(p.name)\(p.isMuted ? ", muted" : "")\(p.isSpeaking ? ", speaking" : "")")
+    }
+
+    // MARK: - PIP (viewer)
+
+    @ViewBuilder
+    private func pipView(geo: GeometryProxy) -> some View {
+        if let layer = HLSStreamingService.shared.getPreviewLayer() {
+            let w = geo.size.width * 0.26
+            let h = w / 9 * 16
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    VideoPreviewLayerView(previewLayer: layer)
+                        .frame(width: w, height: h)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1.5)
+                        )
+                        .shadow(color: .black.opacity(0.5), radius: 8, y: 4)
+                        .padding(.trailing, 14)
+                        .padding(.bottom, geo.safeAreaInsets.bottom + 80)
+                }
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    // MARK: - Close / back button
+
+    private func closeButton(geo: GeometryProxy) -> some View {
+        VStack {
+            HStack {
+                Button(action: leaveStream) {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.black.opacity(0.45))
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Leave stream")
+                .padding(.leading, 14)
+                .padding(.top, geo.safeAreaInsets.top + 8)
+                Spacer()
+            }
             Spacer()
         }
     }
-    
-    private func getConnectionStatus() -> String {
-        if streamingService.isConnected {
-            return "Connected"
-        } else if isStreaming {
-            return "Connecting..."
-        } else if let error = streamingService.errorMessage {
-            return error
-        } else {
-            return "Disconnected"
-        }
-    }
-    
-    @ViewBuilder
-    private var localVideoPIP: some View {
-        // Show local video preview using HLS service
-        // For participants, show local camera in PIP; for host, show remote participants
-        if !isHost, let previewLayer = HLSStreamingService.shared.getPreviewLayer() {
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    VideoPreviewLayerView(previewLayer: previewLayer)
-                        .frame(width: 120, height: 160)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white, lineWidth: 2)
-                        )
-                        .padding()
-                }
-            }
-        } else if let localView = localVideoView {
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    AnyView(localView)
-                        .frame(width: 120, height: 160)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.white, lineWidth: 2)
-                        )
-                        .padding()
-                }
-            }
-        }
-    }
-    
-    private var controlsSection: some View {
-        VStack(spacing: 16) {
-            // Participant list (if multiple participants)
-            if participants.count > 1 {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 12) {
-                                    ForEach(participants) { participant in
-                                        VStack(spacing: 4) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color.purple.opacity(0.3))
-                                                    .frame(width: 60, height: 60)
-                                                
-                                                Image(systemName: "person.fill")
-                                                    .font(.title2)
-                                                    .foregroundColor(.purple)
-                                                
-                                                if participant.isMuted {
-                                                    VStack {
-                                                        HStack {
-                                                            Image(systemName: "mic.slash.fill")
-                                                                .font(.caption2)
-                                                                .foregroundColor(.red)
-                                                                .padding(4)
-                                                                .background(Color.black.opacity(0.7))
-                                                                .clipShape(Circle())
-                                                            Spacer()
-                                                        }
-                                                        Spacer()
-                                                    }
-                                                    .padding(4)
-                                                }
-                                            }
-                                            
-                                            Text(participant.name)
-                                                .font(.caption2)
-                                                .foregroundColor(.white)
-                                                .lineLimit(1)
-                                            
-                                            if participant.isSpeaking {
-                                                Circle()
-                                                    .fill(Color.green)
-                                                    .frame(width: 6, height: 6)
-                                            }
-                                        }
-                                        .frame(width: 70)
-                                        .padding(8)
-                                        .background(spotlightedParticipant == participant.id ? Color.orange.opacity(0.3) : Color.clear)
-                                        .cornerRadius(12)
-                                        .onTapGesture {
-                                            spotlightParticipant(participant.id)
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-            }
-            
-            // Host controls (if host)
-            if isHost {
-                HStack(spacing: 12) {
-                    Button(action: muteAllParticipants) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mic.slash.fill")
-                            Text("Mute All")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.orange)
-                        .cornerRadius(8)
-                    }
-                    
-                    Button(action: { showingParticipantGrid = true }) {
-                        Image(systemName: "rectangle.grid.2x2")
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Color.white.opacity(0.2))
-                            .clipShape(Circle())
-                    }
 
-                    Button(action: { showingPresentation = true }) {
-                        Image(systemName: "play.rectangle.on.rectangle")
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Color.white.opacity(0.2))
-                            .clipShape(Circle())
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal)
-            }
-            
-            // Control buttons (responsive; no Spacer-based clipping)
-            GeometryReader { geo in
-                let isCompact = geo.size.width < 380
-                let buttonSize: CGFloat = isCompact ? 48 : 56
-                let iconFont: Font = isCompact ? .title3 : .title2
-                let spacing: CGFloat = isCompact ? 14 : 20
-                
-                HStack(spacing: spacing) {
-                    // Toggle video
-                    Button(action: {
-                        Task { @MainActor in
-                            streamingService.toggleVideo()
-                        }
-                    }) {
-                        Image(systemName: streamingService.isVideoEnabled ? "video.fill" : "video.slash.fill")
-                            .font(iconFont)
-                            .foregroundColor(.white)
-                            .frame(width: buttonSize, height: buttonSize)
-                            .background(streamingService.isVideoEnabled ? Color.blue : Color.gray)
-                            .clipShape(Circle())
-                    }
-                    
-                    // Toggle audio
-                    Button(action: {
-                        Task { @MainActor in
-                            streamingService.toggleAudio()
-                        }
-                    }) {
-                        Image(systemName: streamingService.isAudioEnabled ? "mic.fill" : "mic.slash.fill")
-                            .font(iconFont)
-                            .foregroundColor(.white)
-                            .frame(width: buttonSize, height: buttonSize)
-                            .background(streamingService.isAudioEnabled ? Color.blue : Color.gray)
-                            .clipShape(Circle())
-                    }
-                    
-                    // Screen sharing
-                    Button(action: toggleScreenSharing) {
-                        Image(systemName: isScreenSharing ? "rectangle.slash" : "rectangle.on.rectangle")
-                            .font(iconFont)
-                            .foregroundColor(.white)
-                            .frame(width: buttonSize, height: buttonSize)
-                            .background(isScreenSharing ? Color.green : Color.purple)
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                            )
-                    }
-                    
-                    // End call
-                    Button(action: { leaveStream() }) {
-                        Image(systemName: "phone.down.fill")
-                            .font(iconFont)
-                            .foregroundColor(.white)
-                            .frame(width: buttonSize, height: buttonSize)
-                            .background(Color.red)
-                            .clipShape(Circle())
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
-            }
-            .frame(height: 80)
-        }
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [Color.black.opacity(0.7), Color.black.opacity(0.9)]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .sheet(isPresented: $showingParticipantGrid) {
-            NavigationStack {
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
-                        ForEach(participants) { participant in
-                            VStack(spacing: 8) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.purple.opacity(0.3))
-                                        .frame(width: 100, height: 100)
-                                    
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.purple)
-                                    
-                                    if participant.isMuted {
-                                        VStack {
-                                            HStack {
-                                                Spacer()
-                                                Image(systemName: "mic.slash.fill")
-                                                    .font(.caption)
-                                                    .foregroundColor(.red)
-                                                    .padding(6)
-                                                    .background(Color.black.opacity(0.7))
-                                                    .clipShape(Circle())
-                                            }
-                                            Spacer()
-                                        }
-                                        .padding(8)
-                                    }
-                                }
-                                
-                                Text(participant.name)
-                                    .font(.headline)
-                                
-                                HStack(spacing: 8) {
-                                    if participant.isMuted {
-                                        Label("Muted", systemImage: "mic.slash.fill")
-                                            .font(.caption)
-                                            .foregroundColor(.red)
-                                    }
-                                    
-                                    if !participant.isVideoEnabled {
-                                        Label("Video Off", systemImage: "video.slash.fill")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                    }
-                                    
-                                    if participant.isSpeaking {
-                                        Label("Speaking", systemImage: "waveform")
-                                            .font(.caption)
-                                            .foregroundColor(.green)
+    // MARK: - Chat sheet
+
+    private var chatSheet: some View {
+        NavigationStack {
+            ZStack {
+                Color(red: 0.059, green: 0.059, blue: 0.059).ignoresSafeArea()
+                VStack(spacing: 0) {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 10) {
+                                if chatMessages.isEmpty {
+                                    Text("No messages yet. Be the first to say something!")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.top, 40)
+                                        .multilineTextAlignment(.center)
+                                } else {
+                                    ForEach(chatMessages) { msg in
+                                        chatRow(msg).id(msg.id)
                                     }
                                 }
                             }
                             .padding()
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
+                        }
+                        .onChange(of: chatMessages.count) { _, _ in
+                            if let last = chatMessages.last {
+                                withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                            }
+                        }
+                    }
+
+                    Divider().overlay(Color.white.opacity(0.1))
+
+                    HStack(spacing: 10) {
+                        TextField("Say something…", text: $chatInputText)
+                            .foregroundStyle(.white)
+                            .tint(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Capsule())
+                            .submitLabel(.send)
+                            .onSubmit { sendChatMessage() }
+
+                        Button(action: sendChatMessage) {
+                            Image(systemName: "paperplane.fill")
+                                .foregroundStyle(.white)
+                                .frame(width: 40, height: 40)
+                                .background(chatInputText.trimmingCharacters(in: .whitespaces).isEmpty
+                                    ? Color.gray.opacity(0.5)
+                                    : Color(red: 1, green: 0, blue: 0))
+                                .clipShape(Circle())
+                        }
+                        .disabled(chatInputText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .accessibilityLabel("Send message")
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color(red: 0.129, green: 0.129, blue: 0.129))
+                }
+            }
+            .navigationTitle("Live Chat")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showChat = false }.foregroundStyle(.white)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    private func chatRow(_ msg: LiveChatMessage) -> some View {
+        if msg.isSuperChat, let amount = msg.superChatAmount {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Image(systemName: "dollarsign.circle.fill").font(.caption2).foregroundStyle(.yellow)
+                    Text("\(msg.username) · \(amount)").font(.caption.weight(.semibold)).foregroundStyle(.yellow)
+                }
+                Text(msg.text).font(.body).foregroundStyle(.white)
+            }
+            .padding(10)
+            .background(Color(red: 0.18, green: 0.10, blue: 0))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.yellow.opacity(0.45), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        } else {
+            HStack(alignment: .top, spacing: 8) {
+                Circle()
+                    .fill(chatNameColor(for: msg.username))
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Text(String(msg.username.prefix(1)).uppercased())
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                    )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(msg.username)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(chatNameColor(for: msg.username))
+                    Text(msg.text)
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func chatNameColor(for username: String) -> Color {
+        let colors: [Color] = [
+            Color(red: 0.12, green: 0.71, blue: 0.96),
+            Color(red: 0.30, green: 0.85, blue: 0.56),
+            Color(red: 0.96, green: 0.71, blue: 0.12),
+            Color(red: 0.96, green: 0.45, blue: 0.12),
+            Color(red: 0.71, green: 0.40, blue: 0.96),
+            Color(red: 0.96, green: 0.26, blue: 0.45),
+        ]
+        return colors[abs(username.hashValue) % colors.count]
+    }
+
+    // MARK: - Participant sheet
+
+    private var participantSheet: some View {
+        NavigationStack {
+            ZStack {
+                Color(red: 0.059, green: 0.059, blue: 0.059).ignoresSafeArea()
+                ScrollView {
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 3),
+                        spacing: 20
+                    ) {
+                        ForEach(participants) { p in
+                            VStack(spacing: 8) {
+                                ZStack(alignment: .topTrailing) {
+                                    Circle()
+                                        .fill(Color.white.opacity(0.1))
+                                        .frame(width: 80, height: 80)
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 34))
+                                        .foregroundStyle(.white.opacity(0.8))
+                                        .frame(width: 80, height: 80)
+                                    if p.isMuted {
+                                        Image(systemName: "mic.slash.fill")
+                                            .font(.caption2)
+                                            .foregroundStyle(.white)
+                                            .padding(4)
+                                            .background(Color.red)
+                                            .clipShape(Circle())
+                                            .offset(x: 4, y: -4)
+                                    }
+                                }
+                                Text(p.name)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                if p.isSpeaking {
+                                    Text("Speaking")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                            .accessibilityLabel("\(p.name)\(p.isMuted ? ", muted" : "")")
                         }
                     }
                     .padding()
                 }
-                .navigationTitle("Participants")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") { showingParticipantGrid = false }
-                    }
+            }
+            .navigationTitle("Participants (\(participants.count))")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showParticipants = false }.foregroundStyle(.white)
                 }
             }
         }
-        .sheet(isPresented: $showingPresentation) {
-            NavigationStack {
-                Text("Presentation is available in Multi‑Participant sessions (Bible Study / PDF / Images).")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding()
-                    .navigationTitle("Presentation")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") { showingPresentation = false }
-                        }
-                    }
-            }
-        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
-    
-    private func muteAllParticipants() {
-        // Implement mute all functionality
-        for participant in participants {
-            muteParticipant(participant.id)
-        }
+
+    // MARK: - Connection status (used externally)
+
+    private func connectionStatusText() -> String {
+        if streamingService.isConnected { return "Connected" }
+        if isStreaming { return "Connecting…" }
+        if let err = streamingService.errorMessage { return err }
+        return "Disconnected"
     }
-    
-    private func spotlightParticipant(_ participantId: String) {
-        spotlightedParticipant = spotlightedParticipant == participantId ? nil : participantId
+
+    // MARK: - Actions
+
+    private func toggleMute() {
+        isMuted.toggle()
+        Task { @MainActor in streamingService.toggleAudio() }
     }
-    
-    private func muteParticipant(_ participantId: String) {
-        // Implement mute participant functionality
+
+    private func toggleCamera() {
+        isCameraOff.toggle()
+        Task { @MainActor in streamingService.toggleVideo() }
     }
-    
+
+    private func flipCamera() {
+        isCameraFront.toggle()
+        HLSStreamingService.shared.flipCamera(toFront: isCameraFront)
+    }
+
     private func toggleScreenSharing() {
         Task {
             if isScreenSharing {
@@ -514,143 +615,134 @@ struct LiveStreamView: View {
             }
         }
     }
-    
-    private func getUserName(for userId: String) -> String {
-        return participants.first(where: { $0.id == userId })?.name ?? "Participant"
-    }
-    
-    private func startStreaming() {
-        guard let session = session else { return }
-        let userId = userService.userIdentifier
 
+    private func shareStream() {
+        guard let session else { return }
+        #if os(iOS)
+        let text = "Join me on Faith Journal Live: \(session.title)"
+        let vc   = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.windows.first?.rootViewController?
+            .present(vc, animated: true)
+        #endif
+    }
+
+    private func startStreaming() {
+        guard let session else { return }
+        let userId = userService.userIdentifier
+        startChatListener()
         Task {
+            await requestPermissions()
             do {
-                // Request camera and microphone permissions before starting
-                await requestPermissions()
-                
-                // Conference mode uses HLS (not broadcast mode)
-                // Both host and participants use the same HLS streaming
-                let userName = userService.getDisplayName(userProfile: userProfile)
-                try await streamingService.startStream(sessionId: session.id, userId: userId, userName: userName, isBroadcastMode: false)
+                let name = userService.getProfileDisplayName(userProfile: userProfile)
+                try await streamingService.startStream(
+                    sessionId: session.id, userId: userId, userName: name, isBroadcastMode: false
+                )
                 isStreaming = true
-                
-                // Setup local video view after stream starts
-                await setupLocalVideoView()
             } catch {
                 errorMessage = "Failed to start streaming: \(error.localizedDescription)"
                 showingError = true
             }
         }
     }
-    
+
+    private func startChatListener() {
+        guard let session else { return }
+        chatListener = FirebaseSyncService.shared.startListeningToChatMessages(sessionId: session.id) { chatMessage in
+            Task { @MainActor in
+                let liveMsg = LiveChatMessage(
+                    username: chatMessage.userName,
+                    text: chatMessage.message,
+                    isSuperChat: false,
+                    superChatAmount: nil
+                )
+                withAnimation(.easeIn(duration: 0.18)) {
+                    self.chatMessages.append(liveMsg)
+                    if self.chatMessages.count > 60 { self.chatMessages.removeFirst() }
+                }
+            }
+        }
+    }
+
+    private func sendChatMessage() {
+        let text = chatInputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let session else { return }
+        chatInputText = ""
+        let displayName = userService.getProfileDisplayName(userProfile: userProfile)
+        Task {
+            let msg = ChatMessage(
+                sessionId: session.id,
+                userId: userService.userIdentifier,
+                userName: displayName,
+                message: text
+            )
+            await FirebaseSyncService.shared.syncChatMessage(msg)
+        }
+    }
+
     private func requestPermissions() async {
-        // Request camera permission
-        let cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
-        if cameraStatus == .notDetermined {
+        if AVCaptureDevice.authorizationStatus(for: .video) == .notDetermined {
             _ = await AVCaptureDevice.requestAccess(for: .video)
         }
-        
-        // Request microphone permission
-        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        if micStatus == .notDetermined {
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
             _ = await AVCaptureDevice.requestAccess(for: .audio)
         }
     }
-    
-    private func setupLocalVideoView() async {
-        // Get the preview layer from the HLS service directly
-        // Retry multiple times as the preview layer may take a moment to initialize
-        for attempt in 1...5 {
-            if let previewLayer = HLSStreamingService.shared.getPreviewLayer() {
-                await MainActor.run {
-                    localVideoView = AnyView(
-                        VideoPreviewLayerView(previewLayer: previewLayer)
-                    )
-                }
-                print("✅ [CAMERA] Local video preview set up successfully (attempt \(attempt))")
-                return
-            }
-            
-            // Wait before retrying (except on last attempt)
-            if attempt < 5 {
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                print("⚠️ [CAMERA] Preview layer not ready yet, attempt \(attempt)/5")
-            }
-        }
-        
-        // If still no preview layer after retries, log warning
-        print("⚠️ [CAMERA] Preview layer not available after 5 attempts")
-    }
-    
-    private func setupSignalingCallbacks(userId: String) {
-        // No-op: signaling handled by unified streaming service or server-side
-    }
-    
-    private func startConnection(userId: String) async {
-        // Connection orchestration handled by `UnifiedStreamingService` / backend
-    }
-    
-    private func setupVideoViews() {
-        // Video rendering handled by streaming service implementations
-    }
-    
+
     private func leaveStream() {
         Task {
-            _ = userService.userIdentifier
-            // Stop unified stream
             streamingService.stopStream()
             isStreaming = false
         }
-        
         dismiss()
     }
+
+    private func cleanup() {
+        FirebaseSyncService.shared.removeChatMessageListener(chatListener)
+        chatListener = nil
+        if isScreenSharing {
+            HLSStreamingService.shared.stopScreenBroadcast()
+            isScreenSharing = false
+        }
+        leaveStream()
+    }
 }
+
+// MARK: - Connection status badge (reusable)
 
 struct ConnectionStatusView: View {
     let state: String
-    
+
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            Text(state)
-                .font(.caption)
-                .foregroundColor(.white)
+            Circle().fill(dotColor).frame(width: 7, height: 7)
+            Text(state).font(.caption).foregroundStyle(.white)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10).padding(.vertical, 5)
         .background(Color.black.opacity(0.5))
-        .cornerRadius(16)
+        .clipShape(Capsule())
     }
-    
-    private var statusColor: Color {
+
+    private var dotColor: Color {
         switch state {
-        case "Connected":
-            return .green
-        case "Connecting...":
-            return .yellow
-        case "Failed":
-            return .red
-        default:
-            return .gray
+        case "Connected":    return .green
+        case "Connecting…":  return .yellow
+        default:             return .gray
         }
     }
 }
 
-
+// MARK: - Preview
 
 @available(iOS 17.0, *)
-struct LiveStreamView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationView {
-            MultiParticipantStreamView(session: LiveSession(
-                title: "Test Session",
-                description: "Test",
-                hostId: "test",
-                category: "Prayer"
-            ))
-        }
+#Preview {
+    NavigationView {
+        MultiParticipantStreamView(session: LiveSession(
+            title: "Evening Prayer",
+            description: "Join us",
+            hostId: "host-1",
+            category: "Prayer"
+        ))
     }
 }
-

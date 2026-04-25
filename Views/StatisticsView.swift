@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 import Charts
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct StatisticsView: View {
     @Query(sort: [SortDescriptor(\JournalEntry.createdAt, order: .reverse)]) var allEntries: [JournalEntry]
     @Query(sort: [SortDescriptor(\PrayerRequest.createdAt, order: .reverse)]) var allPrayers: [PrayerRequest]
@@ -66,8 +66,31 @@ struct StatisticsView: View {
         statsService.filterMoodsByTimeframe(entries: allMoods, timeframe: convertTimeframe(selectedTimeframe))
     }
     
+    private var tabPickerView: some View {
+        ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
+            HStack(spacing: 12) {
+                ForEach(StatsTab.allCases, id: \.self) { tab in
+                    Button(action: { selectedTab = tab }) {
+                        Text(tab.rawValue)
+                            .font(.subheadline)
+                            .font(.body.weight(.medium))
+                            .foregroundColor(selectedTab == tab ? .white : Color.primary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(selectedTab == tab ? themeManager.colors.primary : Color.platformSystemGray6)
+                            )
+                    }
+                }
+            }
+            .padding(.horizontal)
+        }
+        .padding(.vertical, 8)
+    }
+    
     var body: some View {
-        if #available(iOS 17.0, *) {
+        if #available(iOS 17.0, macOS 14.0, *) {
             NavigationStack {
                 VStack(spacing: 0) {
                     // Timeframe Picker
@@ -79,29 +102,7 @@ struct StatisticsView: View {
                     .pickerStyle(SegmentedPickerStyle())
                     .padding()
                     
-                    // Scrollable Category Tabs
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(StatsTab.allCases, id: \.self) { tab in
-                                Button(action: {
-                                    selectedTab = tab
-                                }) {
-                                    Text(tab.rawValue)
-                                        .font(.subheadline)
-                                        .font(.body.weight(.medium))
-                                        .foregroundColor(selectedTab == tab ? .white : Color(UIColor.label))
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 20)
-                                                .fill(selectedTab == tab ? themeManager.colors.primary : Color(UIColor.systemGray6))
-                                        )
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    .padding(.vertical, 8)
+                    tabPickerView
                     
                     ScrollView {
                         VStack(spacing: 24) {
@@ -136,6 +137,8 @@ struct StatisticsView: View {
                             case .mood:
                                 MoodTab(
                                     moods: filteredMoods,
+                                    allMoods: allMoods,
+                                    statsTimeframe: convertTimeframe(selectedTimeframe),
                                     statsService: statsService,
                                     themeManager: themeManager
                                 )
@@ -161,7 +164,7 @@ struct StatisticsView: View {
                 }
                 .navigationTitle("Statistics")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         Menu {
                             Button(action: { showingInsights = true }) {
                                 Label("Insights", systemImage: "lightbulb.fill")
@@ -178,6 +181,9 @@ struct StatisticsView: View {
                             Button(action: { showingExport = true }) {
                                 Label("Export Report", systemImage: "square.and.arrow.up")
                             }
+                            Button(action: { showingMoodAnalytics = true }) {
+                                Label("Full Mood Report", systemImage: "chart.bar.fill")
+                            }
                         } label: {
                             Image(systemName: "ellipsis.circle")
                         }
@@ -185,12 +191,15 @@ struct StatisticsView: View {
                 }
                 .sheet(isPresented: $showingMoodAnalytics) {
                     MoodAnalyticsView()
+                        .macOSSheetFrameForm()
                 }
                 .sheet(isPresented: $showingHeatmap) {
                     ActivityHeatmapView(entries: allEntries, prayers: allPrayers, moods: allMoods, themeManager: themeManager)
+                        .macOSSheetFrameStandard()
                 }
                 .sheet(isPresented: $showingAchievements) {
                     AchievementsView(achievementService: achievementService)
+                        .macOSSheetFrameStandard()
                 }
                 .sheet(isPresented: $showingInsights) {
                     StatisticsInsightsView(
@@ -200,6 +209,7 @@ struct StatisticsView: View {
                         plans: allPlans,
                         statsService: statsService
                     )
+                    .macOSSheetFrameForm()
                 }
                 .sheet(isPresented: $showingExport) {
                     StatisticsExportView(
@@ -209,6 +219,7 @@ struct StatisticsView: View {
                         plans: allPlans,
                         statsService: statsService
                     )
+                    .macOSSheetFrameStandard()
                 }
             }
         } else {

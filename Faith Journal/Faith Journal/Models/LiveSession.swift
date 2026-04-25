@@ -20,13 +20,30 @@ final class LiveSession {
     var viewerCount: Int = 0 // For broadcast mode (legacy, use currentParticipants - currentBroadcasters)
     var peakViewerCount: Int = 0
     var category: String = ""
-    var tags: [String] = []
+    private var tagsJSON: String = "[]"
+    var tags: [String] {
+        get {
+            guard let data = tagsJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set { tagsJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]" }
+    }
     var isPrivate: Bool = false
     var isFavorite: Bool = false
     var isArchived: Bool = false
     var createdAt: Date = Date()
     var agenda: String = "" // Session outline/agenda
-    var relatedResources: [String] = [] // Bible verses, prayer topics, etc.
+    /// Stored as JSON to avoid Core Data "could not materialize Objective-C class Array" for [String].
+    private var relatedResourcesJSON: String = "[]"
+    var relatedResources: [String] {
+        get {
+            guard let data = relatedResourcesJSON.data(using: .utf8),
+                  let decoded = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return decoded
+        }
+        set { relatedResourcesJSON = (try? JSONEncoder().encode(newValue)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]" }
+    }
     var recordingURL: String? // URL to session recording
     var transcriptURL: String? // URL to transcript
     var summary: String = "" // Post-session summary
@@ -66,12 +83,12 @@ final class LiveSession {
         self.viewerCount = 0
         self.peakViewerCount = 0
         self.category = category
-        self.tags = tags
+        self.tagsJSON = (try? JSONEncoder().encode(tags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         self.isPrivate = false
         self.isFavorite = false
         self.createdAt = Date()
         self.agenda = ""
-        self.relatedResources = []
+        self.relatedResourcesJSON = "[]"
         self.connectionQuality = "Good"
         self.isLocked = false
         self.isRecording = false

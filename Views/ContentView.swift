@@ -1,24 +1,41 @@
-
 import SwiftUI
 import SwiftData
+#if os(iOS)
 import UIKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct ContentView: View {
     @EnvironmentObject private var nav: AppNavigation
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeManager = ThemeManager.shared
+    @Query private var userProfiles: [UserProfile]
     @State private var showingNewJournalEntry = false
     @State private var showingNewPrayerRequest = false
     @State private var showingMoodCheckin = false
     @State private var showingAlert = false
     @State private var alertMessage = ""
-    
+
+    /// Use theme background in light mode; system background in dark mode to avoid white shadow/panel.
+    private var contentBackground: Color {
+        colorScheme == .dark ? Color.platformSystemGroupedBackground : themeManager.colors.background
+    }
+
     var body: some View {
         ZStack {
-            Color(.systemGroupedBackground)
+            contentBackground
                 .ignoresSafeArea(.all, edges: .all)
             
-            TabView(selection: $nav.selectedTab) {
-            HomeView(
+            VStack(spacing: 0) {
+                #if os(iOS)
+                BannerAdView()
+                    .frame(height: 60)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .background(contentBackground)
+                #endif
+                
+                TabView(selection: $nav.selectedTab) {
+                HomeView(
                 selectedTab: $nav.selectedTab,
                 showingNewJournalEntry: $showingNewJournalEntry,
                 showingNewPrayerRequest: $showingNewPrayerRequest,
@@ -56,14 +73,18 @@ struct ContentView: View {
                 }
                 .tag(4)
             }
-            .accentColor(.purple)
-            .toolbar(.visible, for: .tabBar)
+                .accentColor(themeManager.colors.primary)
+                #if os(iOS)
+                .toolbar(.visible, for: .tabBar)
+                #endif
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea(.all, edges: .all)
-        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea(.all, edges: .all)
+        .ignoresSafeArea(.all, edges: [.bottom])
         .onAppear {
+            #if os(iOS)
             // Set tab bar appearance to match background
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
@@ -72,6 +93,7 @@ struct ContentView: View {
             if #available(iOS 15.0, *) {
                 UITabBar.appearance().scrollEdgeAppearance = appearance
             }
+            #endif
             // Clear badge when main content view appears - thread safe
             Task { @MainActor in
                 NotificationService.shared.clearBadge()
@@ -80,6 +102,10 @@ struct ContentView: View {
             Task { @MainActor in
                 DevotionalManager.shared.loadDevotionals()
             }
+            #if os(iOS)
+            // Pre-load rewarded interstitial for natural break points
+            RewardedInterstitialManager.shared.loadAd()
+            #endif
         }
         .onChange(of: nav.selectedTab) { oldValue, newValue in
             // Pre-load devotionals when user switches to devotionals tab
@@ -89,14 +115,21 @@ struct ContentView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToFaithFriends"))) { _ in
+            nav.selectedTab = 4
+            nav.navigateToFaithFriends = true
+        }
         .sheet(isPresented: $showingNewJournalEntry) {
             NewJournalEntryView()
+                .macOSSheetFrameForm()
         }
         .sheet(isPresented: $showingNewPrayerRequest) {
             NewPrayerRequestView()
+                .macOSSheetFrameForm()
         }
         .sheet(isPresented: $showingMoodCheckin) {
             MoodCheckinView()
+                .macOSSheetFrameForm()
         }
         .alert("Quick Action", isPresented: $showingAlert) {
             Button("OK") { }

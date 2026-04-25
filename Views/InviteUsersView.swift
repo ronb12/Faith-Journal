@@ -7,10 +7,14 @@
 
 import SwiftUI
 import SwiftData
+#if os(iOS)
 import MessageUI
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct InviteUsersView: View {
     let session: LiveSession
 
@@ -75,7 +79,7 @@ struct InviteUsersView: View {
                     Spacer()
                     
                     Button(action: {
-                        UIPasteboard.general.string = sessionInviteCode
+                        PlatformPasteboard.setString(sessionInviteCode)
                         alertMessage = "Invitation code copied to clipboard"
                         showingAlert = true
                     }) {
@@ -117,8 +121,10 @@ struct InviteUsersView: View {
                             footer: Text("Enter the email address or name of the person you want to invite.")
                         ) {
                             TextField("Email Address", text: $emailAddress)
+                                #if os(iOS)
                                 .keyboardType(.emailAddress)
-                                .autocapitalization(.none)
+                                .textInputAutocapitalization(.never)
+                                #endif
                                 .autocorrectionDisabled()
                             TextField("Name (Optional)", text: $userName)
                             Button(action: sendEmailInvitation) {
@@ -126,6 +132,7 @@ struct InviteUsersView: View {
                             }
                             .disabled(emailAddress.isEmpty)
                         }
+                        #if os(iOS)
                         .sheet(isPresented: $showingEmailComposer) {
                             if MFMailComposeViewController.canSendMail() {
                                 EmailComposerView(
@@ -134,7 +141,6 @@ struct InviteUsersView: View {
                                     body: emailInvitationBody
                                 )
                             } else {
-                                // Fallback: Show alert or share sheet if mail is not configured
                                 VStack {
                                     Text("Mail Not Configured")
                                         .font(.headline)
@@ -152,6 +158,7 @@ struct InviteUsersView: View {
                                 .padding()
                             }
                         }
+                        #endif
                     }
 
                     if inviteMethod == .share {
@@ -166,7 +173,7 @@ struct InviteUsersView: View {
                                     .lineLimit(2)
                                 Spacer()
                                 Button {
-                                    UIPasteboard.general.string = inviteLink
+                                    PlatformPasteboard.setString(inviteLink)
                                     alertMessage = "Link copied to clipboard!"
                                     showingAlert = true
                                 } label: {
@@ -226,9 +233,11 @@ struct InviteUsersView: View {
                     }
                 }
                 .navigationTitle("Invite Users")
+                #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
+                #endif
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         Button("Done") { dismiss() }
                     }
                 }
@@ -245,6 +254,7 @@ struct InviteUsersView: View {
                 } message: {
                     Text("This will create a new invitation code and invalidate the current one. Anyone with the old code will not be able to join. Continue?")
                 }
+                #if os(iOS)
                 .sheet(isPresented: $showingShareSheet) {
                     InviteUsersActivityView(
                         activityItems: {
@@ -273,6 +283,21 @@ struct InviteUsersView: View {
                         }
                     )
                 }
+                #elseif os(macOS)
+                .sheet(isPresented: $showingShareSheet) {
+                    // On macOS, share sheet copies to clipboard
+                    VStack {
+                        Text("Invitation copied to clipboard")
+                            .font(.headline)
+                        Button("Done") { showingShareSheet = false }
+                    }
+                    .padding()
+                    .onAppear {
+                        PlatformPasteboard.setString(shareText.isEmpty ? prepareShareText() : shareText)
+                    }
+                    .macOSSheetFrameCompact()
+                }
+                #endif
                 .task { prepareDefaults() }
             }
         } else {
@@ -396,7 +421,7 @@ struct InviteUsersView: View {
 
     private var emailInvitationBody: String {
         let code = sessionInviteCode.isEmpty ? getOrCreateCode() : sessionInviteCode
-        let clickableLink = inviteLink.isEmpty ? "https://faithjournal.app/invite/\(code)" : inviteLink
+        let clickableLink = inviteLink.isEmpty ? "https://faith-journal.web.app/invite/\(code)" : inviteLink
         let appStoreURL = AppStoreHelper.appStoreURL
         
         return """
@@ -440,16 +465,14 @@ struct InviteUsersView: View {
     }
     
     private func sendEmailInvitation() {
-        // Check if mail is available before proceeding
+        #if os(iOS)
         guard MFMailComposeViewController.canSendMail() else {
-            // If mail is not available, use share sheet instead
             shareText = emailInvitationBody
             showingShareSheet = true
             alertMessage = "Mail is not configured. Using share sheet instead."
             showingAlert = true
             return
         }
-        
         let expirationDate = Calendar.current.date(byAdding: .day, value: 30, to: Date())
         let code = sessionInviteCode.isEmpty ? getOrCreateCode() : sessionInviteCode
         
@@ -482,6 +505,14 @@ struct InviteUsersView: View {
             alertMessage = "Failed to create invitation: \(error.localizedDescription)"
             showingAlert = true
         }
+        #elseif os(macOS)
+        // On macOS, use mailto: link
+        let subject = "Invitation to \(session.title)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let body = emailInvitationBody.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        if let url = URL(string: "mailto:\(emailAddress)?subject=\(subject)&body=\(body)") {
+            NSWorkspace.shared.open(url)
+        }
+        #endif
     }
     
     private func resendInvitation(_ invitation: SessionInvitation) {
@@ -513,8 +544,8 @@ struct InviteUsersView: View {
     }
 }
 
-// MARK: - Email Composer View
-
+// MARK: - Email Composer View (iOS only)
+#if os(iOS)
 struct EmailComposerView: UIViewControllerRepresentable {
     let recipient: String
     let subject: String
@@ -541,9 +572,10 @@ struct EmailComposerView: UIViewControllerRepresentable {
         }
     }
 }
+#endif
 
-// MARK: - Share Activity View
-
+// MARK: - Share Activity View (iOS only)
+#if os(iOS)
 struct InviteUsersActivityView: UIViewControllerRepresentable {
     let activityItems: [Any]
     let onDismiss: () -> Void
@@ -604,7 +636,6 @@ class ShareTextItem: NSObject, UIActivityItemSource {
     }
     
     func activityViewController(_ activityViewController: UIActivityViewController, subjectForActivityType activityType: UIActivity.ActivityType?) -> String {
-        // Extract title from text for email subject
         if let titleRange = text.range(of: "Title: ") {
             let afterTitle = text[titleRange.upperBound...]
             if let newlineRange = afterTitle.range(of: "\n") {
@@ -631,3 +662,4 @@ class ShareURLItem: NSObject, UIActivityItemSource {
         return url
     }
 }
+#endif

@@ -37,6 +37,31 @@ class DevotionalManager: ObservableObject {
     
     private var hasStartedLoading = false
     
+    private func userDefaultsKey(for date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
+        return "devotional_completed_\(formatter.string(from: date))"
+    }
+    
+    private func loadCompletionStatus(for date: Date) -> Bool {
+        UserDefaults.standard.bool(forKey: userDefaultsKey(for: date))
+    }
+    
+    private func saveCompletionStatus(for devotional: Devotional, isCompleted: Bool) {
+        UserDefaults.standard.set(isCompleted, forKey: userDefaultsKey(for: devotional.date))
+        UserDefaults.standard.synchronize()
+        
+        // Sync to Firebase for cross-device sync
+        let completion = DevotionalCompletion(
+            devotionalId: devotional.id,
+            devotionalDate: devotional.date,
+            isCompleted: isCompleted
+        )
+        Task { @MainActor in
+            await FirebaseSyncService.shared.syncDevotionalCompletion(completion)
+        }
+    }
+    
     init() {
         // Pre-load today's devotional immediately for instant display
         preloadTodaysDevotional()
@@ -57,7 +82,7 @@ class DevotionalManager: ObservableObject {
         let category = categories[categoryIndex]
         
         // Create today's devotional immediately
-        let todaysDevotional = Devotional(
+        var todaysDevotional = Devotional(
             title: baseDevotional.title,
             scripture: baseDevotional.scripture,
             content: baseDevotional.content,
@@ -67,6 +92,7 @@ class DevotionalManager: ObservableObject {
             isFavorite: false,
             isCompleted: false
         )
+        todaysDevotional.isCompleted = loadCompletionStatus(for: today)
         
         // Add today's devotional immediately so it shows right away
         devotionals = [todaysDevotional]
@@ -113,7 +139,7 @@ class DevotionalManager: ObservableObject {
             let category = categories[categoryIndex]
             
             // Create variation of devotional for this day
-            let devotional = Devotional(
+            var devotional = Devotional(
                 title: baseDevotional.title,
                 scripture: baseDevotional.scripture,
                 content: baseDevotional.content,
@@ -123,6 +149,7 @@ class DevotionalManager: ObservableObject {
                 isFavorite: false,
                 isCompleted: false
             )
+            devotional.isCompleted = loadCompletionStatus(for: date)
             allDevotionals.append(devotional)
         }
         
@@ -433,8 +460,10 @@ class DevotionalManager: ObservableObject {
     
     func markAsCompleted(_ devotional: Devotional) {
         if let index = devotionals.firstIndex(where: { $0.id == devotional.id }) {
-            // Update the existing devotional's isCompleted property
-            devotionals[index].isCompleted = !devotionals[index].isCompleted
+            let newStatus = !devotionals[index].isCompleted
+            devotionals[index].isCompleted = newStatus
+            saveCompletionStatus(for: devotionals[index], isCompleted: newStatus)
+            objectWillChange.send()
         }
     }
     

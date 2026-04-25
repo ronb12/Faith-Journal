@@ -51,9 +51,11 @@ struct BroadcastSettingsSheet: View {
                 }
             }
             .navigationTitle("Broadcast Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }

@@ -88,6 +88,10 @@ struct DailyReading: Codable, Identifiable {
     var reflection: String = ""
     var studyQuestions: [String] = []
     var crossReferences: [String] = []
+    /// When true, this day is skipped in catch-up queue. Optional for older saved JSON.
+    var isSkipped: Bool?
+    
+    fileprivate var isEffectivelySkipped: Bool { isSkipped == true }
     
     init(day: Int, reference: String, description: String, studyQuestions: [String] = [], crossReferences: [String] = []) {
         self.day = day
@@ -154,10 +158,66 @@ extension ReadingPlan {
     
     func getTodayReading() -> DailyReading? {
         if catchUpModeEnabled {
-            // Find first uncompleted reading
-            return readings.first { !$0.isCompleted }
+            return readings.first { !$0.isCompleted && !$0.isEffectivelySkipped }
         } else {
             return readings.first { $0.day == currentDay }
+        }
+    }
+    
+    /// Uncompleted, non-skipped days in order (for catch-up batching).
+    var pendingCatchUpReadings: [DailyReading] {
+        readings
+            .filter { !$0.isCompleted && !$0.isEffectivelySkipped }
+            .sorted { $0.day < $1.day }
+    }
+    
+    /// How far behind (calendar) vs how many readings are actually left.
+    var effectiveDaysBehind: Int {
+        max(0, min(missedDays, pendingCatchUpReadings.count))
+    }
+    
+    /// Rough total time to complete pending readings, using average per session or a default.
+    var estimatedCatchUpSeconds: TimeInterval {
+        let pending = pendingCatchUpReadings
+        guard !pending.isEmpty else { return 0 }
+        let per = max(averageReadingTime, 120) // at least 2 min per day if no data yet
+        return per * Double(pending.count)
+    }
+    
+    func markDaySkipped(_ day: Int) {
+        var r = readings
+        guard let idx = r.firstIndex(where: { $0.day == day }) else { return }
+        r[idx].isSkipped = true
+        readings = r
+    }
+    
+    /// 1-based day number aligned to calendar: first day of plan = day 1.
+    var expectedCalendarDayIndex: Int {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: startDate)
+        let today = cal.startOfDay(for: Date())
+        let d = cal.dateComponents([.day], from: start, to: today).day ?? 0
+        return min(duration, max(1, d + 1))
+    }
+    
+    /// Skip all uncompleted readings before the calendar "today" slot so the queue moves to today’s day.
+    func alignCatchUpQueueToToday() {
+        let target = expectedCalendarDayIndex
+        var r = readings
+        var changed = false
+        for i in r.indices {
+            if !r[i].isCompleted && (r[i].isSkipped != true) && r[i].day < target {
+                r[i].isSkipped = true
+                changed = true
+            }
+        }
+        if changed { readings = r }
+    }
+    
+    /// Skip the first pending reading so the queue advances.
+    func skipNextPendingReading() {
+        if let d = pendingCatchUpReadings.first {
+            markDaySkipped(d.day)
         }
     }
     

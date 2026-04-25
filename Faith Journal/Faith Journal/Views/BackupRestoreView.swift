@@ -8,8 +8,11 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct BackupRestoreView: View {
     @StateObject private var backupService = BackupRestoreService.shared
     @Environment(\.modelContext) private var modelContext
@@ -26,6 +29,7 @@ struct BackupRestoreView: View {
     @State private var showingError = false
     @State private var backupSuccess = false
     @State private var createdBackupURL: URL?
+    @State private var showingShareSheet = false
     
     var body: some View {
         NavigationStack {
@@ -141,12 +145,20 @@ struct BackupRestoreView: View {
                 }
             }
             .navigationTitle("Backup & Restore")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
             }
+            #elseif os(macOS)
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            #endif
             .fileImporter(
                 isPresented: $showingRestoreBackup,
                 allowedContentTypes: [.json],
@@ -187,6 +199,15 @@ struct BackupRestoreView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage)
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                if let url = createdBackupURL {
+                    #if os(macOS)
+                    MacShareSheet(shareItems: [url])
+                    #else
+                    BackupShareSheet(items: [url])
+                    #endif
+                }
             }
         }
     }
@@ -249,11 +270,11 @@ struct BackupRestoreView: View {
     }
     
     private func shareBackup(url: URL) {
+        #if os(iOS)
         let activityViewController = UIActivityViewController(
             activityItems: [url],
             applicationActivities: nil
         )
-        
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let rootViewController = windowScene.windows.first?.rootViewController {
             if let popover = activityViewController.popoverPresentationController {
@@ -265,5 +286,20 @@ struct BackupRestoreView: View {
             }
             rootViewController.present(activityViewController, animated: true)
         }
+        #elseif os(macOS)
+        showingShareSheet = true
+        #endif
     }
 }
+
+#if os(iOS)
+private struct BackupShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif

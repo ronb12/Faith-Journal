@@ -87,14 +87,25 @@ struct TranslationSettingsView: View {
                 }
             }
             .navigationTitle("Translation Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         translationService.defaultTargetLanguage = selectedLanguage
                         dismiss()
                     }
                 }
+                #else
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        translationService.defaultTargetLanguage = selectedLanguage
+                        dismiss()
+                    }
+                }
+                #endif
             }
         }
     }

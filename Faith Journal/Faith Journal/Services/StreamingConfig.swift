@@ -12,28 +12,16 @@ struct StreamingConfig {
     static let shared = StreamingConfig()
     
     // Server configuration
-    /// LiveKit server URL - update this with your Oracle VM public IP
-    /// Format: wss://YOUR_PUBLIC_IP:7880 or wss://YOUR_DOMAIN:7880
-    /// This URL must be publicly accessible from anywhere for users to join streams
+    /// LiveKit server URL - use LiveKit Cloud (e.g. wss://your-project.livekit.cloud)
     let serverURL: String = {
-        // Development server - Oracle Cloud instance
         let envURL = ProcessInfo.processInfo.environment["LIVEKIT_SERVER_URL"]
-        // Using ws:// instead of wss:// for now (Oracle server may not have SSL)
-        // For production, configure SSL certificate and use wss://
-        return envURL ?? "ws://129.213.114.10:7880" // Your Oracle LiveKit server
+        return envURL ?? "wss://faith-journal-juqej6sx.livekit.cloud"
     }()
     
-    // HLS streaming server URL (Oracle server)
-    /// HLS server URL for streaming - Oracle Cloud instance
-    /// Format: https://YOUR_PUBLIC_IP:8080 or https://YOUR_DOMAIN:8080
-    /// This URL must be publicly accessible from anywhere for users to watch streams
+    // HLS streaming server URL (optional; only if you use a separate HLS server)
     let hlsServerURL: String = {
         let envURL = ProcessInfo.processInfo.environment["HLS_SERVER_URL"]
-        // Convert WebSocket URL to HTTP/HTTPS for HLS
-        // Using HTTP instead of HTTPS for now (Oracle server may not have SSL)
-        // For production, configure SSL certificate and use HTTPS
-        let baseURL = envURL ?? "http://129.213.114.10:8080"
-        return baseURL
+        return envURL ?? ""
     }()
     
     /// Generate HLS stream URL for a session
@@ -52,9 +40,9 @@ struct StreamingConfig {
         return URL(string: urlString)
     }
     
-    // API credentials (for token generation on server)
-    let apiKey = "devkey"
-    let apiSecret = "devsecret"
+    // LiveKit API credentials (from LiveKit Cloud project)
+    let apiKey = ProcessInfo.processInfo.environment["LIVEKIT_API_KEY"] ?? "APIo3PpGD4FqusS"
+    let apiSecret = ProcessInfo.processInfo.environment["LIVEKIT_API_SECRET"] ?? ""
     
     // Default room settings
     let defaultRoomName = "faith-bible-study"
@@ -74,5 +62,12 @@ struct StreamingConfig {
     // MARK: - Validation
     func isValidServerURL() -> Bool {
         return !serverURL.isEmpty && (serverURL.hasPrefix("wss://") || serverURL.hasPrefix("ws://"))
+    }
+
+    /// True if LiveKit URL is set to a real project (not the placeholder).
+    var isLiveKitConfigured: Bool {
+        let url = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !url.isEmpty, url.hasPrefix("wss://") || url.hasPrefix("ws://") else { return false }
+        return !url.contains("YOUR_PROJECT")
     }
 }

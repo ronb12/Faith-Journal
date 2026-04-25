@@ -19,7 +19,7 @@ import FirebaseFirestore
 import FirebaseAuth
 #endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 class FirebaseInitializer {
     static let shared = FirebaseInitializer()
     
@@ -78,6 +78,7 @@ class FirebaseInitializer {
         print("✅ [FIREBASE] GoogleService-Info.plist found at: \(path)")
         
         FirebaseApp.configure()
+        FirebaseConfiguration.shared.setLoggerLevel(.warning)
         isInitialized = true
         
         if let app = FirebaseApp.app() {
@@ -107,10 +108,17 @@ class FirebaseInitializer {
         
         let db = Firestore.firestore()
         let settings = FirestoreSettings()
+        #if os(macOS)
+        // Use in-memory cache on macOS to avoid LevelDB lock errors when multiple instances
+        // run (e.g. Xcode + built app) or when the container path is locked.
+        settings.cacheSettings = MemoryCacheSettings()
+        print("✅ [FIREBASE] Firestore using in-memory cache (macOS)")
+        #else
         // Use new cacheSettings API (replaces deprecated isPersistenceEnabled and cacheSizeBytes)
         settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: FirestoreCacheSizeUnlimited))
-        db.settings = settings
         print("✅ [FIREBASE] Firestore persistence enabled")
+        #endif
+        db.settings = settings
         didConfigureFirestoreSettings = true
         
         #if canImport(FirebaseAuth)

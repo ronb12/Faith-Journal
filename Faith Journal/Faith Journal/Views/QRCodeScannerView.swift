@@ -331,9 +331,9 @@ extension ScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
             let code = scannedValue.replacingOccurrences(of: "faithjournal://invite/", with: "")
             return code.trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        // Format 2: https://faithjournal.app/invite/CODE
-        else if scannedValue.hasPrefix("https://faithjournal.app/invite/") {
-            let code = scannedValue.replacingOccurrences(of: "https://faithjournal.app/invite/", with: "")
+        // Format 2: https://faith-journal.web.app/invite/CODE
+        else if scannedValue.hasPrefix("https://faith-journal.web.app/invite/") {
+            let code = scannedValue.replacingOccurrences(of: "https://faith-journal.web.app/invite/", with: "")
             return code.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         // Format 3: Just the code itself (e.g., "ABC12345")

@@ -125,6 +125,22 @@ struct ReadingPlansView: View {
                                 .id("active")
                             }
 
+                            // Paused Plans
+                            if !pausedPlans.isEmpty && (filterMode == .all || filterMode == .active) {
+                                Section(header: Text("Paused Plans (\(pausedPlans.count))")) {
+                                    ForEach(pausedPlans) { plan in
+                                        NavigationLink(destination: ActivePlanDetailView(plan: plan)) {
+                                            HStack {
+                                                ActivePlanRow(plan: plan)
+                                                Spacer()
+                                                Image(systemName: "pause.circle.fill")
+                                                    .foregroundColor(.orange)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             // Completed Plans
                             if !completedPlans.isEmpty && (filterMode == .all || filterMode == .completed) {
                                 Section(header: Text("Completed Plans (\(completedPlans.count))")) {
@@ -152,12 +168,12 @@ struct ReadingPlansView: View {
                 }
                 .navigationTitle("Reading Plans")
                 .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
+                    ToolbarItem(placement: .cancellationAction) {
                         Button(action: { showingStatistics = true }) {
                             Image(systemName: "chart.bar.fill")
                         }
                     }
-                    ToolbarItem(placement: .navigationBarTrailing) {
+                    ToolbarItem(placement: .automatic) {
                         HStack {
                             if filterMode != .all {
                                 Button(action: {
@@ -279,8 +295,7 @@ struct ReadingPlanStatCard: View {
                     .foregroundColor(color)
                     .font(.title3)
                 Text(value)
-                    .font(.headline)
-                    .font(.body.weight(.bold))
+                    .font(.headline.weight(.bold))
                 Text(title)
                     .font(.caption2)
                     .foregroundColor(.primary)
@@ -289,7 +304,7 @@ struct ReadingPlanStatCard: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.systemGray6))
+                    .fill(Color.platformSystemGray6)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(color.opacity(0.3), lineWidth: 1)
@@ -413,9 +428,11 @@ struct PlanDetailView: View {
     let planTemplate: ReadingPlanTemplate
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: [SortDescriptor(\ReadingPlan.startDate, order: .reverse)]) private var allPlans: [ReadingPlan]
     @State private var showingStartPlan = false
     @State private var showingError = false
     @State private var showingSuccess = false
+    @State private var showingDuplicateAlert = false
     @State private var errorMessage = ""
     @State private var isSaving = false
     
@@ -424,8 +441,7 @@ struct PlanDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(planTemplate.title)
-                        .font(.largeTitle)
-                        .font(.body.weight(.bold))
+                        .font(.largeTitle.weight(.bold))
                     
                     Text(planTemplate.description)
                         .font(.body)
@@ -449,8 +465,7 @@ struct PlanDetailView: View {
                         ForEach(planTemplate.readings.prefix(7), id: \.day) { reading in
                             HStack {
                                 Text("Day \(reading.day)")
-                                    .font(.caption)
-                                    .font(.body.weight(.semibold))
+                                    .font(.caption.weight(.semibold))
                                     .foregroundColor(.purple)
                                     .frame(width: 60)
                                 Text(reading.reference)
@@ -492,11 +507,18 @@ struct PlanDetailView: View {
             .padding()
         }
         .navigationTitle("Plan Details")
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
         .alert("Error", isPresented: $showingError) {
             Button("OK") { }
         } message: {
             Text(errorMessage)
+        }
+        .alert("Plan Already Active", isPresented: $showingDuplicateAlert) {
+            Button("OK") { }
+        } message: {
+            Text("This reading plan is already active. You cannot add the same plan twice while it's still active.")
         }
         .alert("Plan Started!", isPresented: $showingSuccess) {
             Button("OK") {
@@ -508,6 +530,19 @@ struct PlanDetailView: View {
     }
     
     private func startPlan() {
+        // Check if a plan with the same title is already active
+        let activePlansWithSameTitle = allPlans.filter { existingPlan in
+            existingPlan.title == planTemplate.title &&
+            !existingPlan.isCompleted &&
+            !existingPlan.isPaused
+        }
+        
+        if !activePlansWithSameTitle.isEmpty {
+            showingDuplicateAlert = true
+            print("⚠️ [READING PLAN] Plan \"\(planTemplate.title)\" is already active")
+            return
+        }
+        
         isSaving = true
         
         // Create the plan with proper initialization
@@ -600,6 +635,8 @@ struct ActivePlanDetailView: View {
     @State private var showingCalendar = false
     @State private var showingStatistics = false
     @State private var showingShareSheet = false
+    @State private var todayVerse: BibleVerse? = nil
+    @State private var journalPrefill: JournalReadingPlanPrefill? = nil
     @EnvironmentObject private var nav: AppNavigation
     
     var body: some View {
@@ -608,8 +645,7 @@ struct ActivePlanDetailView: View {
                 // Progress Header
                 VStack(alignment: .leading, spacing: 12) {
                     Text(plan.title)
-                        .font(.largeTitle)
-                        .font(.body.weight(.bold))
+                        .font(.largeTitle.weight(.bold))
                     
                     if !plan.isCompleted {
                         VStack(alignment: .leading, spacing: 8) {
@@ -634,6 +670,8 @@ struct ActivePlanDetailView: View {
                 
                 Divider()
                 
+                catchUpSection
+                
                 // Today's Reading - Prominently Displayed
                 if let todayReading = plan.getTodayReading(), !plan.isCompleted {
                     VStack(alignment: .leading, spacing: 16) {
@@ -642,8 +680,7 @@ struct ActivePlanDetailView: View {
                                 .foregroundColor(.purple)
                                 .font(.title2)
                             Text("Today's Reading")
-                                .font(.title2)
-                                .font(.body.weight(.bold))
+                                .font(.title2.weight(.bold))
                                 .foregroundColor(.purple)
                         }
                         
@@ -651,8 +688,7 @@ struct ActivePlanDetailView: View {
                             // Day indicator
                             HStack {
                                 Text("Day \(todayReading.day) of \(plan.duration)")
-                                    .font(.subheadline)
-                                    .font(.body.weight(.semibold))
+                                    .font(.subheadline.weight(.semibold))
                                     .foregroundColor(.purple)
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
@@ -689,8 +725,7 @@ struct ActivePlanDetailView: View {
                                     }
                                 }) {
                                     Text(todayReading.reference)
-                                        .font(.title)
-                                        .font(.body.weight(.bold))
+                                        .font(.title.weight(.bold))
                                         .foregroundColor(.blue)
                                         .underline()
                                 }
@@ -707,17 +742,13 @@ struct ActivePlanDetailView: View {
                             Divider()
                             
                             // Fetch and display verse text
-                            if let verse = BibleService.shared.getAllLocalVerses().first(where: { verse in
-                                verse.reference.lowercased().contains(todayReading.reference.lowercased()) ||
-                                todayReading.reference.lowercased().contains(verse.reference.lowercased())
-                            }) {
+                            if let verse = todayVerse {
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Image(systemName: "book.closed.fill")
                                             .foregroundColor(.purple)
                                         Text("Scripture")
-                                            .font(.caption)
-                                            .font(.body.weight(.semibold))
+                                            .font(.caption.weight(.semibold))
                                             .foregroundColor(.secondary)
                                             .textCase(.uppercase)
                                     }
@@ -743,8 +774,7 @@ struct ActivePlanDetailView: View {
                                         Image(systemName: "book.closed.fill")
                                             .foregroundColor(.purple)
                                         Text("Scripture Reference")
-                                            .font(.caption)
-                                            .font(.body.weight(.semibold))
+                                            .font(.caption.weight(.semibold))
                                             .foregroundColor(.secondary)
                                             .textCase(.uppercase)
                                     }
@@ -790,11 +820,40 @@ struct ActivePlanDetailView: View {
                             }
                             .disabled(todayReading.isCompleted)
                             .padding(.top, 8)
+                            
+                            if todayReading.isCompleted {
+                                Button {
+                                    if let r = plan.getReadingForDay(todayReading.day) {
+                                        journalPrefill = JournalReadingPlanPrefill(
+                                            planId: plan.id,
+                                            planTitle: plan.title,
+                                            day: r.day,
+                                            reference: r.reference,
+                                            dayDescription: r.readingDescription,
+                                            reflection: r.reflection,
+                                            notes: r.notes
+                                        )
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "book.pages.fill")
+                                        Text("Write journal entry")
+                                        Spacer()
+                                    }
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .background(Color.orange)
+                                    .cornerRadius(12)
+                                }
+                                .padding(.top, 8)
+                            }
                         }
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 16)
-                                .fill(Color(.systemBackground))
+                                .fill(Color.platformSystemBackground)
                                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
                         )
                     }
@@ -805,8 +864,7 @@ struct ActivePlanDetailView: View {
                                 .foregroundColor(.green)
                                 .font(.title2)
                             Text("Reading Plan Completed!")
-                                .font(.title2)
-                                .font(.body.weight(.bold))
+                                .font(.title2.weight(.bold))
                                 .foregroundColor(.green)
                         }
                         .padding()
@@ -836,14 +894,12 @@ struct ActivePlanDetailView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
                                         Text("Day \(reading.day)")
-                                            .font(.subheadline)
-                                            .font(.body.weight(.semibold))
+                                            .font(.subheadline.weight(.semibold))
                                             .foregroundColor(isToday ? .purple : .primary)
 
                                         if isToday {
                                             Text("TODAY")
-                                                .font(.caption2)
-                                                .font(.body.weight(.bold))
+                                                .font(.caption2.weight(.bold))
                                                 .foregroundColor(.white)
                                                 .padding(.horizontal, 6)
                                                 .padding(.vertical, 2)
@@ -864,8 +920,7 @@ struct ActivePlanDetailView: View {
                                         }
                                     }) {
                                         Text(reading.reference)
-                                            .font(.subheadline)
-                                            .font(.body.weight(isToday ? .semibold : .regular))
+                                            .font(.subheadline.weight(isToday ? .semibold : .regular))
                                             .foregroundColor(.blue)
                                             .underline()
                                     }
@@ -892,7 +947,7 @@ struct ActivePlanDetailView: View {
                                 Spacer()
                             }
                             .padding()
-                            .background(isToday ? Color.purple.opacity(0.1) : Color(.systemGray6))
+                            .background(isToday ? Color.purple.opacity(0.1) : Color.platformSystemGray6)
                             .cornerRadius(10)
                             .contentShape(Rectangle())
                             .onTapGesture {
@@ -905,9 +960,11 @@ struct ActivePlanDetailView: View {
             .padding()
         }
         .navigationTitle("Reading Plan")
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .automatic) {
                 Menu {
                     Button(action: { showingCalendar = true }) {
                         Label("Calendar", systemImage: "calendar")
@@ -926,6 +983,14 @@ struct ActivePlanDetailView: View {
                 }
             }
         }
+        .onAppear {
+            if let ref = plan.getTodayReading()?.reference {
+                let refLower = ref.lowercased()
+                todayVerse = BibleService.shared.getAllLocalVerses().first {
+                    $0.reference.lowercased().contains(refLower) || refLower.contains($0.reference.lowercased())
+                }
+            }
+        }
         .sheet(item: $selectedReading) { reading in
             ReadingDetailView(reading: reading, plan: plan)
         }
@@ -940,6 +1005,59 @@ struct ActivePlanDetailView: View {
         }
         .sheet(isPresented: $showingShareSheet) {
             ReadingPlanShareSheet(activityItems: [plan.shareText])
+        }
+        .sheet(item: $journalPrefill) { pre in
+            NewJournalEntryView(readingPlanPrefill: pre)
+        }
+    }
+    
+    @ViewBuilder
+    private var catchUpSection: some View {
+        if plan.catchUpModeEnabled && !plan.isCompleted && !plan.isPaused
+            && plan.missedDays > 0 && !plan.pendingCatchUpReadings.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "flame")
+                        .foregroundColor(.orange)
+                    Text("Catch up")
+                        .font(.headline)
+                }
+                Text("You're about \(plan.missedDays) day(s) behind. Tackle \(plan.pendingCatchUpReadings.count) reading(s) — about \(Int(ceil(plan.estimatedCatchUpSeconds / 60.0))) min at your usual pace.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                ForEach(plan.pendingCatchUpReadings.prefix(5), id: \.day) { r in
+                    Text("• Day \(r.day): \(r.reference)")
+                        .font(.caption)
+                }
+                if plan.pendingCatchUpReadings.count > 5 {
+                    Text("… and \(plan.pendingCatchUpReadings.count - 5) more")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                HStack(spacing: 12) {
+                    Button {
+                        plan.skipNextPendingReading()
+                        try? modelContext.save()
+                        Task { await FirebaseSyncService.shared.syncReadingPlan(plan) }
+                    } label: {
+                        Text("Skip one")
+                    }
+                    .buttonStyle(.bordered)
+                    Button {
+                        plan.alignCatchUpQueueToToday()
+                        try? modelContext.save()
+                        Task { await FirebaseSyncService.shared.syncReadingPlan(plan) }
+                    } label: {
+                        Text("Move to today’s reading")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.orange.opacity(0.1))
+            )
         }
     }
 }
@@ -1011,9 +1129,10 @@ struct ReadingDetailView: View {
     @State private var reflection = ""
     @State private var notes = ""
     @State private var startTime: Date?
+    @State private var journalPrefill: JournalReadingPlanPrefill? = nil
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(alignment: .leading, spacing: 12) {
@@ -1037,8 +1156,7 @@ struct ReadingDetailView: View {
                         }
                         
                         Text(reading.reference)
-                            .font(.title2)
-                            .font(.body.weight(.bold))
+                            .font(.title2.weight(.bold))
                         
                         Text(reading.readingDescription)
                             .font(.body)
@@ -1121,7 +1239,7 @@ struct ReadingDetailView: View {
                         TextEditor(text: $reflection)
                             .frame(minHeight: 100)
                             .padding(8)
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(8)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
@@ -1160,14 +1278,43 @@ struct ReadingDetailView: View {
                         .padding()
                         .background(Color.green.opacity(0.1))
                         .cornerRadius(12)
+                        
+                        Button {
+                            if let r = plan.getReadingForDay(reading.day) {
+                                journalPrefill = JournalReadingPlanPrefill(
+                                    planId: plan.id,
+                                    planTitle: plan.title,
+                                    day: r.day,
+                                    reference: r.reference,
+                                    dayDescription: r.readingDescription,
+                                    reflection: reflection.isEmpty ? r.reflection : reflection,
+                                    notes: notes.isEmpty ? r.notes : notes
+                                )
+                            }
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "book.pages.fill")
+                                Text("Write journal entry")
+                                Spacer()
+                            }
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.orange)
+                            .cornerRadius(12)
+                        }
+                        .padding(.top, 8)
                     }
                 }
                 .padding()
             }
             .navigationTitle("Daily Reading")
-            .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { 
                         saveReflection()
                         dismiss() 
@@ -1176,6 +1323,9 @@ struct ReadingDetailView: View {
             }
             .sheet(isPresented: $showingStudyTools) {
                 StudyToolsView(reading: reading, reflection: $reflection, notes: $notes)
+            }
+            .sheet(item: $journalPrefill) { pre in
+                NewJournalEntryView(readingPlanPrefill: pre)
             }
             .onAppear {
                 reflection = reading.reflection
@@ -1261,14 +1411,13 @@ struct StudyToolsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // Study Questions
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Study Questions")
-                            .font(.title2)
-                            .font(.body.weight(.bold))
+                            .font(.title2.weight(.bold))
                         
                         ForEach(studyQuestions, id: \.self) { question in
                             Button(action: {
@@ -1283,7 +1432,7 @@ struct StudyToolsView: View {
                                         .foregroundColor(.secondary)
                                 }
                                 .padding()
-                                .background(Color(.systemGray6))
+                                .background(Color.platformSystemGray6)
                                 .cornerRadius(8)
                             }
                         }
@@ -1293,8 +1442,7 @@ struct StudyToolsView: View {
                     // Reflection Prompts
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Reflection Prompts")
-                            .font(.title2)
-                            .font(.body.weight(.bold))
+                            .font(.title2.weight(.bold))
                         
                         Text("What stood out to you in this reading?")
                             .font(.body)
@@ -1318,16 +1466,18 @@ struct StudyToolsView: View {
                         TextEditor(text: $notes)
                             .frame(minHeight: 150)
                             .padding(8)
-                            .background(Color(.systemGray6))
+                            .background(Color.platformSystemGray6)
                             .cornerRadius(8)
                     }
                     .padding()
                 }
             }
             .navigationTitle("Study Tools")
-            .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -1349,6 +1499,7 @@ struct StudyToolsView: View {
 struct CreateReadingPlanView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: [SortDescriptor(\ReadingPlan.startDate, order: .reverse)]) private var allPlans: [ReadingPlan]
     @State private var title = ""
     @State private var description = ""
     @State private var duration = 30
@@ -1360,6 +1511,7 @@ struct CreateReadingPlanView: View {
     @State private var newReadingDescription = ""
     @State private var showingError = false
     @State private var showingSuccess = false
+    @State private var showingDuplicateAlert = false
     @State private var errorMessage = ""
     @State private var isCreating = false
     
@@ -1367,15 +1519,17 @@ struct CreateReadingPlanView: View {
     let difficulties = ["Beginner", "Intermediate", "Advanced"]
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 backgroundGradient
                 scrollContent
             }
             .navigationTitle("Create Plan")
-            .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
             }
@@ -1392,6 +1546,11 @@ struct CreateReadingPlanView: View {
                 Button("OK") { }
             } message: {
                 Text(errorMessage)
+            }
+            .alert("Plan Already Active", isPresented: $showingDuplicateAlert) {
+                Button("OK") { }
+            } message: {
+                Text("A reading plan with this title is already active. You cannot add the same plan twice while it's still active.")
             }
             .alert("Plan Created!", isPresented: $showingSuccess) {
                 Button("OK") {
@@ -1431,8 +1590,7 @@ struct CreateReadingPlanView: View {
                     .font(.largeTitle)
                     .foregroundColor(.purple)
                 Text("Create Custom Plan")
-                    .font(.title2)
-                    .font(.body.weight(.bold))
+                    .font(.title2.weight(.bold))
             }
             Text("Build your own personalized Bible reading plan")
                 .font(.subheadline)
@@ -1539,7 +1697,7 @@ struct CreateReadingPlanView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(12)
     }
     
@@ -1556,8 +1714,7 @@ struct CreateReadingPlanView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Day \(reading.day)")
-                        .font(.subheadline)
-                        .font(.body.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundColor(.purple)
                     Spacer()
                     Button(action: {
@@ -1582,7 +1739,7 @@ struct CreateReadingPlanView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(10)
     }
     
@@ -1636,7 +1793,7 @@ struct CreateReadingPlanView: View {
     
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 16)
-            .fill(Color(.systemBackground))
+            .fill(Color.platformSystemBackground)
             .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
     }
     
@@ -1671,12 +1828,23 @@ struct CreateReadingPlanView: View {
             return
         }
         
+        // Check if an active plan with the same title already exists
+        let activePlansWithSameTitle = allPlans.filter { existingPlan in
+            existingPlan.title == title.trimmingCharacters(in: .whitespacesAndNewlines) &&
+            !existingPlan.isCompleted &&
+            !existingPlan.isPaused
+        }
+        
+        if !activePlansWithSameTitle.isEmpty {
+            showingDuplicateAlert = true
+            print("⚠️ [READING PLAN] Custom plan \"\(title)\" is already active")
+            return
+        }
+        
         isCreating = true
         
-        // Use actual readings count or duration, whichever is smaller
-        let finalReadings = Array(readings.prefix(duration))
-        let actualDuration = max(finalReadings.count, duration)
-        
+        let actualDuration = readings.count
+
         let plan = ReadingPlan(
             title: title,
             description: description,
@@ -1687,7 +1855,7 @@ struct CreateReadingPlanView: View {
             isCustom: true
         )
         
-        plan.readings = finalReadings
+        plan.readings = readings
         
         do {
             modelContext.insert(plan)
@@ -1718,7 +1886,7 @@ struct AddReadingView: View {
     @State private var description = ""
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Reading Details")) {
                     Text("Day \(day)")
@@ -1729,12 +1897,14 @@ struct AddReadingView: View {
                 }
             }
             .navigationTitle("Add Reading")
-            .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Add") {
                         onAdd(reference, description)
                         dismiss()
@@ -2604,7 +2774,7 @@ struct ReadingPlanStatisticsView: View {
                                         .foregroundColor(.secondary)
                                 }
                                 .padding()
-                                .background(Color(.systemGray6))
+                                .background(Color.platformSystemGray6)
                                 .cornerRadius(8)
                             }
                         }
@@ -2613,9 +2783,11 @@ struct ReadingPlanStatisticsView: View {
                 }
             }
             .navigationTitle("Statistics")
-            .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -2644,7 +2816,7 @@ struct StatisticCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.platformSystemGray6)
         .cornerRadius(12)
     }
 }
@@ -2720,6 +2892,7 @@ struct PlanSettingsView: View {
     @State private var reminderEnabled = false
     @State private var reminderTime = Date()
     @State private var catchUpMode = true
+    @State private var shareWithFriends = false
     
     var body: some View {
         NavigationView {
@@ -2734,6 +2907,13 @@ struct PlanSettingsView: View {
                 Section(header: Text("Reading Options")) {
                     Toggle("Catch-Up Mode", isOn: $catchUpMode)
                     Text("When enabled, you can catch up on missed readings")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Section(header: Text("Friends")) {
+                    Toggle("Share progress with friends", isOn: $shareWithFriends)
+                    Text("When this is on, your current day and streak for this plan can appear in Faith Friends for friends and your accountability partner.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -2755,13 +2935,16 @@ struct PlanSettingsView: View {
                 }
             }
             .navigationTitle("Plan Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") {
                         plan.reminderEnabled = reminderEnabled
                         plan.reminderTime = reminderTime
                         plan.catchUpModeEnabled = catchUpMode
+                        plan.sharedWithFriends = shareWithFriends
                         
                         // Reminder functionality - will be implemented when service is available
                         // For now, just save the reminder settings
@@ -2792,6 +2975,7 @@ struct PlanSettingsView: View {
                         }
                         
                         try? modelContext.save()
+                        Task { await FirebaseSyncService.shared.syncReadingPlan(plan) }
                         dismiss()
                     }
                 }
@@ -2800,6 +2984,7 @@ struct PlanSettingsView: View {
                 reminderEnabled = plan.reminderEnabled
                 reminderTime = plan.reminderTime
                 catchUpMode = plan.catchUpModeEnabled
+                shareWithFriends = plan.sharedWithFriends
             }
         }
     }
@@ -2843,16 +3028,18 @@ struct PlanStatisticsDetailView: View {
                             Text("Average Reading Time: \(formatTime(plan.averageReadingTime))")
                         }
                         .padding()
-                        .background(Color(.systemGray6))
+                        .background(Color.platformSystemGray6)
                         .cornerRadius(12)
                     }
                     .padding()
                 }
             }
             .navigationTitle("Statistics")
-            .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+                #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .automatic) {
                     Button("Done") { dismiss() }
                 }
             }
@@ -2866,15 +3053,26 @@ struct PlanStatisticsDetailView: View {
 }
 
 // MARK: - Reading Plan Share Sheet
-struct ReadingPlanShareSheet: UIViewControllerRepresentable {
+struct ReadingPlanShareSheet: View {
     let activityItems: [Any]
-    
+    var body: some View {
+        #if os(iOS)
+        ReadingPlanShareSheet_iOS(activityItems: activityItems)
+        #elseif os(macOS)
+        MacShareSheet(shareItems: activityItems)
+        #endif
+    }
+}
+#if os(iOS)
+import UIKit
+struct ReadingPlanShareSheet_iOS: UIViewControllerRepresentable {
+    let activityItems: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
     }
-    
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
+#endif
 
 // MARK: - ReadingPlan Extensions
 @available(iOS 17.0, *)

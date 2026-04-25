@@ -48,7 +48,7 @@ struct QuickSettingsPanel: View {
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.8))
                 
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         ForEach(BroadcastStreamView_HLS.VideoFilter.allCases, id: \.self) { filter in
                             FilterButton(

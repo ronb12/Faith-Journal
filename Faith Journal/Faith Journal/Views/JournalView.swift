@@ -245,7 +245,7 @@ struct JournalEntryRow: View {
                 Spacer()
                 
                 if !entry.tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 4) {
                             ForEach(entry.tags.prefix(3), id: \.self) { tag in
                                 Text(tag)
@@ -732,8 +732,19 @@ struct NewJournalEntryView: View {
                     .foregroundColor(.primary)
             }
             
-            // Visual Mood Picker
-            ScrollView(.horizontal, showsIndicators: false) {
+            #if os(macOS)
+            // Dropdown on macOS — horizontal scroll unreliable
+            Picker("Mood", selection: $selectedMood) {
+                Text("None").tag("")
+                ForEach(moodOptions) { mood in
+                    Text("\(mood.emoji) \(mood.name)")
+                        .tag(mood.name)
+                }
+            }
+            .pickerStyle(.menu)
+            #else
+            // Visual Mood Picker on iOS
+            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                 HStack(spacing: 12) {
                     ForEach(moodOptions) { mood in
                         Button(action: {
@@ -759,6 +770,7 @@ struct NewJournalEntryView: View {
                 }
                 .padding(.horizontal, 4)
             }
+            #endif
             
             // Mood Intensity Slider (if mood selected)
             if !selectedMood.isEmpty {
@@ -797,7 +809,7 @@ struct NewJournalEntryView: View {
             
             // Tag Chips
             if !entryTags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 8) {
                         ForEach(entryTags, id: \.self) { tag in
                             HStack(spacing: 6) {
@@ -844,7 +856,21 @@ struct NewJournalEntryView: View {
                     Text("Suggestions")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    #if os(macOS)
+                    // Dropdown on macOS — horizontal scroll unreliable
+                    Menu {
+                        ForEach(suggestedTags.prefix(10), id: \.self) { tag in
+                            Button(tag) {
+                                if !entryTags.contains(tag) {
+                                    entryTags.append(tag)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Add suggested tag", systemImage: "tag.badge.plus")
+                    }
+                    #else
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(suggestedTags.prefix(5), id: \.self) { tag in
                                 Button(action: {
@@ -866,6 +892,7 @@ struct NewJournalEntryView: View {
                     }
                     .frame(height: 40)
                     .fixedSize(horizontal: false, vertical: true)
+                    #endif
                 }
             }
         }
@@ -893,7 +920,7 @@ struct NewJournalEntryView: View {
             
             // Photo Previews
             if !photoImages.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         ForEach(Array(photoImages.enumerated()), id: \.offset) { index, image in
                             ZStack(alignment: .topTrailing) {
@@ -2124,7 +2151,7 @@ struct LocationPickerView: View {
     }
 }
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct BibleVersePickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedVerse: String
@@ -2226,7 +2253,20 @@ struct BibleVersePickerView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Category Picker
-                ScrollView(.horizontal, showsIndicators: false) {
+                #if os(macOS)
+                // Dropdown on macOS — horizontal scroll unreliable
+                Picker("Category", selection: $selectedCategory) {
+                    ForEach(VerseCategory.allCases, id: \.self) { category in
+                        Text(category.rawValue).tag(category)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemBackground))
+                #else
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 12) {
                         ForEach(VerseCategory.allCases, id: \.self) { category in
                             Button(action: {
@@ -2247,6 +2287,7 @@ struct BibleVersePickerView: View {
                 }
                 .padding(.vertical, 12)
                 .background(Color(.systemBackground))
+                #endif
                 
                 // Search Bar
                 HStack {
@@ -2304,9 +2345,16 @@ struct BibleVersePickerView: View {
                         .buttonStyle(.borderedProminent)
                     }
                 }
+                #if os(macOS)
+                .scrollContentBackground(.hidden)
+                .formStyle(.grouped)
+                .padding(.horizontal, 20)
+                #endif
             }
             .navigationTitle("Add Bible Verse")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
@@ -2414,7 +2462,7 @@ struct JournalEntryDetailView: View {
                 
                 // Tags
                 if !entry.tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                         HStack(spacing: 8) {
                             ForEach(entry.tags, id: \.self) { tag in
                                 Text(tag)
@@ -2437,7 +2485,7 @@ struct JournalEntryDetailView: View {
                         
                         // Photos
                         if !entry.photoURLs.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
+                            ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                                 HStack(spacing: 8) {
                                     ForEach(entry.photoURLs, id: \.self) { url in
                                         AsyncImage(url: url) { image in
@@ -2771,7 +2819,7 @@ struct JournalSearchAndFilterBar: View {
             .cornerRadius(10)
             
             HStack {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollView(.horizontal, showsIndicators: PlatformScroll.horizontalShowsIndicators) {
                     HStack(spacing: 8) {
                         FilterChip(title: "All", isSelected: selectedFilter == .all) {
                             selectedFilter = .all

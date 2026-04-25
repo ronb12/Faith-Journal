@@ -7,8 +7,11 @@
 
 import SwiftUI
 import SwiftData
+#if os(macOS)
+import AppKit
+#endif
 
-@available(iOS 17.0, *)
+@available(iOS 17.0, macOS 14.0, *)
 struct MoodSettingsView: View {
     @AppStorage("moodReminderEnabled") private var reminderEnabled = false
     @AppStorage("moodReminderTime") private var reminderTimeData: Data = Data()
@@ -59,8 +62,12 @@ struct MoodSettingsView: View {
                     
                     Button(action: {
                         // Show Privacy Policy view
-                        if let url = URL(string: "https://faithjournal.app/privacy") {
+                        if let url = URL(string: "https://faith-journal.web.app/privacy") {
+                            #if os(iOS)
                             UIApplication.shared.open(url)
+                            #elseif os(macOS)
+                            NSWorkspace.shared.open(url)
+                            #endif
                         }
                     }) {
                         Label("Privacy Policy", systemImage: "hand.raised.fill")
@@ -68,8 +75,12 @@ struct MoodSettingsView: View {
                     
                     Button(action: {
                         // Show Terms of Service view
-                        if let url = URL(string: "https://faithjournal.app/terms") {
+                        if let url = URL(string: "https://faith-journal.web.app/terms") {
+                            #if os(iOS)
                             UIApplication.shared.open(url)
+                            #elseif os(macOS)
+                            NSWorkspace.shared.open(url)
+                            #endif
                         }
                     }) {
                         Label("Terms of Service", systemImage: "doc.text")
@@ -77,7 +88,9 @@ struct MoodSettingsView: View {
                 }
             }
             .navigationTitle("Mood Settings")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .onAppear {
                 if let decoded = try? JSONDecoder().decode(Date.self, from: reminderTimeData) {
                     reminderTime = decoded
