@@ -28,7 +28,7 @@ The current setup (`http://localhost:8080`) only works for:
 3. **Set environment variables**:
    ```bash
    heroku config:set AGORA_APP_ID=89fdd88c9b594cf0947a48a8730e5f62
-   heroku config:set AGORA_APP_CERTIFICATE=d082915a4058446e8537acf5df266736
+   heroku config:set AGORA_APP_CERTIFICATE=YOUR_AGORA_APP_CERTIFICATE
    ```
 
 4. **Deploy**:
@@ -53,7 +53,7 @@ The current setup (`http://localhost:8080`) only works for:
 4. Select your token-server directory
 5. Add environment variables:
    - `AGORA_APP_ID=89fdd88c9b594cf0947a48a8730e5f62`
-   - `AGORA_APP_CERTIFICATE=d082915a4058446e8537acf5df266736`
+   - `AGORA_APP_CERTIFICATE=YOUR_AGORA_APP_CERTIFICATE`
 6. Railway will give you a URL like: `https://your-app.railway.app`
 
 ### Option 3: Deploy to DigitalOcean App Platform

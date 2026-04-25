@@ -35,7 +35,7 @@ vercel env add AGORA_APP_ID production
 
 # Set App Certificate
 vercel env add AGORA_APP_CERTIFICATE production
-# When prompted, enter: d082915a4058446e8537acf5df266736
+# When prompted, enter: YOUR_AGORA_APP_CERTIFICATE
 ```
 
 ## Step 4: Deploy to Production

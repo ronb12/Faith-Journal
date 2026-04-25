@@ -34,7 +34,7 @@
    # Enter: 89fdd88c9b594cf0947a48a8730e5f62
    
    vercel env add AGORA_APP_CERTIFICATE
-   # Enter: d082915a4058446e8537acf5df266736
+   # Enter: YOUR_AGORA_APP_CERTIFICATE
    ```
 
 5. **Redeploy with environment variables**:
@@ -72,7 +72,7 @@
    - In Vercel dashboard → Your Project → Settings → Environment Variables
    - Add:
      - `AGORA_APP_ID` = `89fdd88c9b594cf0947a48a8730e5f62`
-     - `AGORA_APP_CERTIFICATE` = `d082915a4058446e8537acf5df266736`
+     - `AGORA_APP_CERTIFICATE` = `YOUR_AGORA_APP_CERTIFICATE`
 
 4. **Deploy**:
    - Click "Deploy"

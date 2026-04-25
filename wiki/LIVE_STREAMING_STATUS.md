@@ -23,7 +23,7 @@
 - **Status**: Deployment needs verification
 - **Environment Variables Required**:
   - `AGORA_APP_ID`: `89fdd88c9b594cf0947a48a8730e5f62`
-  - `AGORA_APP_CERTIFICATE`: `d082915a4058446e8537acf5df266736`
+  - `AGORA_APP_CERTIFICATE`: `YOUR_AGORA_APP_CERTIFICATE`
 
 **Location**: `token-server/api/agora/token.js`
 
@@ -110,7 +110,7 @@ curl -X POST https://token-server.vercel.app/api/agora/token \
 2. **Set Environment Variables in Vercel**
    - Go to Vercel Dashboard → Project Settings → Environment Variables
    - Add `AGORA_APP_ID`: `89fdd88c9b594cf0947a48a8730e5f62`
-   - Add `AGORA_APP_CERTIFICATE`: `d082915a4058446e8537acf5df266736`
+   - Add `AGORA_APP_CERTIFICATE`: `YOUR_AGORA_APP_CERTIFICATE`
 
 3. **Test Token Generation**
    - Use curl command above

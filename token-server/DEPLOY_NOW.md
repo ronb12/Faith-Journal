@@ -49,7 +49,7 @@ npm install --production
 # Create .env file
 cat > .env << 'EOF'
 AGORA_APP_ID=89fdd88c9b594cf0947a48a8730e5f62
-AGORA_APP_CERTIFICATE=d082915a4058446e8537acf5df266736
+AGORA_APP_CERTIFICATE=YOUR_AGORA_APP_CERTIFICATE
 PORT=3000
 EOF
 
@@ -97,7 +97,7 @@ cd token-server && \
 (command -v node >/dev/null || (curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs)) && \
 npm install --production && \
 echo "AGORA_APP_ID=89fdd88c9b594cf0947a48a8730e5f62
-AGORA_APP_CERTIFICATE=d082915a4058446e8537acf5df266736
+AGORA_APP_CERTIFICATE=YOUR_AGORA_APP_CERTIFICATE
 PORT=3000" > .env && \
 sudo npm install -g pm2 && \
 PORT=3000 pm2 start server.js --name agora-token-server && \
