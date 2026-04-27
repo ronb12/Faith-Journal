@@ -35,8 +35,13 @@ class FirebaseSyncService: ObservableObject {
     private var prayerRequestListener: ListenerRegistration?
     private var invitationListener: ListenerRegistration?
     private var friendSessionAlertsListener: ListenerRegistration?
+    private var prayerIntercessorAlertsListener: ListenerRegistration?
     /// Skip scheduling notifications for the first snapshot (existing alerts); only notify for new alerts.
     private var hasReceivedInitialFriendAlertsSnapshot = false
+    /// Same pattern for prayer intercessor alerts (someone prayed for you).
+    private var hasReceivedInitialPrayerIntercessorSnapshot = false
+    /// Same pattern for session invitations (avoid spamming for historical invites on first connect).
+    private var hasReceivedInitialInvitationSnapshot = false
 
     #if canImport(FirebaseAuth)
     private var authStateListenerHandle: AuthStateDidChangeListenerHandle?
@@ -190,6 +195,7 @@ class FirebaseSyncService: ObservableObject {
                 } else {
                     print("⚠️ [FIREBASE] Auth state changed: signed out")
                     self.stopListeningInternal()
+                    NotificationService.shared.cancelAdminAdMobEarningsReminder()
                     await ProfileManager.shared.refreshFirebaseAppAdminClaim()
                 }
             }
@@ -209,7 +215,11 @@ class FirebaseSyncService: ObservableObject {
         invitationListener = nil
         friendSessionAlertsListener?.remove()
         friendSessionAlertsListener = nil
+        prayerIntercessorAlertsListener?.remove()
+        prayerIntercessorAlertsListener = nil
         hasReceivedInitialFriendAlertsSnapshot = false
+        hasReceivedInitialPrayerIntercessorSnapshot = false
+        hasReceivedInitialInvitationSnapshot = false
         #endif
     }
     
@@ -722,8 +732,12 @@ class FirebaseSyncService: ObservableObject {
                 print("📥 [FIREBASE] Received \(snapshot.documentChanges.count) invitation changes")
                 // Ensure we're on MainActor for ModelContext operations
                 Task { @MainActor in
+                    let suppressInviteNotifications = !self.hasReceivedInitialInvitationSnapshot
+                    if !self.hasReceivedInitialInvitationSnapshot {
+                        self.hasReceivedInitialInvitationSnapshot = true
+                    }
                     for documentChange in snapshot.documentChanges {
-                        self.handleInvitationChange(documentChange)
+                        self.handleInvitationChange(documentChange, suppressInviteNotification: suppressInviteNotifications)
                     }
                 }
             }
@@ -758,6 +772,35 @@ class FirebaseSyncService: ObservableObject {
                             hostName: hostName,
                             sessionTitle: sessionTitle,
                             sessionId: sessionId
+                        )
+                    }
+                }
+            }
+        
+        // When a friend taps "Pray" on your shared prayer, they write users/{you}/prayerIntercessorAlerts/{prayerId}-{theirUid}
+        prayerIntercessorAlertsListener = db.collection("users").document(userId)
+            .collection("prayerIntercessorAlerts")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                if let error = error {
+                    print("❌ [FIREBASE] Prayer intercessor alerts listen error: \(error.localizedDescription)")
+                    return
+                }
+                guard let snapshot = snapshot else { return }
+                if !self.hasReceivedInitialPrayerIntercessorSnapshot {
+                    self.hasReceivedInitialPrayerIntercessorSnapshot = true
+                    return
+                }
+                for change in snapshot.documentChanges where change.type == .added {
+                    let data = change.document.data()
+                    let docId = change.document.documentID
+                    let intercessorName = data["intercessorName"] as? String ?? "A friend"
+                    let prayerId = data["prayerId"] as? String ?? ""
+                    Task { @MainActor in
+                        NotificationService.shared.schedulePrayerIntercessorNotification(
+                            intercessorName: intercessorName,
+                            prayerId: prayerId,
+                            alertDocumentId: docId
                         )
                     }
                 }
@@ -1107,6 +1150,10 @@ class FirebaseSyncService: ObservableObject {
         ]
 
         do {
+            // Refreshed token so `request.auth` in rules matches a signed-in host.
+            if let user = Auth.auth().currentUser {
+                _ = try? await user.getIDTokenResult(forcingRefresh: true)
+            }
             try await ref.setData(data, merge: true)
             print("✅ [INVITE CODE] Published invite code index: \(code)")
         } catch {
@@ -1175,7 +1222,7 @@ class FirebaseSyncService: ObservableObject {
         }
     }
 
-    /// Publish a live session for discovery/join-by-code.
+    /// Publish a live session: **public** → top-level `liveSessions` (discovery); **private** → `users/{hostId}/liveSessions` (owner-only). Thumbnail is uploaded to Storage when still local.
     func syncLiveSessionPublic(_ session: LiveSession) async {
         guard let db = db else { return }
         // Firestore rules: hostId must equal request.auth.uid (signed-in user) or 'simulator-test-user-shared'.
@@ -1187,7 +1234,15 @@ class FirebaseSyncService: ObservableObject {
             return
         }
 
-        let ref = db.collection("liveSessions").document(session.id.uuidString)
+        // Promote local file thumbnails to Storage first so merge includes `thumbnailURL` (Firestore only stores https).
+        await ensureSessionThumbnailOnCloud(session: session)
+
+        let ref: DocumentReference
+        if session.isPrivate {
+            ref = db.collection("users").document(effectiveHostId).collection("liveSessions").document(session.id.uuidString)
+        } else {
+            ref = db.collection("liveSessions").document(session.id.uuidString)
+        }
         var data: [String: Any] = [
             "id": session.id.uuidString,
             "title": session.title,
@@ -1223,12 +1278,12 @@ class FirebaseSyncService: ObservableObject {
 
         do {
             try await ref.setData(data, merge: true)
-            print("✅ [LIVE SESSION] Synced public live session: \(session.id.uuidString)")
+            print("✅ [LIVE SESSION] Synced live session (\(session.isPrivate ? "private → users/\(effectiveHostId)/liveSessions" : "public → liveSessions")): \(session.id.uuidString)")
             // Do NOT notify friends here — notify only when host actually starts the stream
             // (see startLiveStream() in LiveSessionsView), to avoid notifying for sessions
             // that were just created or updated but not yet live.
         } catch {
-            print("⚠️ [LIVE SESSION] Failed to sync public live session: \(error.localizedDescription)")
+            print("⚠️ [LIVE SESSION] Failed to sync live session to Firestore: \(error.localizedDescription)")
         }
     }
 
@@ -1252,12 +1307,17 @@ class FirebaseSyncService: ObservableObject {
             print("⚠️ [FIREBASE] Only the host can delete a session from Firebase")
             return
         }
+        let ownerFirestoreId = getCurrentUserId() ?? hostId
         do {
-            let ref = db.collection("liveSessions").document(sessionId.uuidString)
-            try await ref.delete()
+            try await db.collection("liveSessions").document(sessionId.uuidString).delete()
+        } catch {
+            print("⚠️ [FIREBASE] Delete top-level liveSessions doc (may not exist for private-only): \(error.localizedDescription)")
+        }
+        do {
+            try await db.collection("users").document(ownerFirestoreId).collection("liveSessions").document(sessionId.uuidString).delete()
             print("✅ [FIREBASE] Deleted live session from Firebase: \(sessionId.uuidString)")
         } catch {
-            print("❌ [FIREBASE] Failed to delete live session: \(error.localizedDescription)")
+            print("⚠️ [FIREBASE] Delete users/\(ownerFirestoreId)/liveSessions (may not exist): \(error.localizedDescription)")
         }
         #endif
     }
@@ -1578,6 +1638,40 @@ class FirebaseSyncService: ObservableObject {
         #endif
     }
 
+    /// Upload local `thumbnailURL` file to Storage and set `session.thumbnailURL` to https (public and private sessions). No-op when already https or missing file.
+    func ensureSessionThumbnailOnCloud(session: LiveSession) async {
+        #if canImport(FirebaseStorage)
+        guard storage != nil, FirebaseInitializer.shared.isConfigured else { return }
+        guard let raw = session.thumbnailURL?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return }
+        if raw.hasPrefix("https") { return }
+        guard let fileURL = Self.resolveLocalThumbnailFileURL(raw) else {
+            print("⚠️ [LIVE SESSION] Thumbnail not https and file missing: \(raw.prefix(100))…")
+            return
+        }
+        guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else {
+            print("⚠️ [LIVE SESSION] Could not read thumbnail bytes at \(fileURL.path)")
+            return
+        }
+        do {
+            let https = try await uploadLiveSessionThumbnail(sessionId: session.id, imageData: data)
+            session.thumbnailURL = https
+            try? modelContext?.save()
+            print("✅ [LIVE SESSION] Thumbnail uploaded (\(data.count) bytes) → Firestore sync can include thumbnailURL")
+        } catch {
+            print("⚠️ [LIVE SESSION] ensureSessionThumbnailOnCloud: \(error.localizedDescription)")
+        }
+        #endif
+    }
+
+    /// Resolves a thumbnail string to a readable local file URL (file:// or absolute path).
+    private static func resolveLocalThumbnailFileURL(_ thumbnailURLString: String) -> URL? {
+        let s = thumbnailURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.hasPrefix("https") { return nil }
+        if let u = URL(string: s), u.isFileURL, FileManager.default.fileExists(atPath: u.path) { return u }
+        if FileManager.default.fileExists(atPath: s) { return URL(fileURLWithPath: s) }
+        return nil
+    }
+
     /// Upload live session thumbnail (cover image). Returns download URL.
     func uploadLiveSessionThumbnail(sessionId: UUID, imageData: Data) async throws -> String {
         #if canImport(FirebaseStorage)
@@ -1863,7 +1957,7 @@ class FirebaseSyncService: ObservableObject {
     
     /// Handle invitation changes from Firebase
     #if canImport(FirebaseFirestore)
-    private func handleInvitationChange(_ change: DocumentChange) {
+    private func handleInvitationChange(_ change: DocumentChange, suppressInviteNotification: Bool = false) {
         guard let modelContext = modelContext else { return }
         
         let data = change.document.data()
@@ -1887,6 +1981,10 @@ class FirebaseSyncService: ObservableObject {
             } else {
                 // Create new invitation
                 createLocalInvitation(from: data, id: invitationId)
+            }
+            
+            if change.type == .added && !suppressInviteNotification {
+                scheduleSessionInviteLocalNotification(from: data)
             }
             
         case .removed:
@@ -1988,6 +2086,22 @@ class FirebaseSyncService: ObservableObject {
         try? modelContext.save()
         print("✅ [FIREBASE] Created local invitation from Firebase: \(id)")
         #endif
+    }
+    
+    /// Local notification when this user receives a new Bible study / live session invite (Firestore → users/.../sessionInvitations).
+    private func scheduleSessionInviteLocalNotification(from data: [String: Any]) {
+        let pending = SessionInvitation.InvitationStatus.pending.rawValue
+        let statusString = data["status"] as? String ?? pending
+        guard statusString == pending else { return }
+        let sessionTitle = data["sessionTitle"] as? String ?? "Live session"
+        let hostName = data["hostName"] as? String ?? "Someone"
+        let inviteCode = (data["inviteCode"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !inviteCode.isEmpty else { return }
+        NotificationService.shared.scheduleSessionInvitationNotification(
+            sessionTitle: sessionTitle,
+            hostName: hostName,
+            inviteCode: inviteCode
+        )
     }
     
     // MARK: - Prayer Requests Sync

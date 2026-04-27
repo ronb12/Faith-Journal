@@ -15,8 +15,7 @@ class BibleAPIService {
     private init() {}
     
     func fetchVerse(reference: String, version: BibleVersion) async throws -> BibleVerse {
-        // Map BibleVersion to API code
-        let versionCode = mapVersionToAPICode(version)
+        let versionCode = version.bibleAPIComTranslationCode
         let encodedReference = reference.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? reference
         let urlString = "\(baseURL)\(encodedReference)?translation=\(versionCode)"
         
@@ -110,18 +109,6 @@ class BibleAPIService {
         } catch {
             print("❌ [BibleAPIService] Network error: \(error.localizedDescription)")
             throw BibleAPIError.networkError
-        }
-    }
-    
-    private func mapVersionToAPICode(_ version: BibleVersion) -> String {
-        // bible-api.com only supports 'kjv' and 'web' translations
-        // Map other versions to the closest supported translation
-        switch version {
-        case .kjv: return "kjv"
-        case .web: return "web"
-        case .niv, .esv, .nlt, .nasb, .msg, .amp, .csb:
-            // Fallback to 'web' (World English Bible) as it's closest to modern translations
-            return "web"
         }
     }
 }

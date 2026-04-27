@@ -58,7 +58,11 @@ class AgoraService: NSObject, ObservableObject {
     /// Last time we lowered encoder tier due to network (debounce adaptive video).
     private var lastAdaptiveVideoChange: Date = .distantPast
     private var adaptiveVideoTier: Int = 0 // 0 = HD, 1 = SD, 2 = low
-    
+    /// Last view passed to `setupLocalVideo` — avoid rebinding the same UIView/NSView when SwiftUI layout calls repeatedly.
+    private weak var lastLocalVideoRenderView: AnyObject?
+    /// Incremented when local video must re-attach (e.g. presenter PIP ↔ main grid) so the grid can rebuild surfaces.
+    @Published private(set) var localVideoSurfaceEpoch: UInt = 0
+
     // MARK: - Private Properties
     #if canImport(AgoraRtcKit) || (os(macOS) && canImport(AgoraRtcKit1)) || (os(macOS) && canImport(AgoraRtcKit1))
     private var agoraKit: AgoraRtcEngineKit?
@@ -91,6 +95,19 @@ class AgoraService: NSObject, ObservableObject {
     
     private override init() {
         super.init()
+    }
+
+    /// Call when the local preview moves between UI containers (overlay PIP vs main grid). Clears the last binding, nudges the grid to recreate video views, and restarts capture if video is on.
+    func invalidateLocalVideoBinding() {
+        lastLocalVideoRenderView = nil
+        localVideoSurfaceEpoch &+= 1
+        #if canImport(AgoraRtcKit) || (os(macOS) && canImport(AgoraRtcKit1))
+        guard let kit = agoraKit else { return }
+        if isVideoEnabled {
+            kit.enableLocalVideo(true)
+            kit.startPreview()
+        }
+        #endif
     }
     
     // MARK: - Token fetch (required when Agora project has certificate enabled)
@@ -256,6 +273,7 @@ class AgoraService: NSObject, ObservableObject {
                 self.spotlightSubject = .none
                 self.adaptiveVideoTier = 0
                 self.lastAdaptiveVideoChange = .distantPast
+                self.lastLocalVideoRenderView = nil
                 print("✅ [AGORA] Left channel")
             }
             // Delay destroy so Core Audio can release the AU and avoid _auv3 != nil crash
@@ -328,23 +346,37 @@ class AgoraService: NSObject, ObservableObject {
     #if os(iOS)
     func setupLocalVideo(view: UIView) {
         #if canImport(AgoraRtcKit) || (os(macOS) && canImport(AgoraRtcKit1))
+        guard let kit = agoraKit else { return }
+        if lastLocalVideoRenderView === view { return }
         let videoCanvas = AgoraRtcVideoCanvas()
         videoCanvas.uid = 0
         videoCanvas.view = view
         videoCanvas.renderMode = .hidden
-        agoraKit?.setupLocalVideo(videoCanvas)
-        agoraKit?.startPreview()
+        kit.setupLocalVideo(videoCanvas)
+        lastLocalVideoRenderView = view
+        // When the render target changes (e.g. presenter PIP vs main grid), the SDK must resume preview
+        // or the new surface stays black. Same-view binds are skipped above, so this does not run on every layout.
+        if isVideoEnabled {
+            kit.enableLocalVideo(true)
+            kit.startPreview()
+        }
         #endif
     }
     #elseif os(macOS)
     func setupLocalVideo(view: NSView) {
         #if canImport(AgoraRtcKit) || (os(macOS) && canImport(AgoraRtcKit1))
+        guard let kit = agoraKit else { return }
+        if lastLocalVideoRenderView === view { return }
         let videoCanvas = AgoraRtcVideoCanvas()
         videoCanvas.uid = 0
         videoCanvas.view = view
         videoCanvas.renderMode = .hidden
-        agoraKit?.setupLocalVideo(videoCanvas)
-        agoraKit?.startPreview()
+        kit.setupLocalVideo(videoCanvas)
+        lastLocalVideoRenderView = view
+        if isVideoEnabled {
+            kit.enableLocalVideo(true)
+            kit.startPreview()
+        }
         #endif
     }
     #endif
@@ -585,7 +617,7 @@ extension AgoraService: AgoraRtcEngineDelegate {
     nonisolated func rtcEngine(_ engine: AgoraRtcEngineKit, reportAudioVolumeIndicationOfSpeakers speakers: [AgoraRtcAudioVolumeInfo], totalVolume: Int) {
         Task { @MainActor in
             guard !speakers.isEmpty else {
-                self.spotlightSubject = .none
+                if self.spotlightSubject != .none { self.spotlightSubject = .none }
                 return
             }
             var bestUid: UInt = 0
@@ -597,17 +629,19 @@ extension AgoraService: AgoraRtcEngineDelegate {
                 }
             }
             if bestVol < 8 {
-                self.spotlightSubject = .none
+                if self.spotlightSubject != .none { self.spotlightSubject = .none }
                 return
             }
             let local = self.localRtcUid
+            let next: AgoraSpotlightSubject
             if bestUid == 0 || (local != 0 && bestUid == local) {
-                self.spotlightSubject = .local
+                next = .local
             } else if self.remoteUsers.contains(bestUid) {
-                self.spotlightSubject = .remote(bestUid)
+                next = .remote(bestUid)
             } else {
-                self.spotlightSubject = .none
+                next = .none
             }
+            if self.spotlightSubject != next { self.spotlightSubject = next }
         }
     }
     

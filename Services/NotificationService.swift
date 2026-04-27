@@ -101,10 +101,11 @@ class NotificationService: NSObject, ObservableObject {
                 let oneTimeNotifications = notifications.filter { notification in
                     let userInfo = notification.request.content.userInfo
                     let notificationType = userInfo["type"] as? String
-                    return notificationType != "daily_prompt" && 
-                           notificationType != "devotional" && 
+                    return notificationType != "daily_prompt" &&
+                           notificationType != "devotional" &&
                            notificationType != "bible_verse" &&
-                           notificationType != "daily_reminder"
+                           notificationType != "daily_reminder" &&
+                           notificationType != "admin_admob_earnings_nudge"
                 }
                 
                 let unreadCount = oneTimeNotifications.count
@@ -187,6 +188,65 @@ class NotificationService: NSObject, ObservableObject {
             title: "Friend's Live Session",
             body: "\(hostName) started a live session: \(sessionTitle)",
             identifier: "friend-session-\(sessionId)"
+        )
+    }
+    
+    /// Local alert when a friend prays for your shared prayer (Firestore `prayerIntercessorAlerts`).
+    func schedulePrayerIntercessorNotification(intercessorName: String, prayerId: String, alertDocumentId: String) {
+        guard isAuthorized else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Someone prayed for you"
+        content.body = "\(intercessorName) prayed for your shared request."
+        content.sound = .default
+        content.badge = getNextBadgeNumber()
+        content.userInfo = [
+            "type": "prayer_intercessor",
+            "prayerId": prayerId
+        ]
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "prayer-intercessor-\(alertDocumentId)",
+            content: content,
+            trigger: trigger
+        )
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                print("Error scheduling prayer intercessor notification: \(error)")
+            }
+        }
+    }
+    
+    private static let adminAdMobEarningsReminderIdentifier = "admin-admob-earnings-weekly"
+    
+    /// Weekly local reminder for **admin accounts only** (call from More after confirming `admin` claim). Non-admins should never invoke this.
+    func scheduleAdminAdMobEarningsReminderIfNeeded() {
+        guard isAuthorized else { return }
+        cancelAdminAdMobEarningsReminder()
+        let content = UNMutableNotificationContent()
+        content.title = "AdMob earnings (admin)"
+        content.body = "Review your last 30 days: use the getAdMobEarnings callable from your admin workflow or open More for admin tools."
+        content.sound = .default
+        content.userInfo = ["type": "admin_admob_earnings_nudge"]
+        var dateComponents = DateComponents()
+        dateComponents.weekday = 2
+        dateComponents.hour = 9
+        dateComponents.minute = 0
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        let request = UNNotificationRequest(
+            identifier: Self.adminAdMobEarningsReminderIdentifier,
+            content: content,
+            trigger: trigger
+        )
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error {
+                print("Error scheduling admin AdMob reminder: \(error)")
+            }
+        }
+    }
+    
+    func cancelAdminAdMobEarningsReminder() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: [Self.adminAdMobEarningsReminderIdentifier]
         )
     }
     
@@ -362,10 +422,11 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         // Badge will only be set for one-time notifications (invitations, messages)
         // Recurring notifications (daily prompts, devotionals) won't set badge
         let userInfo = notification.request.content.userInfo
-        let isRecurring = userInfo["type"] as? String == "daily_prompt" || 
-                          userInfo["type"] as? String == "devotional" || 
+        let isRecurring = userInfo["type"] as? String == "daily_prompt" ||
+                          userInfo["type"] as? String == "devotional" ||
                           userInfo["type"] as? String == "bible_verse" ||
-                          userInfo["type"] as? String == "daily_reminder"
+                          userInfo["type"] as? String == "daily_reminder" ||
+                          userInfo["type"] as? String == "admin_admob_earnings_nudge"
         
         if isRecurring {
             // Don't show badge for recurring informational notifications
@@ -392,6 +453,10 @@ extension NotificationService: UNUserNotificationCenterDelegate {
 
             if type == "friend_request" {
                 NotificationCenter.default.post(name: NSNotification.Name("NavigateToFaithFriends"), object: nil)
+            } else if type == "prayer_intercessor" {
+                NotificationCenter.default.post(name: NSNotification.Name("NavigateToPrayer"), object: nil)
+            } else if type == "admin_admob_earnings_nudge" {
+                NotificationCenter.default.post(name: NSNotification.Name("NavigateToMore"), object: nil)
             } else if identifier.contains("session-invitation") {
                 NotificationCenter.default.post(name: NSNotification.Name("NavigateToInvitations"), object: nil)
             } else if identifier.contains("message") || identifier.contains("friend-session") {

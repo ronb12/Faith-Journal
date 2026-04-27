@@ -36,11 +36,113 @@ class DevotionalManager: ObservableObject {
     let categories = ["All", "Faith", "Hope", "Love", "Prayer", "Gratitude", "Forgiveness", "Service", "Wisdom", "Courage", "Peace", "Growth"]
     
     private var hasStartedLoading = false
+
+    private struct DevotionalSeedFile: Codable {
+        let scriptures: [String]
+        let themes: [String]
+        let prayers: [String]
+        let authors: [String]
+        let categories: [String]
+    }
+
+    private struct ReflectionsBundleFile: Codable {
+        let reflections: [String]
+    }
+
+    private func loadDevotionalSeedFileFromBundle() -> DevotionalSeedFile? {
+        guard let url = Bundle.main.url(forResource: "devotional_seeds", withExtension: "json"),
+              let data = try? Data(contentsOf: url)
+        else {
+            return nil
+        }
+
+        do {
+            return try JSONDecoder().decode(DevotionalSeedFile.self, from: data)
+        } catch {
+            #if DEBUG
+            print("Failed to decode devotional_seeds.json: \(error)")
+            #endif
+            return nil
+        }
+    }
+
+    /// 1000 unique classic reflection bodies (`reflections_1000.json`), index-aligned with `dayOffset` 0...999.
+    private func loadReflectionBodiesFromBundle() -> [String]? {
+        guard let url = Bundle.main.url(forResource: "reflections_1000", withExtension: "json"),
+              let data = try? Data(contentsOf: url)
+        else {
+            return nil
+        }
+        do {
+            let file = try JSONDecoder().decode(ReflectionsBundleFile.self, from: data)
+            guard file.reflections.count >= 1000 else { return nil }
+            return Array(file.reflections.prefix(1000))
+        } catch {
+            #if DEBUG
+            print("Failed to decode reflections_1000.json: \(error)")
+            #endif
+            return nil
+        }
+    }
+
+    /// Classic devotional shape: narrative reflection + closing prayer (verse/title already shown elsewhere in the UI).
+    private func classicDevotionalBody(reflection: String, prayer: String) -> String {
+        let trimmedReflection = reflection.trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(trimmedReflection)\n\nPrayer: \(prayer.trimmingCharacters(in: .whitespacesAndNewlines))"
+    }
+
+    #if DEBUG
+    private func debugAssertNoDuplicateDevotionals(_ devotionals: [Devotional]) {
+        func norm(_ s: String) -> String {
+            s
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .lowercased()
+        }
+
+        var seen = Set<String>()
+        for d in devotionals {
+            let key = "\(norm(d.title))|\(norm(d.scripture))|\(norm(d.content))|\(norm(d.author))"
+            if !seen.insert(key).inserted {
+                assertionFailure("Duplicate devotional detected: \(d.title)")
+                return
+            }
+        }
+    }
+    #endif
     
     private func userDefaultsKey(for date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
         return "devotional_completed_\(formatter.string(from: date))"
+    }
+    
+    private func userNoteKey(for date: Date) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
+        return "devotional_user_note_\(formatter.string(from: date))"
+    }
+    
+    func userNote(for devotional: Devotional) -> String {
+        UserDefaults.standard.string(forKey: userNoteKey(for: devotional.date)) ?? ""
+    }
+    
+    /// Persists a reflection note for this devotional. Non-empty text also marks the devotional read and done, same as Mark complete in the UI.
+    func setUserNote(_ text: String, for devotional: Devotional) {
+        UserDefaults.standard.set(text, forKey: userNoteKey(for: devotional.date))
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            setReadCompleted(true, for: devotional)
+        }
+        objectWillChange.send()
+    }
+    
+    private func setReadCompleted(_ isCompleted: Bool, for devotional: Devotional) {
+        if let index = devotionals.firstIndex(where: { $0.id == devotional.id }) {
+            guard devotionals[index].isCompleted != isCompleted else { return }
+            devotionals[index].isCompleted = isCompleted
+            saveCompletionStatus(for: devotionals[index], isCompleted: isCompleted)
+        }
     }
     
     private func loadCompletionStatus(for date: Date) -> Bool {
@@ -68,34 +170,28 @@ class DevotionalManager: ObservableObject {
     }
     
     private func preloadTodaysDevotional() {
-        let calendar = Calendar.current
         let today = Date()
+        if let generated = generate1000DevotionalsFromSeedFile(today: today),
+           let todays = generated.first {
+            devotionals = [todays]
+            return
+        }
+
+        // Fallback (should not be used once devotionals.json is in the app bundle).
         let sampleDevotionals = getSampleDevotionals()
-        guard !sampleDevotionals.isEmpty else { return }
-        
-        let dayOfYear = calendar.ordinality(of: .day, in: .year, for: today) ?? 1
-        let categories = ["Faith", "Hope", "Love", "Prayer", "Gratitude", "Forgiveness", "Service", "Wisdom", "Courage", "Peace", "Growth"]
-        let categoryIndex = (dayOfYear - 1) % categories.count
-        let sampleIndex = (dayOfYear - 1) % sampleDevotionals.count
-        
-        let baseDevotional = sampleDevotionals[sampleIndex]
-        let category = categories[categoryIndex]
-        
-        // Create today's devotional immediately
-        var todaysDevotional = Devotional(
+        guard let baseDevotional = sampleDevotionals.first else { return }
+        var fallback = Devotional(
             title: baseDevotional.title,
             scripture: baseDevotional.scripture,
             content: baseDevotional.content,
             author: baseDevotional.author,
             date: today,
-            category: category,
+            category: baseDevotional.category,
             isFavorite: false,
             isCompleted: false
         )
-        todaysDevotional.isCompleted = loadCompletionStatus(for: today)
-        
-        // Add today's devotional immediately so it shows right away
-        devotionals = [todaysDevotional]
+        fallback.isCompleted = loadCompletionStatus(for: today)
+        devotionals = [fallback]
     }
     
     func loadDevotionals() {
@@ -116,29 +212,113 @@ class DevotionalManager: ObservableObject {
     }
     
     func generate365Devotionals() -> [Devotional] {
-        // NOTE: Kept the function name for compatibility, but this now generates 1000 devotionals.
         let calendar = Calendar.current
         let today = Date()
+        // NOTE: Kept the function name for compatibility, but this now generates 1000 unique devotionals from `devotional_seeds.json`.
+        if let generated = generate1000DevotionalsFromSeedFile(today: today) {
+            return generated
+        }
+
+        // Fallback (should not be used once devotionals.json is in the app bundle).
+        return legacyGenerateFromSamples(today: today, calendar: calendar)
+    }
+
+    private func generate1000DevotionalsFromSeedFile(today: Date) -> [Devotional]? {
+        guard let seedFile = loadDevotionalSeedFileFromBundle(),
+              let reflectionBodies = loadReflectionBodiesFromBundle(),
+              reflectionBodies.count == 1000,
+              !seedFile.scriptures.isEmpty,
+              !seedFile.themes.isEmpty,
+              !seedFile.prayers.isEmpty,
+              !seedFile.authors.isEmpty,
+              !seedFile.categories.isEmpty
+        else {
+            return nil
+        }
+
+        let calendar = Calendar.current
+        var devotionals: [Devotional] = []
+        devotionals.reserveCapacity(1000)
+
+        // Use relatively prime steps so we mix the source lists well without repeating the same tuples.
+        let scriptureStep = 37
+        let themeStep = 53
+        let prayerStep = 89
+        let authorStep = 13
+        let categoryStep = 19
+
+        for dayOffset in 0..<1000 {
+            guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
+
+            let s = seedFile.scriptures[(dayOffset * scriptureStep) % seedFile.scriptures.count]
+            let theme = seedFile.themes[(dayOffset * themeStep) % seedFile.themes.count]
+            let reflection = reflectionBodies[dayOffset]
+            let prayer = seedFile.prayers[(dayOffset * prayerStep) % seedFile.prayers.count]
+            let author = seedFile.authors[(dayOffset * authorStep) % seedFile.authors.count]
+            let category = seedFile.categories[(dayOffset * categoryStep) % seedFile.categories.count]
+
+            let dayNumber = dayOffset + 1
+            let title = "Day \(dayNumber) — \(theme)"
+            let content = classicDevotionalBody(reflection: reflection, prayer: prayer)
+
+            // Stable UUID derived from the day number (good enough to stay stable across installs/builds).
+            let uuid = UUID(uuidString: String(format: "00000000-0000-0000-0000-%012X", dayNumber)) ?? UUID()
+
+            var devotional = Devotional(
+                id: uuid,
+                title: title,
+                scripture: s,
+                content: content,
+                author: author,
+                date: date,
+                category: category,
+                isFavorite: false,
+                isCompleted: false
+            )
+            devotional.isCompleted = loadCompletionStatus(for: date)
+            devotionals.append(devotional)
+        }
+
+        let sorted = devotionals.sorted { $0.date > $1.date }
+
+        #if DEBUG
+        debugAssertUniqueReflectionBodies(reflectionBodies)
+        debugAssertNoDuplicateDevotionals(sorted)
+        #endif
+
+        return sorted
+    }
+
+    #if DEBUG
+    private func debugAssertUniqueReflectionBodies(_ bodies: [String]) {
+        var seen = Set<String>()
+        for (i, b) in bodies.enumerated() {
+            let key = b.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if !seen.insert(key).inserted {
+                assertionFailure("Duplicate reflection body at index \(i)")
+                return
+            }
+        }
+    }
+    #endif
+
+    private func legacyGenerateFromSamples(today: Date, calendar: Calendar) -> [Devotional] {
         var allDevotionals: [Devotional] = []
-        allDevotionals.reserveCapacity(1000) // Pre-allocate for better performance
-        
-        // Get sample devotionals as templates
+        allDevotionals.reserveCapacity(1000)
+
         let sampleDevotionals = getSampleDevotionals()
         guard !sampleDevotionals.isEmpty else { return [] }
-        
         let categories = ["Faith", "Hope", "Love", "Prayer", "Gratitude", "Forgiveness", "Service", "Wisdom", "Courage", "Peace", "Growth"]
-        
-        // Generate 1000 devotionals (cycling through samples)
+
         for dayOffset in 0..<1000 {
             guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
             let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
             let categoryIndex = (dayOfYear - 1) % categories.count
             let sampleIndex = (dayOfYear - 1) % sampleDevotionals.count
-            
+
             let baseDevotional = sampleDevotionals[sampleIndex]
             let category = categories[categoryIndex]
-            
-            // Create variation of devotional for this day
+
             var devotional = Devotional(
                 title: baseDevotional.title,
                 scripture: baseDevotional.scripture,
@@ -152,8 +332,7 @@ class DevotionalManager: ObservableObject {
             devotional.isCompleted = loadCompletionStatus(for: date)
             allDevotionals.append(devotional)
         }
-        
-        // Sort by date (newest first)
+
         return allDevotionals.sorted { $0.date > $1.date }
     }
     
@@ -461,8 +640,7 @@ class DevotionalManager: ObservableObject {
     func markAsCompleted(_ devotional: Devotional) {
         if let index = devotionals.firstIndex(where: { $0.id == devotional.id }) {
             let newStatus = !devotionals[index].isCompleted
-            devotionals[index].isCompleted = newStatus
-            saveCompletionStatus(for: devotionals[index], isCompleted: newStatus)
+            setReadCompleted(newStatus, for: devotionals[index])
             objectWillChange.send()
         }
     }

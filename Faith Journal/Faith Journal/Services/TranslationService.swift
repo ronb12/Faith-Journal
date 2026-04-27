@@ -7,13 +7,9 @@
 //
 //  ✅ CONFIRMED: Uses iOS Native Translation APIs
 //  - Language Detection: NLLanguageRecognizer (iOS 12+, Natural Language framework)
-//  - Translation: TranslationSession (iOS 18.0+, Translation framework)
+//  - Programmatic translation: TranslationSession(installedSource:target:) — iOS 26+ (SDK 26+)
+//  (SwiftUI .translationTask is the non–iOS-26 path in views; not used here.)
 //  Both use Apple's native translation infrastructure - no third-party APIs
-//  
-//  Translation API:
-//  - Language Detection: NLLanguageRecognizer (iOS 12+) - ✅ iOS Native
-//  - Translation: TranslationSession (iOS 18.0+) - ✅ iOS Native
-//  Both use Apple's native translation infrastructure
 //
 
 import Foundation
@@ -90,7 +86,7 @@ class TranslationService: ObservableObject {
             return text
         }
         
-        // Use iOS native translation (Translation framework available in iOS 17.4+)
+        // Use iOS native translation when the OS supports it (see translateWithNLLanguageTranslator)
         return await translateWithNLLanguageTranslator(
             text: text,
             from: detectedSource,
@@ -100,39 +96,23 @@ class TranslationService: ObservableObject {
     
     @available(iOS 15.0, *)
     private func translateWithNLLanguageTranslator(text: String, from sourceLanguage: String, to targetLanguage: String) async -> String? {
-        // Use iOS native Translation framework (TranslationSession available in iOS 18.0+)
-        // This uses Apple's native translation engine - same as iOS system-wide translation
-        if #available(iOS 18.0, *) {
+        // Non-UI TranslationSession.init(installedSource:target:) is iOS 26+ in the current SDK.
+        // (SwiftUI .translationTask remains the path on iOS 18–25 in views.)
+        if #available(iOS 26.0, *) {
             return await translateWithTranslationSession(text: text, from: sourceLanguage, to: targetLanguage)
         }
-        
-        // Fallback for iOS < 18.0: iOS does not have native translation API for developers
-        // Note: iOS 15-17.x does not have native translation API for developers
-        // For iOS < 18.0, you would need to use third-party services like Google ML Kit
         print("ℹ️ Translation requested: \(sourceLanguage) → \(targetLanguage)")
-        print("⚠️ iOS 18.0+ required for native TranslationSession API.")
-        print("💡 Translation feature requires iOS 18.0+. Upgrade deployment target or use third-party service.")
+        print("⚠️ Programmatic native translation requires iOS 26.0+.")
         return nil
     }
     
-    // iOS native translation using Translation framework
-    // Note: TranslationSession API availability varies by SDK version.
-    // - iOS 26+: TranslationSession(installedSource:target:) for programmatic use
-    // - iOS 18-25: Session only available via SwiftUI .translationTask modifier (no programmatic init)
+    /// iOS 26+ programmatic translation (see TranslationSession.init(installedSource:target:)).
+    @available(iOS 26.0, *)
     private func translateWithTranslationSession(text: String, from sourceLanguage: String, to targetLanguage: String) async -> String? {
         #if canImport(Translation) && os(iOS)
-        // TranslationSession(installedSource:target:) is available in iOS 26.0+
-        guard #available(iOS 26.0, *) else {
-            print("⚠️ Programmatic TranslationSession requires iOS 26.0+ (use SwiftUI .translationTask for iOS 18-25)")
-            return nil
-        }
-        // Convert language codes to Locale.Language
         let sourceLang = Locale.Language(identifier: sourceLanguage)
         let targetLang = Locale.Language(identifier: targetLanguage)
-
-        // Create translation session using iOS native Translation framework
         let session = TranslationSession(installedSource: sourceLang, target: targetLang)
-
         do {
             try await session.prepareTranslation()
             let response = try await session.translate(text)

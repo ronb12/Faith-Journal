@@ -34,6 +34,7 @@
 		2ABE1C5F88D9369CD66AB54E /* LiveStreamOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 646161915C60EBE44630F04C /* LiveStreamOverlay.swift */; };
 		2DB19F674BD18CF52AE06598 /* Faith Journal/Faith Journal/Views/BackupRestoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DAB8D641CB8E89E55A6CE6E /* Faith Journal/Faith Journal/Views/BackupRestoreView.swift */; };
 		2DBE17981777202DBBE4D14A /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDCE707BDDE000C541F10113 /* HomeView.swift */; };
+		2DBE179B177702DBBE4D14C /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F3E2D1C0B4A596877869501 /* NotificationsView.swift */; };
 		2E5D246DE35537BEF1731AFC /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AC65BF2FA58E2257A9F2EBC /* PrivacyPolicyView.swift */; };
 		2FEC5FCBE46897CD6FA358CC /* LiveSessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A7C458690928AB05BBFCE87 /* LiveSessionsView.swift */; };
 		2FFF4C42C3637FC50B6A650F /* BibleNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87E9813A163ED6E3E64FB6CB /* BibleNote.swift */; };
@@ -55,8 +56,6 @@
 		47C014792F5F1108002798CF /* MultiParticipantStreamView_Agora.swift in Sources */ = {isa = PBXBuildFile; fileRef = AgoraMP1A2B3C4D5E6F78901 /* MultiParticipantStreamView_Agora.swift */; };
 		47C0147A2F5F1108002798CF /* AgoraVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AgoraVid1A2B3C4D5E6F78901 /* AgoraVideoView.swift */; };
 		47E9027F2F40FF87005D5C78 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 47E9027E2F40FF87005D5C78 /* GoogleMobileAds */; };
-		LKIOSBLD001A2B3C4D5E6F78 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = LKIOSPROD001A2B3C4D5E6F78 /* LiveKit */; };
-		LKMACBLD001A2B3C4D5E6F78 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = LKMACPROD001A2B3C4D5E6F78 /* LiveKit */; };
 		47E90A452F415976005D5C78 /* AchievementService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CB14EFEC77C1A182190C18B /* AchievementService.swift */; };
 		47E90A462F415976005D5C78 /* AchievementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2623B8EF0044708853AF329 /* AchievementsView.swift */; };
 		47E90A472F415976005D5C78 /* ActivityHeatmapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0AD9DA20ACB0A80202E156 /* ActivityHeatmapView.swift */; };
@@ -109,7 +108,6 @@
 		47E90A762F415976005D5C78 /* FirebaseSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FEE59F4458177ADE2585EB /* FirebaseSyncService.swift */; };
 		47E90A772F415976005D5C78 /* GlobalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D5DE5DFCE5B314F8157F6C /* GlobalSearchView.swift */; };
 		47E90A782F415976005D5C78 /* HLSStreamingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC74FA360CAD116395D920D /* HLSStreamingService.swift */; };
-		F1A2B3C4D5E6F789A0B1C2D4 /* LiveStreamChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F789A0B1C2D3 /* LiveStreamChatService.swift */; };
 		47E90A792F415976005D5C78 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDCE707BDDE000C541F10113 /* HomeView.swift */; };
 		47E90A7A2F415976005D5C78 /* InvitationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0FCB98537F4343E93590956 /* InvitationsView.swift */; };
 		47E90A7B2F415976005D5C78 /* InviteCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EE7415E2DA6F13844D41530 /* InviteCodeView.swift */; };
@@ -210,6 +208,8 @@
 		47E90ADA2F415976005D5C78 /* Faith Journal/Faith Journal/Views/WaitingRoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27187DE146BD87E8036417E /* Faith Journal/Faith Journal/Views/WaitingRoomView.swift */; };
 		47E90ADB2F415976005D5C78 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74ACDA599C4EE65FC1EE44A4 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift */; };
 		47E90ADC2F415976005D5C78 /* Faith Journal/Faith Journal/Views/TranslationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F754A20131D82D75448DD6D7 /* Faith Journal/Faith Journal/Views/TranslationSettingsView.swift */; };
+		47E90AED2F415976005D5C78 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7F3E2D1C0B4A596877869501 /* NotificationsView.swift */; };
+		47E90B002F415976005D5C78 /* AdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2B3C44E5F6700AB12EF01 /* AdminService.swift */; };
 		481506644DF74BBBE298EE13 /* JitsiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6E6CF9FCBBA78F5CD6A40E /* JitsiService.swift */; };
 		4B9586561B27DF7C55C84A76 /* Faith Journal/Faith Journal/Services/SessionRecommendationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ED6180D8AE480AE265FE28A /* Faith Journal/Faith Journal/Services/SessionRecommendationService.swift */; };
 		4D267098F58C713D377181D7 /* Subscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004866F3B0FA3F5C8BBC11B0 /* Subscription.swift */; };
@@ -218,8 +218,6 @@
 		51185B6C3D50D36C010DD340 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74ACDA599C4EE65FC1EE44A4 /* Faith Journal/Faith Journal/Views/SessionClipsView.swift */; };
 		51D3F828E570BC235A28EAAA /* BibleVerseOfTheDayManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27E690FAE4D439DB5D357FCC /* BibleVerseOfTheDayManager.swift */; };
 		549264D4E8FE690D3BE5839E /* Faith_JournalApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E98D132390BD4690EB7FE3B6 /* Faith_JournalApp.swift */; };
-		B1D51F000123456789ABCED0 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D51F000123456789ABCDEF /* BuildInfo.swift */; };
-		B1D51F000123456789ABCED1 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D51F000123456789ABCDEF /* BuildInfo.swift */; };
 		56D2B56FD4E2CE54CAB8D525 /* BibleVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8382F0FB32FE7E0B6AECED99 /* BibleVersion.swift */; };
 		583A473672C06E1823020B7A /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D213A1C588B1D051C1DAE6DB /* AppRootView.swift */; };
 		59FA941D335F9E285999D977 /* BibleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8FF5CA810DAA7C11109229C /* BibleViewModel.swift */; };
@@ -241,6 +239,7 @@
 		73F361624C821A3C94B6A621 /* PromptPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C58E4AF0E9CB9C01C773502B /* PromptPickerView.swift */; };
 		780B680EDA62A0CDC0BC31E1 /* MoodReminderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFD244AC4CA73726509FDB7C /* MoodReminderService.swift */; };
 		7A310EFE99B2C8E6BDB54635 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80EFFE2C3DC6DAD57BA28A43 /* NotificationService.swift */; };
+		7A310F0099B2C8E6BDB54640 /* AdminService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1D2B3C44E5F6700AB12EF01 /* AdminService.swift */; };
 		7C979B92CD33F83EF48BCF09 /* BibleStudyTopic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491396DC4872AB7CCE7B682D /* BibleStudyTopic.swift */; };
 		7DE3D2E2AFAF2880699FF1ED /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADAB7FD4DD6098986947D56 /* SearchView.swift */; };
 		7F127B975D356A5C9F735A7E /* BibleStudyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E496E94EBCD8F251F55E54 /* BibleStudyView.swift */; };
@@ -278,6 +277,8 @@
 		AgoraVid2B3C4D5E6F78901234 /* AgoraVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AgoraVid1A2B3C4D5E6F78901 /* AgoraVideoView.swift */; };
 		B082A4C0FBA249008597EF5F /* ActivityHeatmapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B0AD9DA20ACB0A80202E156 /* ActivityHeatmapView.swift */; };
 		B1A2C3D4E5F6789012345670 /* BannerAdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A3C4D5E6F7890123456781 /* BannerAdView.swift */; };
+		B1D51F000123456789ABCED0 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D51F000123456789ABCDEF /* BuildInfo.swift */; };
+		B1D51F000123456789ABCED1 /* BuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D51F000123456789ABCDEF /* BuildInfo.swift */; };
 		B50EB3F12852B5646C7807BF /* Faith Journal/Faith Journal/Utils/BibleBooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DB8DAAE69AE35C697A8B52A /* Faith Journal/Faith Journal/Utils/BibleBooks.swift */; };
 		B86A736F0E0171BA43F7F541 /* MultiParticipantStreamView_Jitsi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2ABE3BEFEC6ED5ED3BC14373 /* MultiParticipantStreamView_Jitsi.swift */; };
 		B8B126C64735A5FAB88BF8AF /* BroadcastSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF40C7771944950F0A37690 /* BroadcastSettingsView.swift */; };
@@ -294,9 +295,10 @@
 		C566DCE7F2B68D07B21B8E78 /* BibleStudyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1740951ABBBA97FC045612A4 /* BibleStudyService.swift */; };
 		C60D0AFA1414A3AD3213E356 /* StatisticsExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D21190362E59EF02DC1803E9 /* StatisticsExportView.swift */; };
 		C79B527CAD7E4E6E8B9F36F9 /* Faith Journal/Faith Journal/Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D3CBB44A7DC0A47A4E33C3A5 /* Faith Journal/Faith Journal/Resources/Assets.xcassets */; };
+		C7D0B0B12C0D5F6A00A1B2C3 /* Faith Journal/Faith Journal/Resources/devotional_seeds.json in Resources */ = {isa = PBXBuildFile; fileRef = C7D0B0B02C0D5F6A00A1B2C3 /* Faith Journal/Faith Journal/Resources/devotional_seeds.json */; };
+		D7E0B0B12C0D5F6A00A1B2C3 /* Faith Journal/Faith Journal/Resources/reflections_1000.json in Resources */ = {isa = PBXBuildFile; fileRef = D7E0B0B02C0D5F6A00A1B2C3 /* Faith Journal/Faith Journal/Resources/reflections_1000.json */; };
 		C969B3092B8A7073E890F4E6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E38553C8FE57FDC4AD3ED61 /* ContentView.swift */; };
 		CBB4C25C9E50404BC1866627 /* HLSStreamingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC74FA360CAD116395D920D /* HLSStreamingService.swift */; };
-		F1A2B3C4D5E6F789A0B1C2D6 /* LiveStreamChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F789A0B1C2D3 /* LiveStreamChatService.swift */; };
 		CC7FD4676DD5751DB74A5B17 /* StreamModerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46F4B6AA049DD0353F7CEA6 /* StreamModerationService.swift */; };
 		D038315AA24C851C4FC4D0C9 /* MoodExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6468201BABC215111936F44 /* MoodExportService.swift */; };
 		D07A683943F1CA2DB1860CAE /* WebRTCSignalingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB10659643D6EFB0F953F03A /* WebRTCSignalingService.swift */; };
@@ -313,6 +315,12 @@
 		DFC73DA0DFE169A8D19E7D9A /* BroadcastStreamView_LiveKit_Stub.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2907E882F0F8796787622F4 /* BroadcastStreamView_LiveKit_Stub.swift */; };
 		E00291AEFBD499DDA4F7BF98 /* StreamRecordingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21FE46CF25E61EB9F1380AF /* StreamRecordingService.swift */; };
 		E1759D86F5D5CEF6F2953E06 /* MultiParticipantStreamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F134623DA8BF9B931072221 /* MultiParticipantStreamView.swift */; };
+		E1F1000DB2C34D5E6F78901A01 /* Faith_JournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F1000BB2C34D5E6F78901A01 /* Faith_JournalTests.swift */; };
+		E1F1000EB2C34D5E6F78901A01 /* CoreFunctionalityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F1000CB2C34D5E6F78901A01 /* CoreFunctionalityTests.swift */; };
+		E1F2000EB2C34D5E6F78901A01 /* Faith_JournalUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2000BB2C34D5E6F78901A01 /* Faith_JournalUITests.swift */; };
+		E1F2000FB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2000CB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift */; };
+		E1F20010B2C34D5E6F78901A01 /* LiveStreamingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2000DB2C34D5E6F78901A01 /* LiveStreamingUITests.swift */; };
+		E1F20014B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F20013B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift */; };
 		E3B55FAB2E85F8DD175B2FE7 /* MoodSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422F94095D028BCEACE40101 /* MoodSettingsView.swift */; };
 		E4F239F32D301F0429ED4AD0 /* InviteUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54930461BCFE5AC38544443 /* InviteUsersView.swift */; };
 		E5DBAD13258EFEB0A702222F /* StatisticsInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37ABBCA50341AE78CF1542D7 /* StatisticsInsightsView.swift */; };
@@ -321,6 +329,8 @@
 		ECBDCE3C5855BA3370F2DE4A /* QRCodeScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD81B918E8F6E6CC3570889 /* QRCodeScannerView.swift */; };
 		ED1ED22CB27F239B6EEC5EBC /* ReadingPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31F2A56D2F490EB7B911E9B /* ReadingPlan.swift */; };
 		EE164B54E2D47E63D5AD698F /* Faith Journal/Faith Journal/Utils/AppStoreHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72F6F852E29DDB0C2FD1083 /* Faith Journal/Faith Journal/Utils/AppStoreHelper.swift */; };
+		F1A2B3C4D5E6F789A0B1C2D4 /* LiveStreamChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F789A0B1C2D3 /* LiveStreamChatService.swift */; };
+		F1A2B3C4D5E6F789A0B1C2D6 /* LiveStreamChatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F789A0B1C2D3 /* LiveStreamChatService.swift */; };
 		F2F5B68A5A78B6D96382143A /* InvitationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0FCB98537F4343E93590956 /* InvitationsView.swift */; };
 		F35072122AF33C7506D59949 /* MoodGoalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF6A76A294068A9744832C99 /* MoodGoalsView.swift */; };
 		F35A763681152FD5EC236BD0 /* FirebaseSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49FEE59F4458177ADE2585EB /* FirebaseSyncService.swift */; };
@@ -334,6 +344,8 @@
 		FA1THF4END000000000004 /* FaithFriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1THF2END000000000002 /* FaithFriendsView.swift */; };
 		FAD0EA6A5E329B0A0A3D455C /* Faith Journal/Faith Journal/Services/PresentationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD0EA6A5E329B0A0A3D455B /* Faith Journal/Faith Journal/Services/PresentationService.swift */; };
 		FUNC1A2B3C4D5E6F78901234 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = FUNC2A2B3C4D5E6F78901235 /* FirebaseFunctions */; };
+		LKIOSBLD001A2B3C4D5E6F78 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = LKIOSPROD001A2B3C4D5E6F78 /* LiveKit */; };
+		LKMACBLD001A2B3C4D5E6F78 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = LKMACPROD001A2B3C4D5E6F78 /* LiveKit */; };
 		MAC001A2B3C4D5E6F789012345 /* Faith_JournalApp_Mac.swift in Sources */ = {isa = PBXBuildFile; fileRef = MAC002A2B3C4D5E6F789012345 /* Faith_JournalApp_Mac.swift */; };
 		MAC005A2B3C4D5E6F789012348 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 7D1399874EFA5C591677ED1F /* FirebaseAuth */; };
 		MAC006A2B3C4D5E6F789012349 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = FAD0B24B73963064C38A57E4 /* FirebaseFirestore */; };
@@ -350,12 +362,6 @@
 		RECFEED1A2B3C4D5E6F78901 /* RecordingCaptureFeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = RECFEED2A2B3C4D5E6F78902 /* RecordingCaptureFeeder.swift */; };
 		RECFEED3A2B3C4D5E6F78903 /* RecordingCaptureFeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = RECFEED2A2B3C4D5E6F78902 /* RecordingCaptureFeeder.swift */; };
 		RWD002A2B3C4D5E6F7890123457 /* Faith Journal/Faith Journal/Services/RewardedInterstitialManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = RWD001A2B3C4D5E6F7890123456 /* Faith Journal/Faith Journal/Services/RewardedInterstitialManager.swift */; };
-		E1F1000DB2C34D5E6F78901A01 /* Faith_JournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F1000BB2C34D5E6F78901A01 /* Faith_JournalTests.swift */; };
-		E1F1000EB2C34D5E6F78901A01 /* CoreFunctionalityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F1000CB2C34D5E6F78901A01 /* CoreFunctionalityTests.swift */; };
-		E1F2000EB2C34D5E6F78901A01 /* Faith_JournalUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2000BB2C34D5E6F78901A01 /* Faith_JournalUITests.swift */; };
-		E1F2000FB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2000CB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift */; };
-		E1F20010B2C34D5E6F78901A01 /* LiveStreamingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2000DB2C34D5E6F78901A01 /* LiveStreamingUITests.swift */; };
-		E1F20014B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F20013B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -375,19 +381,6 @@
 		};
 /* End PBXContainerItemProxy section */
 
-/* Begin PBXTargetDependency section */
-		E1F10009B2C34D5E6F78901A01 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 0667FA2AE1ED61C1EDAFC816 /* Faith Journal */;
-			targetProxy = E1F1000AB2C34D5E6F78901A01 /* PBXContainerItemProxy */;
-		};
-		E1F20009B2C34D5E6F78901A01 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 0667FA2AE1ED61C1EDAFC816 /* Faith Journal */;
-			targetProxy = E1F2000AB2C34D5E6F78901A01 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
 /* Begin PBXFileReference section */
 		0029F6E58EE426FE0659B58F /* BibleAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleAPIService.swift; sourceTree = "<group>"; };
 		004866F3B0FA3F5C8BBC11B0 /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
@@ -404,7 +397,6 @@
 		1ADAB7FD4DD6098986947D56 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		1B59451B4CF4CF7402D5F26F /* StreamingConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingConfig.swift; sourceTree = "<group>"; };
 		1CC74FA360CAD116395D920D /* HLSStreamingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSStreamingService.swift; sourceTree = "<group>"; };
-		F1A2B3C4D5E6F789A0B1C2D3 /* LiveStreamChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamChatService.swift; sourceTree = "<group>"; };
 		1ED6180D8AE480AE265FE28A /* Faith Journal/Faith Journal/Services/SessionRecommendationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/SessionRecommendationService.swift"; sourceTree = SOURCE_ROOT; };
 		22306A16B1C3A2333D3CB66F /* Faith Journal/Faith Journal/Services/StreamAnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/StreamAnalyticsService.swift"; sourceTree = SOURCE_ROOT; };
 		25FFA403D0B9D6A3FEC0659F /* LiveSessionParticipant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSessionParticipant.swift; sourceTree = "<group>"; };
@@ -488,9 +480,11 @@
 		9B0AD9DA20ACB0A80202E156 /* ActivityHeatmapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHeatmapView.swift; sourceTree = "<group>"; };
 		9BD81B918E8F6E6CC3570889 /* QRCodeScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCodeScannerView.swift; sourceTree = "<group>"; };
 		9F9726524F77A08E7400CD10 /* ProfileEditView.swift.backup */ = {isa = PBXFileReference; lastKnownFileType = text; path = ProfileEditView.swift.backup; sourceTree = "<group>"; };
+		A1D2B3C44E5F6700AB12EF01 /* AdminService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminService.swift; sourceTree = "<group>"; };
 		A27187DE146BD87E8036417E /* Faith Journal/Faith Journal/Views/WaitingRoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Views/WaitingRoomView.swift"; sourceTree = SOURCE_ROOT; };
 		A2D11667E0B677E86EBE9B4C /* Faith Journal/Faith Journal/Utils/AppNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/AppNavigation.swift"; sourceTree = SOURCE_ROOT; };
 		A474FB4A82FCD0C304CF2D73 /* DocumentPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPickerView.swift; sourceTree = "<group>"; };
+		A7F3E2D1C0B4A596877869501 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		A81C7F4F3778C29EE2325210 /* ProfileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManager.swift; sourceTree = "<group>"; };
 		ADDAF280A3DA5DBEB4290380 /* Faith Journal/Faith Journal/Utils/AccessibilityHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Utils/AccessibilityHelpers.swift"; sourceTree = SOURCE_ROOT; };
 		ADDBCCD17840DF2D8B4B8E62 /* StreamHighlightsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamHighlightsService.swift; sourceTree = "<group>"; };
@@ -498,6 +492,7 @@
 		AgoraSvc1A2B3C4D5E6F78901 /* AgoraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraService.swift; sourceTree = "<group>"; };
 		AgoraVid1A2B3C4D5E6F78901 /* AgoraVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgoraVideoView.swift; sourceTree = "<group>"; };
 		B0D47B32F1BA492353C4CF6E /* BibleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibleView.swift; sourceTree = "<group>"; };
+		B1D51F000123456789ABCDEF /* BuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInfo.swift; sourceTree = "<group>"; };
 		B21FE46CF25E61EB9F1380AF /* StreamRecordingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamRecordingService.swift; sourceTree = "<group>"; };
 		B2A3C4D5E6F7890123456781 /* BannerAdView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BannerAdView.swift; sourceTree = "<group>"; };
 		B33069E8E48C91F19D894E59 /* FilterChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterChip.swift; sourceTree = "<group>"; };
@@ -524,6 +519,8 @@
 		D213A1C588B1D051C1DAE6DB /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		D2147F566944567A45E1AE2B /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		D3CBB44A7DC0A47A4E33C3A5 /* Faith Journal/Faith Journal/Resources/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Faith Journal/Faith Journal/Resources/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
+		C7D0B0B02C0D5F6A00A1B2C3 /* Faith Journal/Faith Journal/Resources/devotional_seeds.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "Faith Journal/Faith Journal/Resources/devotional_seeds.json"; sourceTree = SOURCE_ROOT; };
+		D7E0B0B02C0D5F6A00A1B2C3 /* Faith Journal/Faith Journal/Resources/reflections_1000.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "Faith Journal/Faith Journal/Resources/reflections_1000.json"; sourceTree = SOURCE_ROOT; };
 		D6B981BA66FC01F2CD3AA741 /* StatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		D7D040269085A86E2F6ABBAE /* JournalPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalPrompt.swift; sourceTree = "<group>"; };
 		D8F9262008FC985C657F058C /* Faith Journal/Faith Journal/Services/BackupRestoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/BackupRestoreService.swift"; sourceTree = SOURCE_ROOT; };
@@ -533,16 +530,24 @@
 		DC294AD9641F2553CF66C640 /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
 		DD93A719C84A27F719F59321 /* BroadcastStreamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastStreamView.swift; sourceTree = "<group>"; };
 		E030442D534B6B898DBE2042 /* Faith Journal/Faith Journal/Models/SessionRating.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Models/SessionRating.swift"; sourceTree = SOURCE_ROOT; };
+		E1F10002B2C34D5E6F78901A01 /* Faith JournalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Faith JournalTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1F1000BB2C34D5E6F78901A01 /* Faith_JournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faith_JournalTests.swift; sourceTree = "<group>"; };
+		E1F1000CB2C34D5E6F78901A01 /* CoreFunctionalityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreFunctionalityTests.swift; sourceTree = "<group>"; };
+		E1F20002B2C34D5E6F78901A01 /* Faith JournalUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Faith JournalUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1F2000BB2C34D5E6F78901A01 /* Faith_JournalUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faith_JournalUITests.swift; sourceTree = "<group>"; };
+		E1F2000CB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faith_JournalUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		E1F2000DB2C34D5E6F78901A01 /* LiveStreamingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamingUITests.swift; sourceTree = "<group>"; };
+		E1F20013B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarFeaturesUITests.swift; sourceTree = "<group>"; };
 		E46F4B6AA049DD0353F7CEA6 /* StreamModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamModerationService.swift; sourceTree = "<group>"; };
 		E54930461BCFE5AC38544443 /* InviteUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteUsersView.swift; sourceTree = "<group>"; };
 		E90C128D8CE56FE3F69E79A4 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
-		B1D51F000123456789ABCDEF /* BuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInfo.swift; sourceTree = "<group>"; };
 		E98D132390BD4690EB7FE3B6 /* Faith_JournalApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faith_JournalApp.swift; sourceTree = "<group>"; };
 		EE108C2D0962818131D2B221 /* MoodGoal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodGoal.swift; sourceTree = "<group>"; };
 		EED03DE5CDBE1BC576BEBF1B /* MoodEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodEntry.swift; sourceTree = "<group>"; };
 		EF6A76A294068A9744832C99 /* MoodGoalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodGoalsView.swift; sourceTree = "<group>"; };
 		F0FCB98537F4343E93590956 /* InvitationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvitationsView.swift; sourceTree = "<group>"; };
 		F172D8247D6B5811ADC5C874 /* HLSStreamingService.swift.backup */ = {isa = PBXFileReference; lastKnownFileType = text; path = HLSStreamingService.swift.backup; sourceTree = "<group>"; };
+		F1A2B3C4D5E6F789A0B1C2D3 /* LiveStreamChatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamChatService.swift; sourceTree = "<group>"; };
 		F1B1040C11D5AF9A43E07005 /* Faith Journal/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Faith Journal/Info.plist"; sourceTree = SOURCE_ROOT; };
 		F2907E882F0F8796787622F4 /* BroadcastStreamView_LiveKit_Stub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BroadcastStreamView_LiveKit_Stub.swift; sourceTree = "<group>"; };
 		F31F2A56D2F490EB7B911E9B /* ReadingPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingPlan.swift; sourceTree = "<group>"; };
@@ -567,17 +572,23 @@
 		PUSH9A2B3C4D5E6F78901234 /* PushNotificationAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationAppDelegate.swift; sourceTree = "<group>"; };
 		RECFEED2A2B3C4D5E6F78902 /* RecordingCaptureFeeder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingCaptureFeeder.swift; sourceTree = "<group>"; };
 		RWD001A2B3C4D5E6F7890123456 /* Faith Journal/Faith Journal/Services/RewardedInterstitialManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Faith Journal/Faith Journal/Services/RewardedInterstitialManager.swift"; sourceTree = SOURCE_ROOT; };
-		E1F10002B2C34D5E6F78901A01 /* Faith JournalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Faith JournalTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E1F1000BB2C34D5E6F78901A01 /* Faith_JournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faith_JournalTests.swift; sourceTree = "<group>"; };
-		E1F1000CB2C34D5E6F78901A01 /* CoreFunctionalityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreFunctionalityTests.swift; sourceTree = "<group>"; };
-		E1F20002B2C34D5E6F78901A01 /* Faith JournalUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Faith JournalUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		E1F2000BB2C34D5E6F78901A01 /* Faith_JournalUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faith_JournalUITests.swift; sourceTree = "<group>"; };
-		E1F2000CB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faith_JournalUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		E1F2000DB2C34D5E6F78901A01 /* LiveStreamingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamingUITests.swift; sourceTree = "<group>"; };
-		E1F20013B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarFeaturesUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		E1F10004B2C34D5E6F78901A01 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E1F20004B2C34D5E6F78901A01 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		EB1A775A26EE35F356C2BDBB /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -603,20 +614,6 @@
 				MAC007A2B3C4D5E6F78901234A /* FirebaseStorage in Frameworks */,
 				MAC00F2B3C4D5E6F78901234 /* FirebaseFunctions in Frameworks */,
 				LKMACBLD001A2B3C4D5E6F78 /* LiveKit in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		E1F10004B2C34D5E6F78901A01 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		E1F20004B2C34D5E6F78901A01 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -705,6 +702,7 @@
 				F5ED39497061C338BE3C70BD /* MoodInsightsView.swift */,
 				422F94095D028BCEACE40101 /* MoodSettingsView.swift */,
 				DC294AD9641F2553CF66C640 /* MoreView.swift */,
+				A7F3E2D1C0B4A596877869501 /* NotificationsView.swift */,
 				2ABE3BEFEC6ED5ED3BC14373 /* MultiParticipantStreamView_Jitsi.swift */,
 				3F134623DA8BF9B931072221 /* MultiParticipantStreamView.swift */,
 				AgoraMP1A2B3C4D5E6F78901 /* MultiParticipantStreamView_Agora.swift */,
@@ -799,6 +797,7 @@
 			isa = PBXGroup;
 			children = (
 				0CB14EFEC77C1A182190C18B /* AchievementService.swift */,
+				A1D2B3C44E5F6700AB12EF01 /* AdminService.swift */,
 				37266D49065F24A006B66B3C /* BackgroundSyncService.swift */,
 				0029F6E58EE426FE0659B58F /* BibleAPIService.swift */,
 				8390C9F1D1CE52FFFBD24254 /* BibleService.swift */,
@@ -945,7 +944,7 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		E1F10011B2C34D5E6F78901A01 /* Faith JournalTests */ = {
+		E1F10011B2C34D5E6F78901A01 /* Faith Journal/Faith JournalTests */ = {
 			isa = PBXGroup;
 			children = (
 				E1F1000BB2C34D5E6F78901A01 /* Faith_JournalTests.swift */,
@@ -954,7 +953,7 @@
 			path = "Faith Journal/Faith JournalTests";
 			sourceTree = "<group>";
 		};
-		E1F20012B2C34D5E6F78901A01 /* Faith JournalUITests */ = {
+		E1F20012B2C34D5E6F78901A01 /* Faith Journal/Faith Journal/Faith JournalUITests */ = {
 			isa = PBXGroup;
 			children = (
 				E1F2000BB2C34D5E6F78901A01 /* Faith_JournalUITests.swift */,
@@ -969,8 +968,8 @@
 			isa = PBXGroup;
 			children = (
 				320B5BAD0673C1A3549F33DB /* Faith Journal */,
-				E1F10011B2C34D5E6F78901A01 /* Faith JournalTests */,
-				E1F20012B2C34D5E6F78901A01 /* Faith JournalUITests */,
+				E1F10011B2C34D5E6F78901A01 /* Faith Journal/Faith JournalTests */,
+				E1F20012B2C34D5E6F78901A01 /* Faith Journal/Faith Journal/Faith JournalUITests */,
 				C43888A113700C13C5CD75A4 /* Products */,
 				47F719A22F1960580092CD94 /* Recovered References */,
 			);
@@ -1011,34 +1010,6 @@
 			productReference = 59DD88F1D3051B1A4DA86120 /* Faith Journal.app */;
 			productType = "com.apple.product-type.application";
 		};
-		MAC009A2B3C4D5E6F78901234C /* Faith Journal macOS */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = MAC00BA2B3C4D5E6F78901234D /* Build configuration list for PBXNativeTarget "Faith Journal macOS" */;
-			buildPhases = (
-				MAC00CA2B3C4D5E6F78901234E /* Sources */,
-				MAC00DA2B3C4D5E6F78901234F /* Resources */,
-				LK5ECOPY2B3C4D5E6F78901234 /* Copy LiveKitSecret */,
-				PEXELSCP1A2B3C4D5E6F78 /* Copy PexelsSecrets */,
-				AGORACP1A2B3C4D5E6F789012 /* Copy AgoraSecrets */,
-				MAC00EA2B3C4D5E6F789012350 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = "Faith Journal macOS";
-			packageProductDependencies = (
-				7D1399874EFA5C591677ED1F /* FirebaseAuth */,
-				FAD0B24B73963064C38A57E4 /* FirebaseFirestore */,
-				FUNC2A2B3C4D5E6F78901235 /* FirebaseFunctions */,
-				C5E284E4EC2F3E403008F105 /* FirebaseStorage */,
-				RTCBASIC1PROD2BE49F1E248D27E2 /* RtcBasic1 */,
-				LKMACPROD001A2B3C4D5E6F78 /* LiveKit */,
-			);
-			productName = "Faith Journal";
-			productReference = MAC008A2B3C4D5E6F78901234B /* Faith Journal.app */;
-			productType = "com.apple.product-type.application";
-		};
 		E1F10001B2C34D5E6F78901A01 /* Faith JournalTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = E1F10006B2C34D5E6F78901A01 /* Build configuration list for PBXNativeTarget "Faith JournalTests" */;
@@ -1074,6 +1045,34 @@
 			productName = "Faith JournalUITests";
 			productReference = E1F20002B2C34D5E6F78901A01 /* Faith JournalUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		MAC009A2B3C4D5E6F78901234C /* Faith Journal macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = MAC00BA2B3C4D5E6F78901234D /* Build configuration list for PBXNativeTarget "Faith Journal macOS" */;
+			buildPhases = (
+				MAC00CA2B3C4D5E6F78901234E /* Sources */,
+				MAC00DA2B3C4D5E6F78901234F /* Resources */,
+				LK5ECOPY2B3C4D5E6F78901234 /* Copy LiveKitSecret */,
+				PEXELSCP1A2B3C4D5E6F78 /* Copy PexelsSecrets */,
+				AGORACP1A2B3C4D5E6F789012 /* Copy AgoraSecrets */,
+				MAC00EA2B3C4D5E6F789012350 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Faith Journal macOS";
+			packageProductDependencies = (
+				7D1399874EFA5C591677ED1F /* FirebaseAuth */,
+				FAD0B24B73963064C38A57E4 /* FirebaseFirestore */,
+				FUNC2A2B3C4D5E6F78901235 /* FirebaseFunctions */,
+				C5E284E4EC2F3E403008F105 /* FirebaseStorage */,
+				RTCBASIC1PROD2BE49F1E248D27E2 /* RtcBasic1 */,
+				LKMACPROD001A2B3C4D5E6F78 /* LiveKit */,
+			);
+			productName = "Faith Journal";
+			productReference = MAC008A2B3C4D5E6F78901234B /* Faith Journal.app */;
+			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -1118,16 +1117,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				C79B527CAD7E4E6E8B9F36F9 /* Faith Journal/Faith Journal/Resources/Assets.xcassets in Resources */,
+				C7D0B0B12C0D5F6A00A1B2C3 /* Faith Journal/Faith Journal/Resources/devotional_seeds.json in Resources */,
+				D7E0B0B12C0D5F6A00A1B2C3 /* Faith Journal/Faith Journal/Resources/reflections_1000.json in Resources */,
 				D589C26CABC3A37A156347BC /* GoogleService-Info.plist in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		MAC00DA2B3C4D5E6F78901234F /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				MAC00FA2B3C4D5E6F789012351 /* Faith Journal/Faith Journal/Resources/Assets.xcassets in Resources */,
-				MAC010A2B3C4D5E6F789012352 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1142,6 +1134,15 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		MAC00DA2B3C4D5E6F78901234F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				MAC00FA2B3C4D5E6F789012351 /* Faith Journal/Faith Journal/Resources/Assets.xcassets in Resources */,
+				MAC010A2B3C4D5E6F789012352 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1171,6 +1172,27 @@
 			runOnlyForDeploymentPostprocessing = 1;
 			shellPath = /bin/sh;
 			shellScript = "# dSYM Generation Script - Handles permissions and generates dSYMs\n# This script runs during archive to ensure all framework dSYMs are included\n\nset +e  # Don't fail on errors (permission issues)\n\necho \"🔍 [dSYM] Starting dSYM generation...\"\n\n# Determine archive paths\nARCHIVE_FRAMEWORKS_PATH=\"\"\nARCHIVE_DSYMS_PATH=\"${DWARF_DSYM_FOLDER_PATH}\"\n\n# Primary: Use ARCHIVE_PRODUCTS_PATH (available during archive)\nif [ -n \"${ARCHIVE_PRODUCTS_PATH}\" ]; then\n    ARCHIVE_FRAMEWORKS_PATH=\"${ARCHIVE_PRODUCTS_PATH}/Applications/${PRODUCT_NAME}.app/Frameworks\"\n    ARCHIVE_DSYMS_PATH=\"${ARCHIVE_PRODUCTS_PATH}/dSYMs\"\n    mkdir -p \"$ARCHIVE_DSYMS_PATH\" 2>/dev/null || true\nfi\n\n# Fallback: Use standard build paths\nif [ -z \"$ARCHIVE_FRAMEWORKS_PATH\" ] || [ ! -d \"$ARCHIVE_FRAMEWORKS_PATH\" ]; then\n    ARCHIVE_FRAMEWORKS_PATH=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\n    if [ -z \"$ARCHIVE_DSYMS_PATH\" ]; then\n        ARCHIVE_DSYMS_PATH=\"${DWARF_DSYM_FOLDER_PATH}\"\n    fi\nfi\n\n# Ensure dSYMs path exists\nif [ -n \"$ARCHIVE_DSYMS_PATH\" ]; then\n    mkdir -p \"$ARCHIVE_DSYMS_PATH\" 2>/dev/null || true\nfi\n\nif [ ! -d \"$ARCHIVE_DSYMS_PATH\" ]; then\n    echo \"⚠️ [dSYM] Could not create archive dSYMs path, skipping\"\n    exit 0\nfi\n\necho \"📦 [dSYM] Archive frameworks: $ARCHIVE_FRAMEWORKS_PATH\"\necho \"📦 [dSYM] Archive dSYMs: $ARCHIVE_DSYMS_PATH\"\n\n# Required frameworks\nREQUIRED_FRAMEWORKS=(\n    \"FirebaseFirestoreInternal\"\n    \"absl\"\n    \"aosl\"\n    \"grpc\"\n    \"grpcpp\"\n    \"openssl_grpc\"\n)\n\n# Function to copy framework to temp location (avoids permission issues)\ncopy_framework_to_temp() {\n    local framework_path=$1\n    local temp_dir=$2\n    \n    if [ ! -d \"$framework_path\" ]; then\n        return 1\n    fi\n    \n    local framework_name=$(basename \"$framework_path\" .framework)\n    local temp_framework=\"$temp_dir/${framework_name}.framework\"\n    \n    # Copy framework to temp location\n    cp -R \"$framework_path\" \"$temp_framework\" 2>/dev/null || return 1\n    \n    # Remove code signature to avoid permission issues\n    codesign --remove-signature \"$temp_framework/${framework_name}\" 2>/dev/null || true\n    \n    echo \"$temp_framework/${framework_name}\"\n}\n\n# Create temp directory for framework copies\nTEMP_DIR=$(mktemp -d 2>/dev/null || echo \"/tmp/dsym_generation_$$\")\nmkdir -p \"$TEMP_DIR\" 2>/dev/null || true\n\n# Process each required framework\nfor framework_name in \"${REQUIRED_FRAMEWORKS[@]}\"; do\n    echo \"\\n🔍 [dSYM] Processing $framework_name...\"\n    \n    dsym_path=\"${ARCHIVE_DSYMS_PATH}/${framework_name}.framework.dSYM\"\n    \n    # Skip if dSYM already exists\n    if [ -d \"$dsym_path\" ]; then\n        echo \"   ✅ [dSYM] dSYM already exists\"\n        continue\n    fi\n    \n    # Find framework binary\n    framework_binary=\"\"\n    \n    # Try archive location first\n    if [ -d \"$ARCHIVE_FRAMEWORKS_PATH\" ]; then\n        potential_binary=\"${ARCHIVE_FRAMEWORKS_PATH}/${framework_name}.framework/${framework_name}\"\n        if [ -f \"$potential_binary\" ]; then\n            framework_binary=\"$potential_binary\"\n        fi\n    fi\n    \n    # Try built products as fallback\n    if [ -z \"$framework_binary\" ] && [ -d \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\" ]; then\n        potential_binary=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/${framework_name}.framework/${framework_name}\"\n        if [ -f \"$potential_binary\" ]; then\n            framework_binary=\"$potential_binary\"\n        fi\n    fi\n    \n    if [ -z \"$framework_binary\" ] || [ ! -f \"$framework_binary\" ]; then\n        echo \"   ⚠️ [dSYM] Framework binary not found for $framework_name\"\n        continue\n    fi\n    \n    echo \"   📍 [dSYM] Found binary: $framework_binary\"\n    \n    # Try to generate dSYM directly first\n    if command -v dsymutil >/dev/null 2>&1; then\n        echo \"   🔧 [dSYM] Attempting to generate dSYM directly...\"\n        \n        # Try direct generation (may fail due to permissions)\n        if dsymutil \"$framework_binary\" -o \"$dsym_path\" 2>/dev/null; then\n            if [ -d \"$dsym_path\" ]; then\n                echo \"   ✅ [dSYM] Successfully generated dSYM for $framework_name\"\n                continue\n            fi\n        fi\n        \n        # If direct generation failed, try copying to temp location first\n        echo \"   🔧 [dSYM] Direct generation failed, trying temp copy method...\"\n        \n        framework_dir=$(dirname \"$framework_binary\")\n        if temp_binary=$(copy_framework_to_temp \"$framework_dir\" \"$TEMP_DIR\"); then\n            echo \"   📍 [dSYM] Copied to temp: $temp_binary\"\n            \n            # Generate dSYM from temp location\n            if dsymutil \"$temp_binary\" -o \"$dsym_path\" 2>/dev/null; then\n                if [ -d \"$dsym_path\" ]; then\n                    echo \"   ✅ [dSYM] Successfully generated dSYM from temp copy\"\n                    rm -rf \"$TEMP_DIR/${framework_name}.framework\" 2>/dev/null || true\n                    continue\n                fi\n            fi\n            \n            # Clean up temp copy\n            rm -rf \"$TEMP_DIR/${framework_name}.framework\" 2>/dev/null || true\n        fi\n        \n        echo \"   ⚠️ [dSYM] Could not generate dSYM for $framework_name (permission or binary issue)\"\n    else\n        echo \"   ⚠️ [dSYM] dsymutil not available\"\n    fi\n    \ndone\n\n# Clean up temp directory\nrm -rf \"$TEMP_DIR\" 2>/dev/null || true\n\n# Process all frameworks in archive (catch-all)\nif [ -d \"$ARCHIVE_FRAMEWORKS_PATH\" ]; then\n    echo \"\\n🔍 [dSYM] Processing all frameworks in archive (catch-all)...\"\n    \n    find \"$ARCHIVE_FRAMEWORKS_PATH\" -name \"*.framework\" -type d 2>/dev/null | while read framework_path; do\n        framework_name=$(basename \"$framework_path\" .framework)\n        framework_binary=\"$framework_path/$framework_name\"\n        dsym_path=\"${ARCHIVE_DSYMS_PATH}/${framework_name}.framework.dSYM\"\n        \n        if [ ! -f \"$framework_binary\" ]; then\n            continue\n        fi\n        \n        # Skip if already processed or exists\n        skip=false\n        for req_framework in \"${REQUIRED_FRAMEWORKS[@]}\"; do\n            if [ \"$framework_name\" = \"$req_framework\" ]; then\n                skip=true\n                break\n            fi\n        done\n        \n        if [ \"$skip\" = true ] || [ -d \"$dsym_path\" ]; then\n            continue\n        fi\n        \n        echo \"🔧 [dSYM] Generating dSYM for $framework_name...\"\n        if command -v dsymutil >/dev/null 2>&1; then\n            dsymutil \"$framework_binary\" -o \"$dsym_path\" 2>/dev/null && echo \"✅ [dSYM] Generated\" || echo \"⚠️ [dSYM] Generation failed\"\n        fi\n    done\nfi\n\necho \"\\n✅ [dSYM] dSYM generation completed\"\necho \"📦 [dSYM] Final dSYMs:\"\nif [ -d \"$ARCHIVE_DSYMS_PATH\" ]; then\n    ls -1 \"$ARCHIVE_DSYMS_PATH\" 2>/dev/null | grep -E \"\\.dSYM\" | head -20 | while read dsym; do\n        echo \"   - $dsym\"\n    done || echo \"   (none found)\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+		AGORACP1A2B3C4D5E6F789012 /* Copy AgoraSecrets */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${SRCROOT}/AgoraSecrets.plist",
+			);
+			name = "Copy AgoraSecrets";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/AgoraSecrets.plist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Copy AgoraSecrets.plist into app bundle (Agora App ID + token server URL)\n# Use TARGET_BUILD_DIR+WRAPPER_NAME (matches outputPaths) so Archive/install paths line up for the script sandbox.\nif [ -f \"${SRCROOT}/AgoraSecrets.plist\" ]; then\n  if [ -n \"${WRAPPER_NAME}\" ]; then\n    APP_DIR=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}\"\n  else\n    APP_DIR=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\n  fi\n  DEST=\"${APP_DIR}/AgoraSecrets.plist\"\n  mkdir -p \"${APP_DIR}\"\n  /bin/cp -f \"${SRCROOT}/AgoraSecrets.plist\" \"${DEST}\"\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 		LK5ECOPY2B3C4D5E6F78901234 /* Copy LiveKitSecret */ = {
@@ -1215,27 +1237,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# Copy PexelsSecrets.plist into app bundle (API key for faith thumbnails)\nif [ -f \"${SRCROOT}/PexelsSecrets.plist\" ]; then\n  DEST=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PexelsSecrets.plist\"\n  mkdir -p \"$(dirname \"$DEST\")\"\n  cp \"${SRCROOT}/PexelsSecrets.plist\" \"$DEST\"\nfi\nif [ -f \"${SRCROOT}/Faith Journal/PexelsSecrets.plist\" ] && [ ! -f \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PexelsSecrets.plist\" ]; then\n  DEST=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PexelsSecrets.plist\"\n  mkdir -p \"$(dirname \"$DEST\")\"\n  cp \"${SRCROOT}/Faith Journal/PexelsSecrets.plist\" \"$DEST\"\nfi\n";
-			showEnvVarsInLog = 0;
-		};
-		AGORACP1A2B3C4D5E6F789012 /* Copy AgoraSecrets */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${SRCROOT}/AgoraSecrets.plist",
-			);
-			name = "Copy AgoraSecrets";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AgoraSecrets.plist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# Copy AgoraSecrets.plist into app bundle (Agora App ID + token server URL)\nif [ -f \"${SRCROOT}/AgoraSecrets.plist\" ]; then\n  DEST=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AgoraSecrets.plist\"\n  mkdir -p \"$(dirname \"$DEST\")\"\n  cp \"${SRCROOT}/AgoraSecrets.plist\" \"$DEST\"\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -1304,6 +1305,7 @@
 				CBB4C25C9E50404BC1866627 /* HLSStreamingService.swift in Sources */,
 				F1A2B3C4D5E6F789A0B1C2D6 /* LiveStreamChatService.swift in Sources */,
 				2DBE17981777202DBBE4D14A /* HomeView.swift in Sources */,
+				2DBE179B177702DBBE4D14C /* NotificationsView.swift in Sources */,
 				F2F5B68A5A78B6D96382143A /* InvitationsView.swift in Sources */,
 				3FFEBA78AC357F62C487B2FF /* InviteCodeView.swift in Sources */,
 				E4F239F32D301F0429ED4AD0 /* InviteUsersView.swift in Sources */,
@@ -1334,6 +1336,7 @@
 				780B680EDA62A0CDC0BC31E1 /* MoodReminderService.swift in Sources */,
 				E3B55FAB2E85F8DD175B2FE7 /* MoodSettingsView.swift in Sources */,
 				A9E9C17BB5B3702F5D3E3A60 /* MoreView.swift in Sources */,
+				7A310F0099B2C8E6BDB54640 /* AdminService.swift in Sources */,
 				E1759D86F5D5CEF6F2953E06 /* MultiParticipantStreamView.swift in Sources */,
 				AgoraMP2B3C4D5E6F78901234 /* MultiParticipantStreamView_Agora.swift in Sources */,
 				B86A736F0E0171BA43F7F541 /* MultiParticipantStreamView_Jitsi.swift in Sources */,
@@ -1411,6 +1414,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E1F10003B2C34D5E6F78901A01 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E1F1000DB2C34D5E6F78901A01 /* Faith_JournalTests.swift in Sources */,
+				E1F1000EB2C34D5E6F78901A01 /* CoreFunctionalityTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E1F20003B2C34D5E6F78901A01 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E1F2000EB2C34D5E6F78901A01 /* Faith_JournalUITests.swift in Sources */,
+				E1F2000FB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift in Sources */,
+				E1F20010B2C34D5E6F78901A01 /* LiveStreamingUITests.swift in Sources */,
+				E1F20014B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		MAC00CA2B3C4D5E6F78901234E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -1473,6 +1496,7 @@
 				47E90A782F415976005D5C78 /* HLSStreamingService.swift in Sources */,
 				F1A2B3C4D5E6F789A0B1C2D4 /* LiveStreamChatService.swift in Sources */,
 				47E90A792F415976005D5C78 /* HomeView.swift in Sources */,
+				47E90AED2F415976005D5C78 /* NotificationsView.swift in Sources */,
 				47E90A7A2F415976005D5C78 /* InvitationsView.swift in Sources */,
 				47E90A7B2F415976005D5C78 /* InviteCodeView.swift in Sources */,
 				47E90A7C2F415976005D5C78 /* InviteUsersView.swift in Sources */,
@@ -1503,6 +1527,7 @@
 				47E90A952F415976005D5C78 /* MoodReminderService.swift in Sources */,
 				47E90A962F415976005D5C78 /* MoodSettingsView.swift in Sources */,
 				47E90A972F415976005D5C78 /* MoreView.swift in Sources */,
+				47E90B002F415976005D5C78 /* AdminService.swift in Sources */,
 				47E90A982F415976005D5C78 /* MultiParticipantStreamView.swift in Sources */,
 				47C014792F5F1108002798CF /* MultiParticipantStreamView_Agora.swift in Sources */,
 				47919B3D2F59E134008E663E /* AgoraService.swift in Sources */,
@@ -1580,27 +1605,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		E1F10003B2C34D5E6F78901A01 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				E1F1000DB2C34D5E6F78901A01 /* Faith_JournalTests.swift in Sources */,
-				E1F1000EB2C34D5E6F78901A01 /* CoreFunctionalityTests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		E1F20003B2C34D5E6F78901A01 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				E1F2000EB2C34D5E6F78901A01 /* Faith_JournalUITests.swift in Sources */,
-				E1F2000FB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift in Sources */,
-				E1F20010B2C34D5E6F78901A01 /* LiveStreamingUITests.swift in Sources */,
-				E1F20014B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		E1F10009B2C34D5E6F78901A01 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0667FA2AE1ED61C1EDAFC816 /* Faith Journal */;
+			targetProxy = E1F1000AB2C34D5E6F78901A01 /* PBXContainerItemProxy */;
+		};
+		E1F20009B2C34D5E6F78901A01 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0667FA2AE1ED61C1EDAFC816 /* Faith Journal */;
+			targetProxy = E1F2000AB2C34D5E6F78901A01 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		320875EFAFA53F2BECA9C747 /* Release */ = {
@@ -1610,9 +1628,10 @@
 				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 36;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
@@ -1630,7 +1649,9 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
+				STRIP_BITCODE_FROM_COPIED_FILES = NO;
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -1676,7 +1697,7 @@
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -1690,7 +1711,9 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				STRIP_BITCODE_FROM_COPIED_FILES = NO;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				WATCHOS_DEPLOYMENT_TARGET = 10.0;
@@ -1738,7 +1761,7 @@
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -1759,7 +1782,9 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				STRIP_BITCODE_FROM_COPIED_FILES = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				WATCHOS_DEPLOYMENT_TARGET = 10.0;
@@ -1773,9 +1798,10 @@
 				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 32;
+				CURRENT_PROJECT_VERSION = 36;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
@@ -1793,82 +1819,12 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
+				STRIP_BITCODE_FROM_COPIED_FILES = NO;
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
-		};
-		MAC011A2B3C4D5E6F789012353 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal macOS.entitlements";
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
-				DEVELOPMENT_TEAM = 4SQJ3AH62S;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Faith Journal uses the camera to take photos for journal entries, profile pictures, and live streaming sessions.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Faith Journal uses your location to provide location-based features and enhance your journaling experience.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Faith Journal uses the microphone to record voice notes and prayers for your journal entries, and for live streaming sessions.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Faith Journal accesses your photo library to add photos to journal entries and set profile pictures.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Faith Journal uses speech recognition to transcribe your voice notes and prayers into text.";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UIRequiredDeviceCapabilities = armv7;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
-				PRODUCT_NAME = "Faith Journal";
-				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-			};
-			name = Debug;
-		};
-		MAC012A2B3C4D5E6F789012354 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal macOS.entitlements";
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
-				DEVELOPMENT_TEAM = 4SQJ3AH62S;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Faith Journal uses the camera to take photos for journal entries, profile pictures, and live streaming sessions.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Faith Journal uses your location to provide location-based features and enhance your journaling experience.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Faith Journal uses the microphone to record voice notes and prayers for your journal entries, and for live streaming sessions.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Faith Journal accesses your photo library to add photos to journal entries and set profile pictures.";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Faith Journal uses speech recognition to transcribe your voice notes and prayers into text.";
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UIRequiredDeviceCapabilities = armv7;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
-				PRODUCT_NAME = "Faith Journal";
-				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-			};
-			name = Release;
 		};
 		E1F10007B2C34D5E6F78901A01 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -1944,6 +1900,80 @@
 			};
 			name = Release;
 		};
+		MAC011A2B3C4D5E6F789012353 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal macOS.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 11;
+				DEVELOPMENT_TEAM = 4SQJ3AH62S;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Faith Journal uses the camera to take photos for journal entries, profile pictures, and live streaming sessions.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Faith Journal uses your location to provide location-based features and enhance your journaling experience.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Faith Journal uses the microphone to record voice notes and prayers for your journal entries, and for live streaming sessions.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Faith Journal accesses your photo library to add photos to journal entries and set profile pictures.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Faith Journal uses speech recognition to transcribe your voice notes and prayers into text.";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = armv7;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
+				PRODUCT_NAME = "Faith Journal";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+			};
+			name = Debug;
+		};
+		MAC012A2B3C4D5E6F789012354 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal macOS.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 11;
+				DEVELOPMENT_TEAM = 4SQJ3AH62S;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Faith Journal uses the camera to take photos for journal entries, profile pictures, and live streaming sessions.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Faith Journal uses your location to provide location-based features and enhance your journaling experience.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Faith Journal uses the microphone to record voice notes and prayers for your journal entries, and for live streaming sessions.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Faith Journal accesses your photo library to add photos to journal entries and set profile pictures.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Faith Journal uses speech recognition to transcribe your voice notes and prayers into text.";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = armv7;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
+				PRODUCT_NAME = "Faith Journal";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1965,15 +1995,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		MAC00BA2B3C4D5E6F78901234D /* Build configuration list for PBXNativeTarget "Faith Journal macOS" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				MAC011A2B3C4D5E6F789012353 /* Debug */,
-				MAC012A2B3C4D5E6F789012354 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
-		};
 		E1F10006B2C34D5E6F78901A01 /* Build configuration list for PBXNativeTarget "Faith JournalTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1988,6 +2009,15 @@
 			buildConfigurations = (
 				E1F20007B2C34D5E6F78901A01 /* Debug */,
 				E1F20008B2C34D5E6F78901A01 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		MAC00BA2B3C4D5E6F78901234D /* Build configuration list for PBXNativeTarget "Faith Journal macOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				MAC011A2B3C4D5E6F789012353 /* Debug */,
+				MAC012A2B3C4D5E6F789012354 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
@@ -2067,16 +2097,6 @@
 			package = EE51873CCFA453492C77D78F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFunctions;
 		};
-		MESS2A2B3C4D5E6F78901235 /* FirebaseMessaging */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = EE51873CCFA453492C77D78F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseMessaging;
-		};
-		RTCBASIC1PROD2BE49F1E248D27E2 /* RtcBasic1 */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AGORAMAC1LOCAL2BE49F1E248D27E2 /* XCLocalSwiftPackageReference "AgoraRtcEngine_macOS_1" */;
-			productName = RtcBasic1;
-		};
 		LKIOSPROD001A2B3C4D5E6F78 /* LiveKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = LKREF001A2B3C4D5E6F789012 /* XCRemoteSwiftPackageReference "client-sdk-swift" */;
@@ -2086,6 +2106,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = LKREF001A2B3C4D5E6F789012 /* XCRemoteSwiftPackageReference "client-sdk-swift" */;
 			productName = LiveKit;
+		};
+		MESS2A2B3C4D5E6F78901235 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EE51873CCFA453492C77D78F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		RTCBASIC1PROD2BE49F1E248D27E2 /* RtcBasic1 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AGORAMAC1LOCAL2BE49F1E248D27E2 /* XCLocalSwiftPackageReference "AgoraRtcEngine_macOS_1" */;
+			productName = RtcBasic1;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

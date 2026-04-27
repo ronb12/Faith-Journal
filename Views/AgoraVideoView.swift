@@ -258,16 +258,9 @@ struct AgoraParticipantGridView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Refresh when participants or active speaker changes
-        .id("\(agoraService.participantCount)-\(spotlightIdentityKey)-l:\(presentationHidesLocal)-r:\(presentationHidesRemoteUid.map { String($0) } ?? "-")")
-    }
-    
-    private var spotlightIdentityKey: String {
-        switch agoraService.spotlightSubject {
-        case .none: return "n"
-        case .local: return "l"
-        case .remote(let u): return "r-\(u)"
-        }
+        // `participantCount` avoids spotlight churn. `localVideoSurfaceEpoch` bumps only when the host moves local
+        // preview (PIP ↔ grid) so surfaces rebind — e.g. after closing Bible overlay.
+        .id("\(agoraService.participantCount)-\(agoraService.localVideoSurfaceEpoch)")
     }
     
     @ViewBuilder

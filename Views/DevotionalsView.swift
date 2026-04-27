@@ -391,10 +391,20 @@ struct DevotionalDetailView: View {
     let devotional: Devotional
     @ObservedObject var manager: DevotionalManager
     @Environment(\.dismiss) private var dismiss
+    @State private var noteText: String = ""
     
     // Get the current state of the devotional from the manager
     private var currentDevotional: Devotional? {
         manager.devotionals.first { $0.id == devotional.id }
+    }
+    
+    /// Explains that Mark complete = read and done in one step; Done only dismisses.
+    private var devotionalCompletionHintMarkdown: AttributedString {
+        let md = "Tap **Mark complete** in the toolbar to count this devotional as **read and done** for today—that is **one step** (there is no separate mark-done action). A **note** with any text also marks it complete. The **Done** button only closes this page."
+        if let parsed = try? AttributedString(markdown: md) {
+            return parsed
+        }
+        return AttributedString(md.replacingOccurrences(of: "**", with: ""))
     }
     
     var body: some View {
@@ -434,22 +444,31 @@ struct DevotionalDetailView: View {
                         .background(themeManager.colors.primary.opacity(0.1))
                         .cornerRadius(8)
                     
-                    // Instructions to mark as read (iOS and macOS)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Your note")
+                            .font(.headline)
+                        Text("A short reflection is saved with this day's devotional. When your note has any text, this devotional is marked read and done (same as Mark complete).")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        TextEditor(text: $noteText)
+                            .frame(minHeight: 100)
+                            .padding(8)
+                            .background(Color.platformSystemGray6)
+                            .cornerRadius(10)
+                            .accessibilityLabel("Devotional reflection note")
+                    }
+                    .padding(.top, 4)
+                    
+                    // One toolbar action marks read + done; "Done" only dismisses.
                     HStack(spacing: 10) {
                         Image(systemName: "checkmark.circle")
                             .foregroundColor(themeManager.colors.primary)
                             .font(.body)
-                        #if os(macOS)
-                        Text("When you've finished reading, tap \"Mark as Read\" below to mark this devotional as done.")
+                        Text(devotionalCompletionHintMarkdown)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        #else
-                        Text("When you've finished reading, tap \"Mark as Read\" in the toolbar above to mark this devotional as done.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        #endif
                     }
                     .padding(.vertical, 12)
                     .padding(.horizontal, 14)
@@ -463,6 +482,14 @@ struct DevotionalDetailView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("Devotional")
+            .onAppear {
+                let d = manager.devotionals.first { $0.id == devotional.id } ?? devotional
+                noteText = manager.userNote(for: d)
+            }
+            .onChange(of: noteText) { _, newValue in
+                let d = manager.devotionals.first { $0.id == devotional.id } ?? devotional
+                manager.setUserNote(newValue, for: d)
+            }
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -473,13 +500,14 @@ struct DevotionalDetailView: View {
                         HStack {
                             let isCompleted = currentDevotional?.isCompleted ?? devotional.isCompleted
                             Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                            Text(isCompleted ? "Mark as Unread" : "Mark as Read")
+                            Text(isCompleted ? "Mark incomplete" : "Mark complete")
                         }
                         .foregroundColor((currentDevotional?.isCompleted ?? devotional.isCompleted) ? .green : themeManager.colors.secondary)
                     }
+                    .accessibilityLabel("Mark devotional read and done")
                 }
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    // Show save button when devotional is marked as read
+                    // Show save button when devotional is marked complete
                     if (currentDevotional?.isCompleted ?? devotional.isCompleted) {
                         Button(action: {
                             manager.toggleFavorite(devotional)
@@ -492,6 +520,7 @@ struct DevotionalDetailView: View {
                     Button("Done") {
                         RewardedInterstitialManager.shared.tryShowAd { dismiss() }
                     }
+                    .accessibilityHint("Closes this page only. Use Mark complete to count the devotional as finished.")
                 }
             }
             #elseif os(macOS)
@@ -503,10 +532,11 @@ struct DevotionalDetailView: View {
                         HStack {
                             let isCompleted = currentDevotional?.isCompleted ?? devotional.isCompleted
                             Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                            Text(isCompleted ? "Mark as Unread" : "Mark as Read")
+                            Text(isCompleted ? "Mark incomplete" : "Mark complete")
                         }
                         .foregroundColor((currentDevotional?.isCompleted ?? devotional.isCompleted) ? .green : themeManager.colors.secondary)
                     }
+                    .accessibilityLabel("Mark devotional read and done")
                 }
                 if (currentDevotional?.isCompleted ?? devotional.isCompleted) {
                     ToolbarItem(placement: .automatic) {
@@ -523,6 +553,7 @@ struct DevotionalDetailView: View {
                     Button("Done") {
                         dismiss()
                     }
+                    .accessibilityHint("Closes this page only. Use Mark complete to count the devotional as finished.")
                 }
             }
             #endif

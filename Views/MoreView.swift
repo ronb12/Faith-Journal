@@ -1,8 +1,5 @@
 import SwiftUI
 import SwiftData
-#if canImport(FirebaseAuth)
-import FirebaseAuth
-#endif
 
 @available(iOS 17.0, macOS 14.0, *)
 struct MoreView: View {
@@ -242,6 +239,18 @@ struct MoreView: View {
             #endif
             .onAppear {
                 Task { await firebaseSync.refreshPendingFriendRequestCount() }
+                #if canImport(FirebaseAuth)
+                if #available(iOS 17.0, macOS 14.0, *) {
+                    Task { @MainActor in
+                        await AdminService.shared.refreshAdminStatus()
+                        if AdminService.shared.isAdmin {
+                            NotificationService.shared.scheduleAdminAdMobEarningsReminderIfNeeded()
+                        } else {
+                            NotificationService.shared.cancelAdminAdMobEarningsReminder()
+                        }
+                    }
+                }
+                #endif
                 if nav.bibleTarget != nil && !navigateToBible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         navigateToBible = true

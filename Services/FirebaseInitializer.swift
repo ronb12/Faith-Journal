@@ -113,6 +113,11 @@ class FirebaseInitializer {
         // run (e.g. Xcode + built app) or when the container path is locked.
         settings.cacheSettings = MemoryCacheSettings()
         print("✅ [FIREBASE] Firestore using in-memory cache (macOS)")
+        #elseif os(iOS) && targetEnvironment(simulator) && DEBUG
+        // Simulator stores Firestore under the host disk; when disk is full or the cache is corrupted,
+        // LevelDB open/commit can abort the process. Memory cache avoids on-disk LevelDB here.
+        settings.cacheSettings = MemoryCacheSettings()
+        print("✅ [FIREBASE] Firestore using in-memory cache (iOS Simulator DEBUG)")
         #else
         // Use new cacheSettings API (replaces deprecated isPersistenceEnabled and cacheSizeBytes)
         settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: FirestoreCacheSizeUnlimited))

@@ -274,25 +274,50 @@ struct HomeView: View {
                     .foregroundColor(.primary)
             }
             Spacer()
-            // Profile avatar - shows photo if available, otherwise shows initial
-            if let img = avatarImage {
-                avatarImageDisplay(img)
-            } else {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [themeManager.colors.primary, themeManager.colors.secondary],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+            HStack(spacing: 12) {
+                Button {
+                    selectedTab = 5
+                } label: {
+                    Image(systemName: colorScheme == .light ? "bell.fill" : "bell")
+                        .font(.title3)
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundColor(
+                            colorScheme == .light
+                            ? Color(red: 0.84, green: 0.65, blue: 0.12)
+                            : Color(.systemYellow)
                         )
-                    )
-                    .frame(width: 50, height: 50)
-                    .overlay(
-                        Text(profileInitial)
-                            .font(.title3)
-                            .font(.body.weight(.semibold))
-                            .foregroundColor(.white)
-                    )
+                        .frame(width: 36, height: 36)
+                        .background(
+                            (colorScheme == .light
+                                ? Color(red: 0.84, green: 0.65, blue: 0.12)
+                                : Color(.systemYellow)
+                            ).opacity(0.15)
+                        )
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Notifications")
+                .accessibilityHint("Open notifications")
+
+                // Profile avatar - shows photo if available, otherwise shows initial
+                if let img = avatarImage {
+                    avatarImageDisplay(img)
+                } else {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [themeManager.colors.primary, themeManager.colors.secondary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Text(profileInitial)
+                                .font(.title3)
+                                .font(.body.weight(.semibold))
+                                .foregroundColor(.white)
+                        )
+                }
             }
         }
         .padding(.horizontal, 4)

@@ -67,21 +67,23 @@ class BibleService: ObservableObject {
     }
     
     private func fetchFromBibleGateway(reference: String, translation: String = "NIV") async throws -> BibleVerseResponse {
-        // First try to get from local database
-        if let localVerse = getLocalVerse(reference: reference) {
+        let version = UserDefaults.standard.string(forKey: "selectedBibleVersion")
+            .flatMap { BibleVersion(rawValue: $0) } ?? .niv
+        if let localVerse = getLocalVerse(reference: reference), version.bibleAPIComTranslationCode == "web" {
             return BibleVerseResponse(
                 reference: localVerse.reference,
                 text: localVerse.text,
                 translation: localVerse.translation
             )
         }
-        
-        // For now, since we don't have API access, we'll use the local database
-        // In production, you would integrate with:
-        // - ESV API (free tier available at https://api.esv.org/)
-        // - Bible.com API (YouVersion - requires partnership)
-        // - or use Bible Gateway's search with proper HTML parsing
-        
+        if #available(iOS 17.0, *) {
+            let verse = try await BibleAPIService.shared.fetchVerse(reference: reference, version: version)
+            return BibleVerseResponse(
+                reference: verse.reference,
+                text: verse.text,
+                translation: verse.translation
+            )
+        }
         throw BibleServiceError.verseNotFound
     }
     

@@ -2082,31 +2082,10 @@ struct BibleView: View {
         }
     }
     
-    private func mapBibleVersionToAPICode(_ version: BibleVersion) -> String {
-        // Map BibleVersion enum to bible-api.com format (lowercase)
-        switch version {
-        case .niv: return "niv"
-        case .kjv: return "kjv"
-        case .esv: return "esv"
-        case .nlt: return "nlt"
-        case .nasb: return "nasb"
-        case .web: return "web"
-        case .msg: return "msg"
-        case .amp: return "amp"
-        case .csb: return "csb"
-        }
-    }
-    
     private func fetchChapterFromAPI(reference: String, translation: String? = nil, fallbackAttempted: Bool = false) async throws -> BibleAPIPassage {
-        // Use the BibleVersion enum for consistent mapping
         let translationToUse = translation ?? selectedTranslation
-        let translationCode: String
-        if translationToUse.uppercased() == "WEB" {
-            translationCode = "web"
-        } else {
-            let bibleVersion = BibleVersion(rawValue: translationToUse) ?? .niv
-            translationCode = mapBibleVersionToAPICode(bibleVersion)
-        }
+        let bibleVersion = BibleVersion(rawValue: translationToUse) ?? .niv
+        let translationCode = bibleVersion.bibleAPIComTranslationCode
         
         // Normalize book names for API (e.g., "Psalm" -> "Psalms")
         let bookNameMap: [String: String] = [

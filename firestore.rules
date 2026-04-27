@@ -102,6 +102,22 @@ service cloud.firestore {
         allow read, write: if isOwner(userId) || isTestUser(userId);
       }
       
+      // Friend-visible prayer mirror (owner writes; friends may update intercessorIds when they pray)
+      match /sharedPrayers/{prayerId} {
+        allow read: if isAuthenticated() || isTestUser(userId);
+        allow create, delete: if isOwner(userId) || isTestUser(userId);
+        allow update: if isOwner(userId) || isTestUser(userId)
+          || (isAuthenticated() && resource.data.isSharedWithFriends == true);
+      }
+      
+      // Owner receives an alert doc when someone prays (intercessor creates under owner's uid)
+      match /prayerIntercessorAlerts/{alertId} {
+        allow read, delete: if isOwner(userId) || isTestUser(userId);
+        allow create: if (isAuthenticated() && request.auth.uid == request.resource.data.intercessorId)
+          || request.resource.data.intercessorId == 'simulator-test-user-shared';
+        allow update: if false;
+      }
+      
       // Test connection collection (for debugging)
       match /testConnection/{testId} {
         allow read, write: if isOwner(userId) || isTestUser(userId);
@@ -115,12 +131,26 @@ service cloud.firestore {
     }
     
     // Invite code index (document id = invite code) - for join-by-code lookup
-    // Read: public for join-by-code. Write: same pattern as /liveSessions — signed-in host OR simulator dev id (no auth token in simulator).
+    // Read: public. Writes use setData(merge: true) (create + update); rules must allow
+    // updates when the merged `hostId` still matches the signed-in user (not only the pre-merge resource).
     match /sessionInviteCodes/{inviteCode} {
       allow read: if true;
+      // Create, or idempotent re-publish: merged doc must name the caller as host (or shared simulator test id for dev).
       allow create: if (isAuthenticated() && request.resource.data.hostId == request.auth.uid)
                     || request.resource.data.hostId == 'simulator-test-user-shared';
-      allow update, delete: if (isAuthenticated() && resource.data.hostId == request.auth.uid)
+      // Merge updates: allow when the *result* keeps ownership with request.auth, including:
+      // - re-save by same host, or
+      // - first merge field population (legacy doc missing hostId), or
+      // - migrate index from shared simulator id → real auth uid
+      allow update: if
+          (isAuthenticated() && request.resource.data.hostId == request.auth.uid
+            && ( !('hostId' in resource.data)
+                 || resource.data.hostId == request.auth.uid
+                 || resource.data.hostId == 'simulator-test-user-shared' ))
+        || (request.resource.data.hostId == 'simulator-test-user-shared'
+            && ( !('hostId' in resource.data) || resource.data.hostId == 'simulator-test-user-shared' ));
+      // Delete: only the stored host
+      allow delete: if (isAuthenticated() && resource.data.hostId == request.auth.uid)
                     || resource.data.hostId == 'simulator-test-user-shared';
     }
 
@@ -250,10 +280,14 @@ service cloud.firestore {
     }
 
     // Friend codes - lookup by code to send friend request (like invite codes)
+    // Same simulator pattern as sessionInviteCodes/liveSessions: no auth token in simulator demo,
+    // but app uses userId simulator-test-user-shared (see FirebaseSyncService.getCurrentUserId).
     match /friendCodes/{code} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if (isAuthenticated() && request.resource.data.userId == request.auth.uid)
+                    || request.resource.data.userId == 'simulator-test-user-shared';
+      allow update, delete: if (isAuthenticated() && resource.data.userId == request.auth.uid)
+                    || resource.data.userId == 'simulator-test-user-shared';
     }
 
     // Friends / friend requests

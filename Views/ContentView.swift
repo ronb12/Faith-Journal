@@ -65,6 +65,12 @@ struct ContentView: View {
                     Label("Devotionals", systemImage: "heart.fill")
                 }
                 .tag(3)
+
+            NotificationsView()
+                .tabItem {
+                    Label("Notifications", systemImage: "bell.badge.fill")
+                }
+                .tag(5)
             
             MoreView(selectedTab: $nav.selectedTab)
                 .environmentObject(nav)
@@ -118,6 +124,12 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToFaithFriends"))) { _ in
             nav.selectedTab = 4
             nav.navigateToFaithFriends = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToPrayer"))) { _ in
+            nav.selectedTab = 2
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("NavigateToMore"))) { _ in
+            nav.selectedTab = 4
         }
         .sheet(isPresented: $showingNewJournalEntry) {
             NewJournalEntryView()

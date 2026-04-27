@@ -24,4 +24,12 @@ enum BibleVersion: String, CaseIterable, Codable {
         case .csb: return "Christian Standard Bible"
         }
     }
+    
+    /// `bible-api.com` only serves `kjv` and `web` query values. In-app names like NIV/ESV map to `web` (public-domain WEB text).
+    var bibleAPIComTranslationCode: String {
+        switch self {
+        case .kjv: return "kjv"
+        case .niv, .esv, .nlt, .nasb, .web, .msg, .amp, .csb: return "web"
+        }
+    }
 }

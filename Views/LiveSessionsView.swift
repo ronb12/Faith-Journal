@@ -1368,8 +1368,7 @@ struct CreateLiveSessionView: View {
     // Use regular property for singleton, not @StateObject
     // CloudKitPublicSyncService removed - use Firebase for sync in the future
     // private let syncService = CloudKitPublicSyncService.shared
-    // Note: SessionNotificationService.swift needs to be added to Xcode project
-    // private let notificationService = SessionNotificationService.shared
+    private let sessionNotificationService = SessionNotificationService.shared
     @State private var title = ""
     @State private var details = ""
     @State private var category = "Prayer"
@@ -2617,22 +2616,27 @@ struct CreateLiveSessionView: View {
             let canUseFirebase = FirebaseInitializer.shared.isConfigured
             if let image = thumbImage, let localURL = ProfileManager.shared.saveLiveSessionThumbnailToLocalSync(sessionId: sessionId, image: image) {
                 session.thumbnailURL = localURL
-                try? ctx.save()
-                NotificationCenter.default.post(name: liveSessionThumbnailDidSaveNotification, object: nil)
+                do {
+                    try ctx.save()
+                    NotificationCenter.default.post(name: liveSessionThumbnailDidSaveNotification, object: nil)
+                } catch {
+                    print("❌ [LIVE SESSION] Failed to save session after writing thumbnail: \(error.localizedDescription)")
+                }
             }
 
             // Dismiss immediately so the user sees the sheet close and the new session in the list.
             isCreating = false
             dismiss()
 
-            // Background: sync public session to Firebase, then upload thumbnail and update to https when done.
+            // Background: sync session to Firebase (private → users/{uid}/liveSessions; public → liveSessions). Thumbnail promoted to https when possible. Invite index only for public.
             Task {
+                await FirebaseSyncService.shared.syncLiveSessionPublic(session)
                 if !isPrivateSession {
-                    await FirebaseSyncService.shared.syncLiveSessionPublic(session)
                     await FirebaseSyncService.shared.syncSessionInvitation(invitation)
                 }
                 var sessionToSync: LiveSession? = session
-                if let image = thumbImage, canUseFirebase, let jpegData = platformImageToJPEGData(image, quality: 0.85) {
+                if let image = thumbImage, canUseFirebase, session.thumbnailURL?.hasPrefix("https") != true,
+                   let jpegData = platformImageToJPEGData(image, quality: 0.85) {
                     do {
                         let httpsURL = try await FirebaseSyncService.shared.uploadLiveSessionThumbnail(sessionId: sessionId, imageData: jpegData)
                         await MainActor.run {
@@ -2646,7 +2650,7 @@ struct CreateLiveSessionView: View {
                             FirebaseSyncService.shared.saveThumbnailURL(sessionId: sessionId, urlString: httpsURL)
                             NotificationCenter.default.post(name: liveSessionThumbnailDidSaveNotification, object: nil)
                         }
-                        print("✅ [LIVE SESSION] Thumbnail uploaded to Firebase: \(httpsURL.prefix(60))...")
+                        print("✅ [LIVE SESSION] Thumbnail uploaded to Firebase (fallback): \(httpsURL.prefix(60))...")
                     } catch {
                         let ns = error as NSError
                         if ns.domain == "FirebaseSyncService", ns.code == 401 {
@@ -2656,7 +2660,7 @@ struct CreateLiveSessionView: View {
                         }
                     }
                 }
-                if !isPrivateSession, let toSync = sessionToSync, toSync.thumbnailURL != nil, toSync.thumbnailURL?.hasPrefix("https") == true {
+                if let toSync = sessionToSync, toSync.thumbnailURL != nil, toSync.thumbnailURL?.hasPrefix("https") == true {
                     await FirebaseSyncService.shared.syncLiveSessionPublic(toSync)
                 }
             }
@@ -2672,23 +2676,26 @@ struct CreateLiveSessionView: View {
                 // }
             }
             
-            // Schedule notifications and calendar event
-            // Note: Uncomment when SessionNotificationService.swift is added to Xcode project
-            /*
-            if let scheduled = scheduledDate {
-                if enableReminders {
-                    await notificationService.scheduleSessionStartingSoon(session: session, minutesBefore: reminderMinutes)
-                }
-                
-                if addToCalendar {
-                    do {
-                        try await notificationService.addSessionToCalendar(session: session)
-                    } catch {
-                        print("Error adding to calendar: \(error)")
+            // Schedule local notification before scheduled start + optional Calendar event
+            if scheduledDate != nil {
+                let sessionForNotifications = session
+                let reminderMins = reminderMinutes
+                let remindersOn = enableReminders
+                let calendarOn = addToCalendar
+                Task {
+                    _ = await sessionNotificationService.requestNotificationPermission()
+                    if remindersOn {
+                        await sessionNotificationService.scheduleSessionStartingSoon(session: sessionForNotifications, minutesBefore: reminderMins)
+                    }
+                    if calendarOn {
+                        do {
+                            try await sessionNotificationService.addSessionToCalendar(session: sessionForNotifications)
+                        } catch {
+                            print("Error adding session to calendar: \(error)")
+                        }
                     }
                 }
             }
-            */
         } catch {
             isCreating = false
             createErrorMessage = error.localizedDescription
@@ -4146,7 +4153,14 @@ struct LiveSessionDetailView: View {
             participant.isActive = false
             participant.leftAt = Date()
         }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("❌ [LIVE SESSION] endSessionForAll save failed: \(error.localizedDescription)")
+        }
+        Task {
+            await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+        }
     }
 
     private func hostControlButton(
@@ -4234,11 +4248,11 @@ struct LiveSessionDetailView: View {
         session.typedStreamMode = streamMode
         try? modelContext.save()
 
-        // Publish updated session state to Firebase (start time + active flag).
-        if !session.isPrivate {
-            Task {
-                await FirebaseSyncService.shared.syncLiveSessionPublic(session)
-                // Notify friends only when the host actually starts the stream (not on create/thumbnail sync).
+        // Publish updated session state to Firebase (private → user-scoped doc; public → discovery doc).
+        Task {
+            await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+            if !session.isPrivate {
+                // Notify friends only when the host actually starts a public stream (not on create/thumbnail sync).
                 await FirebaseSyncService.shared.notifyFriendsOfNewSession(session: session)
             }
         }
@@ -4313,13 +4327,12 @@ struct LiveSessionDetailView: View {
             }
             hasJoined = true
             
-            // Schedule notification for participant joined (if host)
-            // Note: Uncomment when SessionNotificationService.swift is added to Xcode project
-            /*
             if isHost {
-                await notificationService.scheduleParticipantJoined(session: session, participantName: userName)
+                Task {
+                    _ = await SessionNotificationService.shared.requestNotificationPermission()
+                    await SessionNotificationService.shared.scheduleParticipantJoined(session: session, participantName: nameToStore)
+                }
             }
-            */
         } catch {
             print("Error joining session: \(error)")
         }
@@ -5231,6 +5244,17 @@ struct LiveSessionChatView: View {
                     } else {
                         ctx.insert(message)
                         try? ctx.save()
+                        let myId = LocalUserService.shared.userIdentifier
+                        if message.userId != myId {
+                            Task {
+                                _ = await SessionNotificationService.shared.requestNotificationPermission()
+                                await SessionNotificationService.shared.scheduleNewMessage(
+                                    session: session,
+                                    senderName: message.userName,
+                                    message: message.message
+                                )
+                            }
+                        }
                     }
                 } catch { }
             }

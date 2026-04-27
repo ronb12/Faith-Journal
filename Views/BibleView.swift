@@ -130,9 +130,16 @@ struct BibleView: View {
                 if !searchText.isEmpty {
                     // Search view
                     enhancedSearchView
+                } else if showingChapterRangeView, let rBook = rangeBook, let rStart = rangeStartChapter, let rEnd = rangeEndChapter {
+                    #if os(iOS)
+                    // Inline on iOS so the live stream presenter PIP (sibling in the parent ZStack) is not covered by a fullScreenCover
+                    chapterRangeReadingView(book: rBook, startChapter: rStart, endChapter: rEnd)
+                    #elseif os(macOS)
+                    mainBibleView
+                    #endif
                 } else if showingChapterView, let book = selectedBook, let chapter = selectedChapter {
                     #if os(iOS)
-                    // On iOS: fullScreenCover replaces view, so show chapter inline in ZStack
+                    // Inline on iOS — do not also use .fullScreenCover, or it would sit above the stream overlay and hide the camera PIP
                     chapterReadingView(book: book, chapter: chapter)
                     #elseif os(macOS)
                     // On macOS: chapter opens in sheet modal; keep main view in background (avoid duplicate)
@@ -263,18 +270,9 @@ struct BibleView: View {
                 readingHistoryView
                     .macOSSheetFrameStandard()
             }
-            #if os(iOS)
-            .fullScreenCover(isPresented: $showingChapterView) {
-                if let book = selectedBook, let chapter = selectedChapter {
-                    chapterReadingView(book: book, chapter: chapter)
-                }
-            }
-            .fullScreenCover(isPresented: $showingChapterRangeView) {
-                if let book = selectedBook, let startChapter = rangeStartChapter, let endChapter = rangeEndChapter {
-                    chapterRangeReadingView(book: book, startChapter: startChapter, endChapter: endChapter)
-                }
-            }
-            #elseif os(macOS)
+            // iOS: chapter and range are inline in the ZStack (see body) so live stream PIP is not covered.
+            // macOS: use sheets; iOS has no .fullScreenCover for those (would cover the presenter PIP in stream overlay).
+            #if os(macOS)
             .sheet(isPresented: $showingChapterView) {
                 if let book = selectedBook, let chapter = selectedChapter {
                     chapterReadingView(book: book, chapter: chapter)
@@ -2159,30 +2157,13 @@ struct BibleView: View {
         }
     }
     
-    private func mapBibleVersionToAPICode(_ version: BibleVersion) -> String {
-        // Map BibleVersion enum to bible-api.com format (lowercase)
-        switch version {
-        case .niv: return "niv"
-        case .kjv: return "kjv"
-        case .esv: return "esv"
-        case .nlt: return "nlt"
-        case .nasb: return "nasb"
-        case .web: return "web"
-        case .msg: return "msg"
-        case .amp: return "amp"
-        case .csb: return "csb"
-        }
-    }
-    
     private func fetchChapterFromAPI(reference: String, translation: String? = nil, fallbackAttempted: Bool = false) async throws -> BibleAPIPassage {
-        // Use the BibleVersion enum for consistent mapping
         let translationToUse = translation ?? selectedTranslation
-        let translationCode: String
-        if translationToUse.uppercased() == "WEB" {
-            translationCode = "web"
-        } else {
-            let bibleVersion = BibleVersion(rawValue: translationToUse) ?? .niv
-            translationCode = mapBibleVersionToAPICode(bibleVersion)
+        let bibleVersion = BibleVersion(rawValue: translationToUse) ?? .niv
+        let translationCode = bibleVersion.bibleAPIComTranslationCode
+        
+        if let pro = await BibleTranslationProviders.tryFetchBibleAPIStyle(humanReference: reference, for: bibleVersion) {
+            return biblePassageFromAPIResponse(pro, displayTranslation: translationToUse)
         }
         
         // Normalize book names for API (e.g., "Psalm" -> "Psalms")
@@ -2308,6 +2289,34 @@ struct BibleView: View {
             }
             throw error
         }
+    }
+    
+    private func biblePassageFromAPIResponse(_ apiResponse: BibleAPIResponse, displayTranslation: String) -> BibleAPIPassage {
+        let bookName = apiResponse.reference.components(separatedBy: " ").dropLast().joined(separator: " ")
+        let tlabel = apiResponse.translation_id?.uppercased() ?? displayTranslation
+        let verses = apiResponse.verses.map { apiVerse in
+            let verseRef = "\(bookName) \(apiVerse.chapter):\(apiVerse.verse)"
+            return BibleVerse(
+                reference: verseRef,
+                text: apiVerse.text.trimmingCharacters(in: .whitespacesAndNewlines),
+                translation: tlabel
+            )
+        }
+        let versesWithNumbers = apiResponse.verses.map { apiVerse in
+            let verseRef = "\(bookName) \(apiVerse.chapter):\(apiVerse.verse)"
+            let verse = BibleVerse(
+                reference: verseRef,
+                text: apiVerse.text.trimmingCharacters(in: .whitespacesAndNewlines),
+                translation: tlabel
+            )
+            return (verse: verse, number: apiVerse.verse)
+        }
+        return BibleAPIPassage(
+            reference: apiResponse.reference,
+            verses: verses,
+            versesWithNumbers: versesWithNumbers,
+            text: apiResponse.text
+        )
     }
     
     private func extractVerseNumber(from reference: String) -> Int? {
