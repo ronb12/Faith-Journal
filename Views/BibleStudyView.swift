@@ -1470,7 +1470,7 @@ struct BibleStudyGameView: View {
     @State private var bestStreak: Int = 0
     @State private var isComplete: Bool = false
     @State private var hasStartedGame: Bool = false
-    @State private var roundLength: Int = 20
+    @State private var roundLength: Int = 10
     @State private var topicFilter: GameTopicFilter = .all
     @State private var selectedCategory: BibleStudyTopic.TopicCategory = .faith
     @State private var isTimed: Bool = false
@@ -1482,10 +1482,13 @@ struct BibleStudyGameView: View {
     @State private var speedBonusThisQuestion: Int = 0
     @State private var newAchievementsThisGame: [String] = []
     @State private var filterProducesQuestions: Bool = true
+    @State private var showQuitConfirmation: Bool = false
+    @State private var missedQuestions: [GameQuestion] = []
 
     private var highScore: Int { UserDefaults.standard.integer(forKey: kHighScoreKey) }
     private var totalGamesPlayed: Int { UserDefaults.standard.integer(forKey: kTotalGamesKey) }
     private var totalCorrectAllTime: Int { UserDefaults.standard.integer(forKey: kTotalCorrectKey) }
+    private var isPlayingRound: Bool { hasStartedGame && !questions.isEmpty && !isComplete }
     private var currentQuestion: GameQuestion? {
         guard questions.indices.contains(currentIndex) else { return nil }
         return questions[currentIndex]
@@ -1504,7 +1507,19 @@ struct BibleStudyGameView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        themeManager.colors.primary.opacity(0.10),
+                        Color(.systemBackground),
+                        Color(.systemBackground)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                VStack(spacing: 20) {
                 if !hasStartedGame {
                     gameSetupView
                 } else if questions.isEmpty {
@@ -1523,109 +1538,62 @@ struct BibleStudyGameView: View {
                 } else if isComplete {
                     resultsView
                 } else if let question = currentQuestion {
-                    VStack(alignment: .leading, spacing: 16) {
-                        ProgressView(value: Double(currentIndex + 1), total: Double(questions.count))
-                            .tint(themeManager.colors.primary)
-                        Text("Question \(currentIndex + 1) of \(questions.count)")
-                            .font(.subheadline)
-                            .foregroundColor(themeManager.colors.textSecondary)
-                        Text(question.prompt)
-                            .font(.headline)
-                        if let verseText = question.verseText, !verseText.isEmpty {
-                            Text("“\(verseText)”")
-                                .font(.body)
-                                .foregroundColor(themeManager.colors.textSecondary)
-                                .italic()
-                        }
-
-                        ForEach(visibleOptions, id: \.self) { option in
-                            Button {
-                                selectOption(option)
-                            } label: {
-                                HStack {
-                                    Text(option)
-                                        .multilineTextAlignment(.leading)
-                                        .foregroundColor(.primary)
-                                    Spacer()
-                                    if let selected = selectedOption, selected == option {
-                                        Image(systemName: option == question.correctAnswer ? "checkmark.circle.fill" : "x.circle.fill")
-                                            .foregroundColor(option == question.correctAnswer ? themeManager.colors.primary : .red)
-                                    }
-                                }
-                                .padding()
-                                .background(optionBackground(option, correct: question.correctAnswer))
-                                .cornerRadius(12)
-                            }
-                            .disabled(selectedOption != nil)
-                            .buttonStyle(.plain)
-                        }
-                        if !lifelineUsed && selectedOption == nil && visibleOptions.count >= 3 {
-                            Button { useLifeline5050() } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "lightbulb.fill")
-                                    Text("50/50 – remove two wrong answers").font(.caption)
-                                }
-                                .foregroundColor(themeManager.colors.primary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        if let selected = selectedOption {
-                            Text(selected.isEmpty ? "Time's up!" : (selected == question.correctAnswer ? "Correct! \(question.correctAnswer)" : "Correct Answer: \(question.correctAnswer)"))
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(selected.isEmpty ? .red : (selected == question.correctAnswer ? themeManager.colors.primary : .red))
-                            if speedBonusThisQuestion > 0 {
-                                Text("+\(speedBonusThisQuestion) speed bonus").font(.caption).foregroundColor(themeManager.colors.primary)
-                            }
-                            Text(question.explanation)
-                                .font(.caption)
-                                .foregroundColor(themeManager.colors.textSecondary)
-                        }
-                    }
-                    Spacer()
-                    Button(action: goToNextQuestion) {
-                        Text(currentIndex == questions.count - 1 ? "Finish Game" : "Next Question")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .disabled(selectedOption == nil)
-                    .buttonStyle(.borderedProminent)
-                    .tint(themeManager.colors.primary)
+                    questionView(question)
+                }
+                }
+                .padding()
+            }
+            .safeAreaInset(edge: .bottom) {
+                if isPlayingRound {
+                    gameActionButton
+                        .padding(.horizontal)
+                        .padding(.top, 10)
+                        .padding(.bottom, 8)
+                        .background(.ultraThinMaterial)
+                } else if !hasStartedGame {
+                    setupStartButton
+                        .padding(.horizontal)
+                        .padding(.top, 10)
+                        .padding(.bottom, 8)
+                        .background(.ultraThinMaterial)
                 }
             }
-            .padding()
             .navigationTitle(isDailyChallenge ? "Daily Challenge" : "Bible Game")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .tabBar)
             #endif
             .onDisappear {
                 timerTask?.cancel()
             }
+            .confirmationDialog("Quit this round?", isPresented: $showQuitConfirmation, titleVisibility: .visible) {
+                Button("Quit Game", role: .destructive) {
+                    timerTask?.cancel()
+                    dismiss()
+                }
+                Button("Keep Playing", role: .cancel) {}
+            } message: {
+                Text("Your current round progress will be lost.")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        timerTask?.cancel()
-                        dismiss()
+                        if isPlayingRound {
+                            showQuitConfirmation = true
+                        } else {
+                            timerTask?.cancel()
+                            dismiss()
+                        }
                     }
                 }
                 if hasStartedGame && !questions.isEmpty && !isComplete {
                     ToolbarItem(placement: .principal) {
-                        HStack(spacing: 16) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "star.fill").font(.caption)
-                                Text("\(points)").font(.subheadline.weight(.semibold))
-                            }
-                            .foregroundColor(themeManager.colors.primary)
-                            HStack(spacing: 4) {
-                                Image(systemName: "flame.fill").font(.caption)
-                                Text("\(currentStreak)").font(.subheadline.weight(.semibold))
-                            }
-                            .foregroundColor(currentStreak >= 3 ? .orange : themeManager.colors.textSecondary)
+                        HStack(spacing: 10) {
+                            scorePill(icon: "star.fill", title: "\(points)", color: themeManager.colors.primary)
+                            scorePill(icon: "flame.fill", title: "\(currentStreak)", color: currentStreak >= 3 ? .orange : themeManager.colors.textSecondary)
                             if isTimed {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "clock.fill").font(.caption)
-                                    Text("\(timeRemaining)s").font(.subheadline.weight(.semibold))
-                                        .foregroundColor(timeRemaining <= 5 ? .red : themeManager.colors.textSecondary)
-                                }
+                                scorePill(icon: "clock.fill", title: "\(timeRemaining)s", color: timeRemaining <= 5 ? .red : themeManager.colors.textSecondary)
                             }
                         }
                     }
@@ -1634,67 +1602,274 @@ struct BibleStudyGameView: View {
         }
     }
 
+    private func questionView(_ question: GameQuestion) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Label("Question \(currentIndex + 1) of \(questions.count)", systemImage: "bolt.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(themeManager.colors.primary)
+                        Spacer()
+                        Text("\(Int((Double(currentIndex + 1) / Double(max(questions.count, 1))) * 100))%")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(themeManager.colors.textSecondary)
+                    }
+                    ProgressView(value: Double(currentIndex + 1), total: Double(questions.count))
+                        .tint(themeManager.colors.primary)
+                        .scaleEffect(x: 1, y: 1.7, anchor: .center)
+                }
+
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(question.prompt)
+                        .font(.title3.weight(.bold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let verseText = question.verseText, !verseText.isEmpty {
+                        Text("\"\(verseText)\"")
+                            .font(.body.italic())
+                            .foregroundColor(themeManager.colors.textSecondary)
+                            .lineSpacing(4)
+                    }
+                }
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemBackground))
+                .cornerRadius(18)
+                .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 6)
+
+                VStack(spacing: 12) {
+                    ForEach(visibleOptions, id: \.self) { option in
+                        optionButton(option, question: question)
+                    }
+                }
+
+                if !lifelineUsed && selectedOption == nil && visibleOptions.count >= 3 {
+                    Button { useLifeline5050() } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "lightbulb.fill")
+                            Text("50/50")
+                                .font(.subheadline.weight(.bold))
+                            Text("remove two wrong answers")
+                                .font(.caption)
+                                .foregroundColor(themeManager.colors.textSecondary)
+                            Spacer()
+                        }
+                        .padding()
+                        .background(themeManager.colors.primary.opacity(0.12))
+                        .cornerRadius(14)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if let selected = selectedOption {
+                    feedbackCard(selected: selected, question: question)
+                }
+
+                Color.clear.frame(height: 88)
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func optionButton(_ option: String, question: GameQuestion) -> some View {
+        Button {
+            selectOption(option)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: optionIcon(option, correct: question.correctAnswer))
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(optionIconColor(option, correct: question.correctAnswer))
+                    .frame(width: 28)
+                Text(option)
+                    .font(.body.weight(.semibold))
+                    .multilineTextAlignment(.leading)
+                    .foregroundColor(.primary)
+                Spacer()
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(optionBackground(option, correct: question.correctAnswer))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(optionBorder(option, correct: question.correctAnswer), lineWidth: selectedOption == nil ? 0 : 1.5)
+            )
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(selectedOption == nil ? 0.05 : 0), radius: 8, x: 0, y: 4)
+        }
+        .disabled(selectedOption != nil)
+        .buttonStyle(.plain)
+    }
+
+    private func feedbackCard(selected: String, question: GameQuestion) -> some View {
+        let isCorrect = selected == question.correctAnswer
+        return VStack(alignment: .leading, spacing: 10) {
+            Label(
+                selected.isEmpty ? "Time's up" : (isCorrect ? "Correct" : "Not quite"),
+                systemImage: selected.isEmpty ? "clock.badge.exclamationmark" : (isCorrect ? "checkmark.seal.fill" : "xmark.circle.fill")
+            )
+            .font(.headline)
+            .foregroundColor(isCorrect ? themeManager.colors.primary : .red)
+
+            Text(isCorrect ? question.correctAnswer : "Correct Answer: \(question.correctAnswer)")
+                .font(.subheadline.weight(.semibold))
+
+            if speedBonusThisQuestion > 0 {
+                Label("+\(speedBonusThisQuestion) speed bonus", systemImage: "bolt.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.orange)
+            }
+
+            Text(question.explanation)
+                .font(.caption)
+                .foregroundColor(themeManager.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background((isCorrect ? themeManager.colors.primary : Color.red).opacity(0.10))
+        .cornerRadius(16)
+    }
+
+    private var gameActionButton: some View {
+        Button(action: goToNextQuestion) {
+            HStack {
+                Text(currentIndex == questions.count - 1 ? "Finish Game" : "Next Question")
+                    .font(.headline)
+                Image(systemName: currentIndex == questions.count - 1 ? "flag.checkered" : "arrow.right")
+                    .font(.headline)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+        }
+        .disabled(selectedOption == nil)
+        .buttonStyle(.borderedProminent)
+        .tint(themeManager.colors.primary)
+        .controlSize(.large)
+    }
+
+    private func scorePill(icon: String, title: String, color: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.caption)
+            Text(title)
+                .font(.caption.weight(.bold))
+        }
+        .foregroundColor(color)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.12))
+        .clipShape(Capsule())
+    }
+
+    private func optionIcon(_ option: String, correct: String) -> String {
+        guard let selected = selectedOption else { return "circle" }
+        if option == selected {
+            return option == correct ? "checkmark.circle.fill" : "xmark.circle.fill"
+        }
+        if option == correct { return "checkmark.circle.fill" }
+        return "circle"
+    }
+
+    private func optionIconColor(_ option: String, correct: String) -> Color {
+        guard selectedOption != nil else { return themeManager.colors.textSecondary.opacity(0.55) }
+        if option == correct { return themeManager.colors.primary }
+        if option == selectedOption { return .red }
+        return themeManager.colors.textSecondary.opacity(0.35)
+    }
+
+    private func optionBorder(_ option: String, correct: String) -> Color {
+        guard selectedOption != nil else { return .clear }
+        if option == correct { return themeManager.colors.primary.opacity(0.45) }
+        if option == selectedOption { return Color.red.opacity(0.45) }
+        return .clear
+    }
+
     private var gameSetupView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                setupHeroView
+
                 if isDailyChallenge, dailyChallengeCompletedToday {
                     Label("You already finished today’s Daily Challenge. Come back tomorrow for a new set.", systemImage: "checkmark.seal.fill")
                         .font(.subheadline)
                         .foregroundColor(themeManager.colors.textSecondary)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(14)
                 }
                 if !filterProducesQuestions, !dailyChallengeCompletedToday {
-                    Text("This combination can’t build a full round. Choose more topics, a different filter, or fewer questions.")
+                    Label("This combination can’t build a full round. Choose more topics, a different filter, or fewer questions.", systemImage: "exclamationmark.triangle.fill")
                         .font(.subheadline)
                         .foregroundColor(.orange)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.orange.opacity(0.12))
+                        .cornerRadius(14)
                 }
-                Text("Round length")
-                    .font(.subheadline.weight(.semibold))
-                Picker("Questions", selection: $roundLength) {
-                    Text("10").tag(10)
-                    Text("20").tag(20)
-                    Text("30").tag(30)
-                    Text("50").tag(50)
-                }
-                .pickerStyle(.segmented)
-                Text("Topics")
-                    .font(.subheadline.weight(.semibold))
-                Picker("Filter", selection: $topicFilter) {
-                    ForEach([GameTopicFilter.all, .today, .category], id: \.self) { f in
-                        Text(f.rawValue).tag(f)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    Label("Round length", systemImage: "list.number")
+                        .font(.subheadline.weight(.semibold))
+                    Picker("Questions", selection: $roundLength) {
+                        Text("10").tag(10)
+                        Text("20").tag(20)
+                        Text("30").tag(30)
+                        Text("50").tag(50)
                     }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.menu)
-                if topicFilter == .category {
-                    Picker("Category", selection: $selectedCategory) {
-                        ForEach(BibleStudyTopic.TopicCategory.allCases, id: \.self) { cat in
-                            Text(cat.rawValue).tag(cat)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemBackground))
+                .cornerRadius(18)
+                .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 5)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    Label("Topics", systemImage: "rectangle.stack.fill")
+                        .font(.subheadline.weight(.semibold))
+                    Picker("Filter", selection: $topicFilter) {
+                        ForEach([GameTopicFilter.all, .today, .category], id: \.self) { f in
+                            Text(f.rawValue).tag(f)
                         }
                     }
                     .pickerStyle(.menu)
+                    if topicFilter == .category {
+                        Picker("Category", selection: $selectedCategory) {
+                            ForEach(BibleStudyTopic.TopicCategory.allCases, id: \.self) { cat in
+                                Text(cat.rawValue).tag(cat)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
                 }
-                Toggle(isOn: $isTimed) {
-                    Label("Timed (bonus for quick answers)", systemImage: "clock.fill")
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemBackground))
+                .cornerRadius(18)
+                .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 5)
+
+                VStack(spacing: 14) {
+                    Toggle(isOn: $isTimed) {
+                        Label("Timed (bonus for quick answers)", systemImage: "clock.fill")
+                    }
+                    Toggle(isOn: $isDailyChallenge) {
+                        Label("Today's Daily Challenge", systemImage: "calendar.badge.clock")
+                    }
+                    if isDailyChallenge {
+                        Text("Same questions for everyone today. Play once and compare!")
+                            .font(.caption)
+                            .foregroundColor(themeManager.colors.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
-                Toggle(isOn: $isDailyChallenge) {
-                    Label("Today's Daily Challenge", systemImage: "calendar.badge.clock")
-                }
-                if isDailyChallenge {
-                    Text("Same questions for everyone today. Play once and compare!")
-                        .font(.caption)
-                        .foregroundColor(themeManager.colors.textSecondary)
-                }
-                Button(action: startGame) {
-                    Text("Start Game")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(themeManager.colors.primary)
-                .padding(.top, 8)
-                .disabled(
-                    (isDailyChallenge && dailyChallengeCompletedToday)
-                    || !filterProducesQuestions
-                )
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemBackground))
+                .cornerRadius(18)
+                .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 5)
+
+                Color.clear.frame(height: 86)
             }
             .padding(.vertical, 8)
         }
@@ -1703,6 +1878,77 @@ struct BibleStudyGameView: View {
         .onChange(of: topicFilter) { _, _ in refreshFilterProducesQuestions() }
         .onChange(of: selectedCategory) { _, _ in refreshFilterProducesQuestions() }
         .onChange(of: isDailyChallenge) { _, _ in refreshFilterProducesQuestions() }
+    }
+
+    private var setupStartButton: some View {
+        Button(action: startGame) {
+            Label("Start Game", systemImage: "play.fill")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(themeManager.colors.primary)
+        .controlSize(.large)
+        .disabled(
+            (isDailyChallenge && dailyChallengeCompletedToday)
+            || !filterProducesQuestions
+        )
+    }
+
+    private var setupHeroView: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Image(systemName: "gamecontroller.fill")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 66, height: 66)
+                    .background(themeManager.colors.primary.opacity(0.92))
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("High score")
+                        .font(.caption)
+                        .foregroundColor(themeManager.colors.textSecondary)
+                    Text("\(highScore) pts")
+                        .font(.title3.weight(.bold))
+                        .foregroundColor(themeManager.colors.primary)
+                }
+            }
+
+            Text("Bible Game")
+                .font(.title.weight(.bold))
+            Text("Match verses, build streaks, and unlock achievements as you learn.")
+                .font(.subheadline)
+                .foregroundColor(themeManager.colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                setupStatChip(icon: "star.fill", text: "\(totalCorrectAllTime) correct")
+                setupStatChip(icon: "gamecontroller.fill", text: "\(totalGamesPlayed) games")
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [themeManager.colors.primary.opacity(0.16), Color(.systemBackground)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(22)
+        .shadow(color: .black.opacity(0.08), radius: 14, x: 0, y: 7)
+    }
+
+    private func setupStatChip(icon: String, text: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.caption.weight(.semibold))
+            .foregroundColor(themeManager.colors.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(themeManager.colors.primary.opacity(0.10))
+            .clipShape(Capsule())
     }
 
     private func refreshFilterProducesQuestions() {
@@ -1751,6 +1997,7 @@ struct BibleStudyGameView: View {
         lifelineUsed = false
         hiddenOptions = []
         newAchievementsThisGame = []
+        missedQuestions = []
         speedBonusThisQuestion = 0
         if isTimed {
             timeRemaining = kTimerSecondsPerQuestion
@@ -1873,6 +2120,35 @@ struct BibleStudyGameView: View {
                 .background(themeManager.colors.primary.opacity(0.1))
                 .cornerRadius(12)
             }
+            if !missedQuestions.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Review missed questions", systemImage: "book.closed.fill")
+                        .font(.headline)
+                        .foregroundColor(themeManager.colors.primary)
+                    ForEach(missedQuestions.prefix(5)) { question in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(question.prompt)
+                                .font(.subheadline.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("Answer: \(question.correctAnswer)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(themeManager.colors.primary)
+                            Text(question.explanation)
+                                .font(.caption)
+                                .foregroundColor(themeManager.colors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(16)
+            }
             VStack(alignment: .leading, spacing: 8) {
                 Text("All achievements")
                     .font(.headline)
@@ -1895,6 +2171,7 @@ struct BibleStudyGameView: View {
                 hasStartedGame = false
                 questions = []
                 newAchievementsThisGame = []
+                missedQuestions = []
             }
                 .buttonStyle(.borderedProminent)
                 .tint(themeManager.colors.primary)
@@ -1925,12 +2202,16 @@ struct BibleStudyGameView: View {
             points += pts
         } else {
             currentStreak = 0
+            missedQuestions.append(question)
         }
     }
 
     private func goToNextQuestion() {
         guard selectedOption != nil else { return }
         timerTask?.cancel()
+        if selectedOption == "", let question = currentQuestion {
+            missedQuestions.append(question)
+        }
         if !isTimed { timeRemaining = 0 }
         selectedOption = nil
         hiddenOptions = []
@@ -2020,11 +2301,12 @@ struct BibleStudyGameView: View {
 
         for topic in shuffledTopics {
             guard questions.count < count else { break }
-            let verses = topic.keyVerses.compactMap { v -> String? in
-                let t = v.trimmingCharacters(in: .whitespacesAndNewlines)
-                return t.isEmpty ? nil : t
+            let verses = topic.keyVerses.enumerated().compactMap { index, v -> (index: Int, reference: String)? in
+                let reference = v.trimmingCharacters(in: .whitespacesAndNewlines)
+                return reference.isEmpty ? nil : (index, reference)
             }
-            guard let correct = verses.isEmpty ? nil : verses[Int(rng % UInt64(verses.count))] else { continue }
+            guard let selectedVerse = verses.isEmpty ? nil : verses[Int(rng % UInt64(verses.count))] else { continue }
+            let correct = selectedVerse.reference
 
             var decoys = Set<String>()
             let otherVerses = candidates.filter { $0.id != topic.id }
@@ -2039,7 +2321,10 @@ struct BibleStudyGameView: View {
             guard decoys.count >= 3 else { continue }
             let options = shuffleOrder([correct] + Array(decoys))
             let explanation = topic.topicDescription.isEmpty ? "Category: \(topic.category.rawValue)." : topic.topicDescription
-            let verseText = topic.verseTexts.first
+            let storedVerseText = topic.verseTexts.indices.contains(selectedVerse.index)
+                ? topic.verseTexts[selectedVerse.index].trimmingCharacters(in: .whitespacesAndNewlines)
+                : ""
+            let verseText = BibleService.shared.getLocalVerse(reference: correct)?.text ?? (storedVerseText.isEmpty ? nil : storedVerseText)
             let prompt = "Which verse reference ties to “\(topic.title)”?"
 
             questions.append(GameQuestion(

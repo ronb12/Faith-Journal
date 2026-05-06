@@ -311,84 +311,14 @@ struct LiveSessionsView: View {
     
     var body: some View {
         if #available(iOS 17.0, *) {
-            NavigationStack {
-                VStack(spacing: 0) {
-                    // Search Bar
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                        TextField("Search sessions...", text: $searchText)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.platformSystemGray6)
-                    .cornerRadius(10)
-                    .padding(.horizontal)
-                    
-                    // Session filter dropdown (Live Now, Upcoming, Past, Replays…)
-                    HStack {
-                        Text("Show:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Picker("Show", selection: $selectedFilter) {
-                            ForEach(SessionFilter.allCases, id: \.self) { filter in
-                                Text("\(filter.rawValue) (\(filterCount(for: filter)))").tag(filter)
-                            }
+            VStack(spacing: 0) {
+                    liveSessionsDashboardHeader
+                    liveSessionFilterRail
+                        .alert("Live Sessions", isPresented: $showingSortFilterHelp) {
+                            Button("OK", role: .cancel) { }
+                        } message: {
+                            Text("Live Now: sessions currently in progress. Use the filter tabs to see Upcoming, Past, Replays, or My Sessions. Sort changes the order (e.g. Recently Started, Most Popular).")
                         }
-                        .pickerStyle(.menu)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(Color.platformSystemGray6)
-                    
-                    // Category dropdown (same style as Sort)
-                    if !categories.isEmpty {
-                        HStack {
-                            Text("Category:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Picker("Category", selection: $selectedCategory) {
-                                ForEach(categories, id: \.self) { category in
-                                    Text(category).tag(category)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 8)
-                        .background(Color.platformSystemGray6)
-                    }
-                    
-                    // Sort Picker + Help
-                    HStack {
-                        Text("Sort:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Picker("Sort", selection: $selectedSort) {
-                            ForEach(SessionSort.allCases, id: \.self) { sort in
-                                Text(sort.rawValue).tag(sort)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        Button {
-                            showingSortFilterHelp = true
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .font(.title3)
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 4)
-                    .alert("Live Sessions", isPresented: $showingSortFilterHelp) {
-                        Button("OK", role: .cancel) { }
-                    } message: {
-                        Text("Live Now: sessions currently in progress. Use the filter tabs to see Upcoming, Past, Replays, or My Sessions. Sort changes the order (e.g. Recently Started, Most Popular).")
-                    }
                     
                     if filteredSessions.isEmpty {
                         VStack(spacing: 20) {
@@ -504,16 +434,12 @@ struct LiveSessionsView: View {
                         .frame(minHeight: 0)
                     }
                 }
-                }
                 .onReceive(NotificationCenter.default.publisher(for: liveSessionThumbnailDidSaveNotification)) { _ in
                     thumbnailRefreshID = UUID()
                 }
                 .navigationTitle("Live Sessions")
-                #if os(iOS)
-                .navigationViewStyle(.stack)
-                #endif
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
+                    ToolbarItem(placement: .automatic) {
                         Button(action: { showingInvitations = true }) {
                             ZStack(alignment: .topTrailing) {
                                 Image(systemName: "envelope.fill")
@@ -616,6 +542,107 @@ struct LiveSessionsView: View {
         } else {
             Text("Live Sessions are only available on iOS 17+")
         }
+    }
+
+    private var liveSessionsDashboardHeader: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Gather live")
+                        .font(.title3.weight(.bold))
+                    Text("\(liveNowSessions.count) live now - \(upcomingSessions.count) upcoming")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Button(action: { showingCreateSession = true }) {
+                    Label("Create", systemImage: "video.badge.plus")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.purple)
+            }
+
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("Search sessions", text: $searchText)
+                    .textInputAutocapitalization(.never)
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.platformSystemGray6)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+    }
+
+    private var liveSessionFilterRail: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(SessionFilter.allCases, id: \.self) { filter in
+                        Button {
+                            selectedFilter = filter
+                        } label: {
+                            Text("\(filter.rawValue) \(filterCount(for: filter))")
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(1)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(selectedFilter == filter ? Color.purple : Color.platformSystemGray6)
+                                .foregroundColor(selectedFilter == filter ? .white : .primary)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+
+            HStack(spacing: 12) {
+                Menu {
+                    ForEach(categories, id: \.self) { category in
+                        Button(category) { selectedCategory = category }
+                    }
+                } label: {
+                    Label(selectedCategory, systemImage: "line.3.horizontal.decrease.circle")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+
+                Menu {
+                    ForEach(SessionSort.allCases, id: \.self) { sort in
+                        Button(sort.rawValue) { selectedSort = sort }
+                    }
+                } label: {
+                    Label(selectedSort.rawValue, systemImage: "arrow.up.arrow.down")
+                        .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+
+                Button { showingSortFilterHelp = true } label: {
+                    Image(systemName: "info.circle")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+            }
+            .padding(.horizontal)
+        }
+        .padding(.bottom, 8)
     }
     
     /// Archives ended sessions older than 30 days so they only appear under "Archived".
@@ -877,6 +904,73 @@ struct SessionFilterChip: View {
 }
 
 @available(iOS 17.0, *)
+private struct LiveSessionThumbnailView: View {
+    let urlString: String?
+    let category: String
+    let height: CGFloat
+
+    private var placeholder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                Image(systemName: category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.white.opacity(0.8))
+            )
+    }
+
+    var body: some View {
+        Group {
+            if let urlString = urlString?.trimmingCharacters(in: .whitespacesAndNewlines), !urlString.isEmpty {
+                if let fileURL = localFileURL(from: urlString),
+                   let data = try? Data(contentsOf: fileURL),
+                   let image = platformImageFromData(data) {
+                    platformImage(image)
+                        .resizable()
+                        .scaledToFill()
+                } else if let url = URL(string: urlString), url.scheme?.hasPrefix("http") == true {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        case .failure:
+                            placeholder
+                        case .empty:
+                            placeholder.overlay(ProgressView())
+                        @unknown default:
+                            placeholder
+                        }
+                    }
+                    .id(urlString)
+                } else {
+                    placeholder
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(height: height)
+        .clipped()
+    }
+
+    private func localFileURL(from value: String) -> URL? {
+        if let url = URL(string: value), url.isFileURL, FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+        if FileManager.default.fileExists(atPath: value) {
+            return URL(fileURLWithPath: value)
+        }
+        return nil
+    }
+}
+
+@available(iOS 17.0, *)
 struct EnhancedLiveSessionCard: View {
     let session: LiveSession
     let onTap: () -> Void
@@ -914,22 +1008,7 @@ struct EnhancedLiveSessionCard: View {
     }
     
     private var thumbnailPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(
-                LinearGradient(
-                    gradient: Gradient(colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .frame(height: 180)
-            .overlay(
-                VStack {
-                    Image(systemName: session.category == "Prayer" ? "hands.sparkles.fill" : "book.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.white.opacity(0.8))
-                }
-            )
+        LiveSessionThumbnailView(urlString: nil, category: session.category, height: 180)
     }
     
     var body: some View {
@@ -937,30 +1016,7 @@ struct EnhancedLiveSessionCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 // Thumbnail/Preview Area
                 ZStack(alignment: .topTrailing) {
-                    Group {
-                        if let urlString = session.thumbnailURL, !urlString.isEmpty, let url = URL(string: urlString) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                case .failure:
-                                    thumbnailPlaceholder
-                                case .empty:
-                                    thumbnailPlaceholder
-                                        .overlay(ProgressView())
-                                @unknown default:
-                                    thumbnailPlaceholder
-                                }
-                            }
-                            .id(urlString)
-                            .frame(height: 180)
-                            .clipped()
-                        } else {
-                            thumbnailPlaceholder
-                        }
-                    }
+                    LiveSessionThumbnailView(urlString: session.thumbnailURL, category: session.category, height: 180)
                     .cornerRadius(12)
                     
                     // Top overlay: info button, status badges (LIVE/ENDED/etc), then favorite — single row to avoid overlap
@@ -1396,6 +1452,7 @@ struct CreateLiveSessionView: View {
     @State private var selectedThumbnailImage: PlatformImage?
     @State private var selectedThumbnailPreset: FaithThumbnailPreset?
     @State private var showingThumbnailPicker = false
+    @State private var showingThumbnailCreator = false
     @State private var isCreating = false
     @State private var createErrorMessage: String?
 
@@ -1453,10 +1510,6 @@ struct CreateLiveSessionView: View {
                             recurringSessionCard
                         }
 
-                        if enableReminders {
-                            remindersCard
-                        }
-
                         // Feature 6 – Segment Agenda
                         segmentAgendaCard
 
@@ -1471,10 +1524,14 @@ struct CreateLiveSessionView: View {
                     }
                     .padding()
                 }
+                .safeAreaInset(edge: .bottom) {
+                    createSessionBottomBar
+                }
             }
             .navigationTitle("Create Live Session")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            .navigationBarBackButtonHidden(true)
             #endif
             .onAppear {
                 // Initialize selectedTags from tags string if it exists
@@ -1493,30 +1550,6 @@ struct CreateLiveSessionView: View {
                         .foregroundColor(.primary)
                     }
                 }
-                ToolbarItem(placement: .automatic) {
-                    Button(action: { createSession() }) {
-                        HStack(spacing: 6) {
-                            if isCreating {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Create")
-                            }
-                        }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            title.isEmpty || details.isEmpty ?
-                            LinearGradient(colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                            themeManager.colors.primaryGradient
-                        )
-                        .cornerRadius(12)
-                    }
-                    .disabled(title.isEmpty || details.isEmpty || isCreating)
-                }
             }
             .alert("Could not create session", isPresented: Binding(get: { createErrorMessage != nil }, set: { if !$0 { createErrorMessage = nil } })) {
                 Button("OK", role: .cancel) { createErrorMessage = nil }
@@ -1527,6 +1560,46 @@ struct CreateLiveSessionView: View {
     }
     
     // MARK: - View Components
+
+    private var canCreateSession: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !details.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !isCreating
+    }
+
+    private var createSessionBottomBar: some View {
+        VStack(spacing: 8) {
+            Button(action: { createSession() }) {
+                HStack(spacing: 10) {
+                    if isCreating {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Image(systemName: scheduledDate == nil ? "video.badge.plus" : "calendar.badge.plus")
+                        Text(scheduledDate == nil ? "Create Live Session" : "Schedule Session")
+                    }
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .foregroundColor(.white)
+                .background(canCreateSession ? themeManager.colors.primaryGradient : LinearGradient(colors: [Color.gray.opacity(0.35), Color.gray.opacity(0.35)], startPoint: .leading, endPoint: .trailing))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .disabled(!canCreateSession)
+            .accessibilityLabel(scheduledDate == nil ? "Create live session" : "Schedule live session")
+
+            if !canCreateSession && !isCreating {
+                Text("Add a title and description to continue.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+        .background(.regularMaterial)
+    }
     
     private var headerSection: some View {
         VStack(spacing: 12) {
@@ -1615,39 +1688,54 @@ struct CreateLiveSessionView: View {
             Text("Add a cover image for your live session.")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Button(action: {
-                selectedThumbnailPreset = nil
-                showingThumbnailPicker = true
-            }) {
-                Group {
-                    if let img = selectedThumbnailImage {
-                        platformImage(img)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 160)
-                            .clipped()
-                    } else {
+            if let img = selectedThumbnailImage {
+                platformImage(img)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 160)
+                    .clipped()
+                    .cornerRadius(12)
+                    .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.platformTertiarySystemBackground)
-                            .frame(height: 160)
-                            .overlay(
-                                VStack(spacing: 8) {
-                                    Image(systemName: "photo.badge.plus")
-                                        .font(.title)
-                                    Text("Tap to add from device")
-                                        .font(.subheadline)
-                                }
-                                .foregroundColor(.secondary)
-                            )
-                    }
-                }
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.platformSeparator, lineWidth: 0.5)
-                )
+                            .stroke(Color.platformSeparator, lineWidth: 0.5)
+                    )
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.platformTertiarySystemBackground)
+                    .frame(height: 160)
+                    .overlay(
+                        VStack(spacing: 8) {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.title)
+                            Text("Choose, upload, or create a thumbnail")
+                                .font(.subheadline)
+                        }
+                        .foregroundColor(.secondary)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.platformSeparator, lineWidth: 0.5)
+                    )
             }
-            .buttonStyle(.plain)
+            HStack(spacing: 10) {
+                Button {
+                    selectedThumbnailPreset = nil
+                    showingThumbnailPicker = true
+                } label: {
+                    Label("Device", systemImage: "photo.on.rectangle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    showingThumbnailCreator = true
+                } label: {
+                    Label("Create", systemImage: "paintpalette.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(themeManager.colors.primary)
+            }
             Text("Or choose a faith-based preset:")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -1694,6 +1782,14 @@ struct CreateLiveSessionView: View {
             MacImagePicker(image: $selectedThumbnailImage)
                 .macOSSheetFrameCompact()
             #endif
+        }
+        .sheet(isPresented: $showingThumbnailCreator) {
+            CustomThumbnailCreatorView(defaultTitle: title, defaultSubtitle: category) { image in
+                selectedThumbnailImage = image
+                selectedThumbnailPreset = nil
+                showingThumbnailCreator = false
+            }
+            .macOSSheetFrameStandard()
         }
     }
     
@@ -2183,7 +2279,15 @@ struct CreateLiveSessionView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             VStack(spacing: 12) {
-                Toggle(isOn: $recordNextSession) {
+                Toggle(isOn: Binding(
+                    get: { recordNextSession },
+                    set: { isOn in
+                        recordNextSession = isOn
+                        if isOn {
+                            uploadReplayToCloud = true
+                        }
+                    }
+                )) {
                     HStack {
                         Image(systemName: "record.circle")
                             .foregroundColor(themeManager.colors.primary)
@@ -2197,14 +2301,15 @@ struct CreateLiveSessionView: View {
                         HStack {
                             Image(systemName: "cloud.fill")
                                 .foregroundColor(themeManager.colors.primary)
-                            Text("Upload replay (share with everyone)")
+                            Text("Save replay for everyone")
                                 .foregroundColor(.primary)
                         }
-                        Text("Off = replay only on your device. On = anyone can watch later.")
+                        Text("Keep this on so invited users can rewatch after the live session ends.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
+                .disabled(!recordNextSession)
                 .tint(themeManager.colors.primary)
             }
         }
@@ -2873,6 +2978,7 @@ struct LiveSessionDetailView: View {
             .navigationTitle("Session Details")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -3356,24 +3462,7 @@ struct LiveSessionDetailView: View {
     private var detailScrollContent: some View {
         VStack(alignment: .leading, spacing: 24) {
                     // Cover image (custom thumbnail or placeholder)
-                    Group {
-                        if let urlString = session.thumbnailURL, !urlString.isEmpty, let url = URL(string: urlString) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image.resizable().scaledToFill()
-                                case .failure, .empty:
-                                    sessionDetailThumbnailPlaceholder
-                                @unknown default:
-                                    sessionDetailThumbnailPlaceholder
-                                }
-                            }
-                            .frame(height: 160)
-                            .clipped()
-                        } else {
-                            sessionDetailThumbnailPlaceholder
-                        }
-                    }
+                    LiveSessionThumbnailView(urlString: session.thumbnailURL, category: session.category, height: 160)
                     .frame(maxWidth: .infinity)
                     .frame(height: 160)
                     .cornerRadius(12)
@@ -4191,6 +4280,9 @@ struct LiveSessionDetailView: View {
         do {
             try modelContext.save()
             print("✅ Session archived: \(session.title)")
+            Task {
+                await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+            }
         } catch {
             print("❌ Error archiving session: \(error)")
         }
@@ -4202,6 +4294,9 @@ struct LiveSessionDetailView: View {
         do {
             try modelContext.save()
             print("✅ Session unarchived: \(session.title)")
+            Task {
+                await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+            }
         } catch {
             print("❌ Error unarchiving session: \(error)")
         }
@@ -5620,6 +5715,146 @@ struct EmojiReactionPicker: View {
     }
 }
 
+@available(iOS 17.0, *)
+struct CustomThumbnailCreatorView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var headline: String
+    @State private var subheadline: String
+    @State private var selectedStyle: CustomThumbnailStyle = .sunrise
+    @State private var selectedSymbol = "sparkles"
+
+    let onCreate: (PlatformImage) -> Void
+
+    private let symbols = ["sparkles", "cross.fill", "book.closed.fill", "hands.sparkles.fill", "heart.fill", "person.3.fill", "sun.max.fill", "music.note", "leaf.fill", "moon.stars.fill"]
+
+    init(defaultTitle: String, defaultSubtitle: String, onCreate: @escaping (PlatformImage) -> Void) {
+        _headline = State(initialValue: defaultTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Live Session" : defaultTitle)
+        _subheadline = State(initialValue: defaultSubtitle.trimmingCharacters(in: .whitespacesAndNewlines))
+        self.onCreate = onCreate
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    thumbnailPreview
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Text").font(.headline)
+                        TextField("Thumbnail title", text: $headline)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("Subtitle", text: $subheadline)
+                            .textFieldStyle(.roundedBorder)
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Style").font(.headline)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 10)], spacing: 10) {
+                            ForEach(CustomThumbnailStyle.allCases) { style in
+                                Button {
+                                    selectedStyle = style
+                                    selectedSymbol = style.symbolName
+                                } label: {
+                                    VStack(spacing: 8) {
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(styleGradient(style))
+                                            .frame(height: 48)
+                                            .overlay(Image(systemName: style.symbolName).foregroundColor(.white))
+                                        Text(style.rawValue)
+                                            .font(.caption.weight(.medium))
+                                            .foregroundColor(.primary)
+                                    }
+                                    .padding(8)
+                                    .background(selectedStyle == style ? Color.platformSystemGray5 : Color.platformTertiarySystemBackground)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Icon").font(.headline)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 48), spacing: 10)], spacing: 10) {
+                            ForEach(symbols, id: \.self) { symbol in
+                                Button {
+                                    selectedSymbol = symbol
+                                } label: {
+                                    Image(systemName: symbol)
+                                        .font(.title3)
+                                        .frame(width: 48, height: 48)
+                                        .background(selectedSymbol == symbol ? ThemeManager.shared.colors.primary.opacity(0.18) : Color.platformTertiarySystemBackground)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Create Thumbnail")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .automatic) {
+                    Button("Use") {
+                        if let image = renderedImage {
+                            onCreate(image)
+                        }
+                    }
+                    .disabled(renderedImage == nil)
+                }
+            }
+        }
+    }
+
+    private var renderedImage: PlatformImage? {
+        platformImageFromCustomThumbnail(
+            title: headline,
+            subtitle: subheadline,
+            style: selectedStyle,
+            symbolName: selectedSymbol
+        )
+    }
+
+    private var thumbnailPreview: some View {
+        Group {
+            if let image = renderedImage {
+                platformImage(image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                styleGradient(selectedStyle)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(16 / 9, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.platformSeparator, lineWidth: 0.5)
+        )
+    }
+
+    private func styleGradient(_ style: CustomThumbnailStyle) -> LinearGradient {
+        let colors: [Color]
+        switch style {
+        case .sunrise: colors = [Color(red: 0.98, green: 0.64, blue: 0.24), Color(red: 0.54, green: 0.23, blue: 0.72)]
+        case .violet: colors = [Color(red: 0.43, green: 0.25, blue: 0.79), Color(red: 0.13, green: 0.14, blue: 0.32)]
+        case .ocean: colors = [Color(red: 0.04, green: 0.48, blue: 0.64), Color(red: 0.05, green: 0.18, blue: 0.34)]
+        case .forest: colors = [Color(red: 0.12, green: 0.48, blue: 0.32), Color(red: 0.05, green: 0.22, blue: 0.18)]
+        case .rose: colors = [Color(red: 0.82, green: 0.25, blue: 0.43), Color(red: 0.33, green: 0.13, blue: 0.29)]
+        case .midnight: colors = [Color(red: 0.06, green: 0.09, blue: 0.20), Color(red: 0.22, green: 0.27, blue: 0.48)]
+        }
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
 // MARK: - Chat Emoji Picker
 
 @available(iOS 17.0, *)
@@ -5685,4 +5920,3 @@ struct ChatEmojiPickerView: View {
 
 @available(iOS 17.0, *)
 extension LiveSession: Identifiable {}
-

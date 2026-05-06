@@ -1,0 +1,29 @@
+{
+  "name": "faith-journal",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "firebase:set-admin": "node scripts/set-firebase-admin-claims.cjs",
+    "firebase:clear-admin": "node scripts/set-firebase-admin-claims.cjs --clear"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ronb12/Faith-Journal.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ronb12/Faith-Journal/issues"
+  },
+  "homepage": "https://github.com/ronb12/Faith-Journal#readme",
+  "devDependencies": {
+    "firebase-admin": "^13.8.0"
+  }
+}

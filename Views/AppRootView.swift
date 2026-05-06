@@ -80,6 +80,7 @@ struct AppRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(selectedColorScheme)
+        .tint(themeManager.colors.primary)
         #if os(macOS)
         .ignoresSafeArea(.all, edges: [.bottom, .leading, .trailing])
         #else
@@ -129,16 +130,6 @@ struct AppRootView: View {
                 if FirebaseInitializer.shared.isConfigured {
                     firebaseSync.configure(modelContext: modelContext)
                     print("✅ [FIREBASE] Sync service configured")
-                    
-                    // If user is already logged in, sync all existing data to Firebase
-                    // This ensures any local entries created before sign-in are uploaded
-                    if hasLoggedIn {
-                        print("🔄 [FIREBASE] User is already logged in, syncing existing data...")
-                        Task {
-                            await firebaseSync.syncAllData()
-                            print("✅ [FIREBASE] Existing data sync initiated")
-                        }
-                    }
                 }
                 
                 // Check for pending username/email from email/password sign-up
@@ -188,6 +179,11 @@ struct AppRootView: View {
                         UserDefaults.standard.removeObject(forKey: "pendingInviteCode")
                     }
                 }
+
+                if UserDefaults.standard.string(forKey: "pendingFriendCode") != nil,
+                   hasLoggedIn && hasCompletedOnboarding {
+                    NotificationCenter.default.post(name: NSNotification.Name("NavigateToFaithFriends"), object: nil)
+                }
             }
         }
         #if os(iOS)
@@ -217,8 +213,6 @@ struct AppRootView: View {
                 FirebaseSyncService.shared.restartListening()
                 print("🔄 [FIREBASE] Restarted listener on app becoming active")
                 if hasLoggedIn {
-                    print("🔄 [FIREBASE] User is authenticated, syncing all existing data...")
-                    await FirebaseSyncService.shared.syncAllData()
                     await FirebaseSyncService.shared.refreshPendingFriendRequestCount()
                     let count = FirebaseSyncService.shared.pendingFriendRequestCount
                     if count > 0 {
@@ -255,14 +249,19 @@ struct AppRootView: View {
         print("🔗 [DEEP LINK] PathComponents: \(url.pathComponents)")
         
         var extractedCode: String? = nil
+        var extractedFriendCode: String? = nil
         
-        // Handle faithjournal://invite/CODE format
+        // Handle faithjournal://invite/CODE and faithjournal://friend/CODE formats
         if url.scheme == "faithjournal" {
             if url.host == "invite" {
                 // Extract the code from the path (format: /CODE or CODE)
                 let pathComponents = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
                 extractedCode = pathComponents.first ?? pathComponents.joined()
                 print("🔗 [DEEP LINK] Extracted invite code from scheme: \(extractedCode ?? "nil")")
+            } else if url.host == "friend" {
+                let pathComponents = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
+                extractedFriendCode = pathComponents.first ?? pathComponents.joined()
+                print("🔗 [DEEP LINK] Extracted friend code from scheme: \(extractedFriendCode ?? "nil")")
             } else if url.host == nil || url.host?.isEmpty == true {
                 // Handle faithjournal://CODE format (no host, just code)
                 let pathComponents = url.pathComponents.filter { $0 != "/" && !$0.isEmpty }
@@ -281,11 +280,23 @@ struct AppRootView: View {
             if pathComponents.first == "invite", let code = pathComponents.dropFirst().first {
                 extractedCode = code
                 print("🔗 [DEEP LINK] Extracted invite code from https link: \(code)")
+            } else if pathComponents.first == "friend", let code = pathComponents.dropFirst().first {
+                extractedFriendCode = code
+                print("🔗 [DEEP LINK] Extracted friend code from https link: \(code)")
             }
         }
         
         // Process the extracted code
-        if let code = extractedCode, !code.isEmpty {
+        if let friendCode = extractedFriendCode, !friendCode.isEmpty {
+            let cleanCode = friendCode.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            UserDefaults.standard.set(cleanCode, forKey: "pendingFriendCode")
+            if hasLoggedIn && hasCompletedOnboarding {
+                NotificationCenter.default.post(name: NSNotification.Name("NavigateToFaithFriends"), object: nil)
+                print("🔗 [DEEP LINK] Opening Faith Friends with code: \(cleanCode)")
+            } else {
+                print("🔗 [DEEP LINK] Stored friend code for after login: \(cleanCode)")
+            }
+        } else if let code = extractedCode, !code.isEmpty {
             let cleanCode = code.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
             print("🔗 [DEEP LINK] Processing code: \(cleanCode)")
             

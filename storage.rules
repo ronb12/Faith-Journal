@@ -1,0 +1,39 @@
+rules_version = '2';
+// Deploy: firebase deploy --only storage (from project root)
+// Requires default Storage bucket to exist (create once in Firebase Console > Build > Storage if needed).
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Session presentation files: PDFs and images shared by host during live sessions.
+    // Authenticated users can read (participants) and write (host uploads).
+    // Path: sessions/{sessionId}/presentation/{filename}
+    match /sessions/{sessionId}/presentation/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && (request.resource == null  // delete
+            || (request.resource.size < 50 * 1024 * 1024  // 50 MB max
+                && (request.resource.contentType.matches('application/pdf')
+                    || request.resource.contentType.matches('image/.*'))));
+    }
+    // Live session cover thumbnails (Create Live Session → Thumbnail). Auth required.
+    match /liveSessionThumbnails/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource != null
+        && request.resource.size < 10 * 1024 * 1024  // 10 MB max
+        && request.resource.contentType.matches('image/.*');
+    }
+    // Session recordings (replay). Path: sessionRecordings/{sessionId}.mp4. Auth required; 2 GB max per file.
+    match /sessionRecordings/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource != null
+        && request.resource.size < 2 * 1024 * 1024 * 1024  // 2 GB max
+        && request.resource.contentType == 'video/mp4';
+    }
+    // Optional: allow other app paths with auth. Tighten as needed.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import LocalAuthentication
 import AuthenticationServices
 
@@ -12,6 +13,7 @@ import FirebaseAuth
 @available(iOS 17.0, *)
 struct LoginView: View {
     @Binding var hasLoggedIn: Bool
+    @Environment(\.modelContext) private var modelContext
     @State private var isAuthenticating = false
     @State private var errorMessage: String?
     @State private var showMainApp = false
@@ -521,14 +523,12 @@ struct LoginView: View {
             print("🔍 [FIREBASE AUTH] Creating OAuth credential with Apple ID token...")
             print("🔍 [FIREBASE AUTH] ID Token length: \(idTokenString.count) characters")
             
-            // Create Firebase credential from Apple credential
-            // For Apple Sign In with Firebase, we use the static credential method
-            // providerID must be AuthProviderID.apple, idToken is the Apple ID token,
-            // rawNonce can be empty string if not using nonce, accessToken is optional
+            // Create Firebase credential from Apple credential.
+            // Firebase requires Apple's provider ID to be "apple.com".
             let credential = OAuthProvider.credential(
-                withProviderID: "apple",
+                withProviderID: "apple.com",
                 idToken: idTokenString,
-                rawNonce: "",
+                rawNonce: nil,
                 accessToken: nil
             )
             
@@ -553,22 +553,12 @@ struct LoginView: View {
             await MainActor.run {
                 // Ensure sync service is configured (modelContext might already be set from AppRootView)
                 // If not set yet, it will be set when AppRootView appears
+                FirebaseSyncService.shared.prepareLocalStoreForAuthenticatedUser(userId: firebaseUserId, email: authResult.user.email)
                 FirebaseSyncService.shared.restartListening()
                 print("✅ [FIREBASE] Restarted sync listener after sign-in")
                 print("✅ [FIREBASE] User ID: \(firebaseUserId)")
                 print("✅ [FIREBASE] Cross-device sync is now active")
                 print("✅ [FIREBASE] All journal entries will sync automatically across devices")
-                
-                // Test Firebase connection immediately after sign-in
-                Task {
-                    await FirebaseSyncService.shared.testFirebaseConnection()
-                    
-                    // After successful test, sync all existing data
-                    // This ensures all local journal entries are uploaded to Firebase
-                    print("🔄 [FIREBASE] Syncing all existing data to Firebase...")
-                    await FirebaseSyncService.shared.syncAllData()
-                    print("✅ [FIREBASE] All existing data synced to Firebase")
-                }
             }
             
             await MainActor.run {
@@ -1018,12 +1008,32 @@ struct LoginView: View {
         }
         
         do {
-            let authResult = try await Auth.auth().signIn(withEmail: email, password: password)
+            let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let auth = Auth.auth()
+            if let currentUser = auth.currentUser,
+               currentUser.email?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() != normalizedEmail {
+                print("ℹ️ [FIREBASE AUTH] Clearing cached Firebase user before email sign-in: \(currentUser.email ?? currentUser.uid)")
+                try? auth.signOut()
+                ProfileManager.shared.clearProfile()
+            }
+
+            let authResult = try await auth.signIn(withEmail: normalizedEmail, password: password)
             let firebaseUserId = authResult.user.uid
+            let signedInEmail = authResult.user.email?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard signedInEmail == nil || signedInEmail == normalizedEmail else {
+                print("❌ [FIREBASE AUTH] Email mismatch after sign-in. Requested \(normalizedEmail), got \(signedInEmail ?? "nil")")
+                try? Auth.auth().signOut()
+                ProfileManager.shared.clearProfile()
+                await MainActor.run {
+                    errorMessage = "Firebase signed into a different account. Please sign out and try \(normalizedEmail) again."
+                    isAuthenticating = false
+                }
+                return
+            }
             
             print("✅ [FIREBASE AUTH] Signed in with email successfully")
             print("✅ [FIREBASE AUTH] Firebase User ID: \(firebaseUserId)")
-            print("✅ [FIREBASE AUTH] Email: \(email)")
+            print("✅ [FIREBASE AUTH] Email: \(normalizedEmail)")
             
             // Update user profile with email if available
             if let userEmail = authResult.user.email {
@@ -1032,18 +1042,12 @@ struct LoginView: View {
             
             // Restart Firebase sync listener
             await MainActor.run {
+                FirebaseSyncService.shared.prepareLocalStoreForAuthenticatedUser(userId: firebaseUserId, email: signedInEmail ?? normalizedEmail)
+                syncLocalProfileEmail(to: signedInEmail ?? normalizedEmail)
                 FirebaseSyncService.shared.restartListening()
                 print("✅ [FIREBASE] Restarted sync listener after email sign-in")
                 print("✅ [FIREBASE] User ID: \(firebaseUserId)")
                 print("✅ [FIREBASE] Cross-device sync is now active")
-                
-                // Test Firebase connection and sync existing data
-                Task {
-                    await FirebaseSyncService.shared.testFirebaseConnection()
-                    print("🔄 [FIREBASE] Syncing all existing data to Firebase...")
-                    await FirebaseSyncService.shared.syncAllData()
-                    print("✅ [FIREBASE] All existing data synced to Firebase")
-                }
             }
             
             await MainActor.run {
@@ -1081,6 +1085,32 @@ struct LoginView: View {
         print("❌ [FIREBASE AUTH] Solution: Link packages in Xcode → Clean build (⇧⌘K) → Rebuild (⌘B)")
         #endif
     }
+
+    @MainActor
+    private func syncLocalProfileEmail(to email: String) {
+        let normalized = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return }
+
+        do {
+            let profiles = try modelContext.fetch(FetchDescriptor<UserProfile>())
+            if let profile = profiles.first {
+                if profile.email?.lowercased() != normalized.lowercased() {
+                    profile.email = normalized
+                    profile.updatedAt = Date()
+                    try modelContext.save()
+                    print("✅ [PROFILE] Updated local profile email to active Firebase email: \(normalized)")
+                }
+            } else {
+                let profile = UserProfile(name: "", email: normalized)
+                modelContext.insert(profile)
+                try modelContext.save()
+                print("✅ [PROFILE] Created local profile for active Firebase email: \(normalized)")
+            }
+            ProfileManager.shared.email = normalized
+        } catch {
+            print("⚠️ [PROFILE] Failed to sync local profile email: \(error.localizedDescription)")
+        }
+    }
     
     private func signUpWithEmail(email: String, password: String, username: String) async {
         print("🔍 [FIREBASE AUTH] Starting email/password sign-up...")
@@ -1115,18 +1145,11 @@ struct LoginView: View {
             
             // Restart Firebase sync listener
             await MainActor.run {
+                FirebaseSyncService.shared.prepareLocalStoreForAuthenticatedUser(userId: firebaseUserId, email: authResult.user.email ?? email)
                 FirebaseSyncService.shared.restartListening()
                 print("✅ [FIREBASE] Restarted sync listener after sign-up")
                 print("✅ [FIREBASE] User ID: \(firebaseUserId)")
                 print("✅ [FIREBASE] Cross-device sync is now active")
-                
-                // Test Firebase connection and sync existing data
-                Task {
-                    await FirebaseSyncService.shared.testFirebaseConnection()
-                    print("🔄 [FIREBASE] Syncing all existing data to Firebase...")
-                    await FirebaseSyncService.shared.syncAllData()
-                    print("✅ [FIREBASE] All existing data synced to Firebase")
-                }
             }
             
             await MainActor.run {
@@ -1186,4 +1209,3 @@ struct ModernTextFieldStyle: TextFieldStyle {
 #Preview {
     LoginView()
 }
-

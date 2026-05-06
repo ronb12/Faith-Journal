@@ -71,6 +71,7 @@ class ProfileManager: ObservableObject {
     #endif
     
     @Published var userName: String = ""
+    @Published var email: String?
     @Published var profileImageURL: String?
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -561,10 +562,13 @@ class ProfileManager: ObservableObject {
         guard let userId = Auth.auth().currentUser?.uid else {
             print("⚠️ [ProfileManager] User not authenticated, cannot load profile")
             self.userName = ""
+            self.email = nil
             self.profileImageURL = nil
             await refreshFirebaseAppAdminClaim()
             return
         }
+        let authEmail = Auth.auth().currentUser?.email?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.email = authEmail
         
         print("🔄 [ProfileManager] Loading profile for user: \(userId)")
         
@@ -597,14 +601,18 @@ class ProfileManager: ObservableObject {
                     updated = true
                     print("✅ [ProfileManager] Loaded profile name: \(name)")
                 }
-                var email = data["email"] as? String
-                if (email == nil || email!.isEmpty), let authEmail = Auth.auth().currentUser?.email {
-                    email = authEmail
-                    // Persist email to users/ for Faith Friends search
-                    try? await db.collection("users").document(userId).setData(["email": authEmail], merge: true)
+                var profileEmail = (data["email"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let authEmail, !authEmail.isEmpty, profileEmail?.lowercased() != authEmail.lowercased() {
+                    profileEmail = authEmail
+                    // Persist the active Firebase Auth email so stale profile docs cannot display an old account.
+                    try? await db.collection("users").document(userId).setData([
+                        "email": authEmail,
+                        "emailLower": authEmail.lowercased()
+                    ], merge: true)
                 }
+                self.email = profileEmail
                 let avatarURL = (data["profileImageURL"] as? String) ?? self.profileImageURL
-                FirebaseSyncService.shared.upsertUserSearchProfile(userId: userId, displayName: name, email: email, avatarURL: avatarURL)
+                FirebaseSyncService.shared.upsertUserSearchProfile(userId: userId, displayName: name, email: profileEmail, avatarURL: avatarURL)
             } else {
                 print("ℹ️ [ProfileManager] No name field in profile document")
             }
@@ -687,6 +695,7 @@ class ProfileManager: ObservableObject {
     
     func clearProfile() {
         self.userName = ""
+        self.email = nil
         self.profileImageURL = nil
     }
 }

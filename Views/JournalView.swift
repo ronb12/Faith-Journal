@@ -129,6 +129,8 @@ struct JournalView: View {
                 }
             }
             .onAppear {
+                cleanupLegacyTestEntries()
+
                 // Create sample data if no entries exist
                 if entries.isEmpty {
                     createSampleEntries()
@@ -149,18 +151,67 @@ struct JournalView: View {
     }
     
     private func deleteEntry(at offsets: IndexSet) {
+        var deletedEntryIds: [UUID] = []
+
         for index in offsets {
             guard index < displayedEntries.count else { continue }
             let entry = displayedEntries[index]
+            deletedEntryIds.append(entry.id)
             modelContext.delete(entry)
         }
         
         do {
             try modelContext.save()
+            for entryId in deletedEntryIds {
+                Task {
+                    await FirebaseSyncService.shared.deleteJournalEntry(id: entryId)
+                }
+            }
         } catch {
             print("❌ Error deleting journal entry: \(error.localizedDescription)")
             ErrorHandler.shared.handle(.deleteFailed)
         }
+    }
+
+    private func cleanupLegacyTestEntries() {
+        let testEntries = entries.filter(isLegacyTestEntry)
+        guard !testEntries.isEmpty else { return }
+
+        let testEntryIds = testEntries.map(\.id)
+        for entry in testEntries {
+            modelContext.delete(entry)
+        }
+
+        do {
+            try modelContext.save()
+            print("🗑️ Removed \(testEntryIds.count) legacy test journal entr(y/ies) locally")
+            for entryId in testEntryIds {
+                Task {
+                    await FirebaseSyncService.shared.deleteJournalEntry(id: entryId)
+                }
+            }
+        } catch {
+            print("❌ Error removing legacy test journal entries: \(error.localizedDescription)")
+        }
+    }
+
+    private func isLegacyTestEntry(_ entry: JournalEntry) -> Bool {
+        let title = normalizedJournalText(entry.title)
+        let content = normalizedJournalText(entry.content)
+        let tags = entry.tags.map(normalizedJournalText)
+
+        if title == "test" || content == "test" { return true }
+        if title == "test entry" || title == "test journal entry" { return true }
+        if title.contains("test journal entry") || title.contains("cloudkit test entry") { return true }
+        if content.contains("test journal entry created") || content.contains("created via cli") { return true }
+        if content.contains("cloudkit sync") || content.contains("cloudkit verification") { return true }
+        if tags.contains("test") && (title.contains("test") || content.contains("test")) { return true }
+
+        return false
+    }
+
+    private func normalizedJournalText(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
     
     private func createSampleEntries() {
@@ -2222,14 +2273,14 @@ struct JournalEntryDetailView: View {
         }
         .alert("Delete Entry", isPresented: $showingDeleteAlert) {
             Button("Delete", role: .destructive) {
-                let entryToDelete = entry // Capture entry before deletion
+                let entryIdToDelete = entry.id // Capture id before deletion
                 modelContext.delete(entry)
                 do {
                     try modelContext.save()
                     
                     // Sync deletion to Firebase for cross-device sync
                     Task {
-                        await FirebaseSyncService.shared.deleteJournalEntry(entryToDelete)
+                        await FirebaseSyncService.shared.deleteJournalEntry(id: entryIdToDelete)
                         print("✅ [FIREBASE] Entry deletion synced to Firebase")
                     }
                 } catch {

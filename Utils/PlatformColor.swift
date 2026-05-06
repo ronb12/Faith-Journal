@@ -188,6 +188,60 @@ enum FaithThumbnailPreset: String, CaseIterable, Identifiable {
     }
 }
 
+/// Lightweight custom thumbnail styles for live sessions.
+enum CustomThumbnailStyle: String, CaseIterable, Identifiable {
+    case sunrise = "Sunrise"
+    case violet = "Violet"
+    case ocean = "Ocean"
+    case forest = "Forest"
+    case rose = "Rose"
+    case midnight = "Midnight"
+
+    var id: String { rawValue }
+
+    var symbolName: String {
+        switch self {
+        case .sunrise: return "sun.max.fill"
+        case .violet: return "sparkles"
+        case .ocean: return "water.waves"
+        case .forest: return "leaf.fill"
+        case .rose: return "heart.fill"
+        case .midnight: return "moon.stars.fill"
+        }
+    }
+}
+
+/// Faith-based virtual backgrounds for live streams. These are generated locally so hosts can hide their room/location without adding large binary assets to the app bundle.
+enum FaithLiveBackgroundPreset: String, CaseIterable, Identifiable {
+    case none = "None"
+    case crossSunrise = "Cross Sunrise"
+    case scriptureLight = "Scripture Light"
+    case worshipGlow = "Worship Glow"
+    case peaceGarden = "Peace Garden"
+    case stainedGlass = "Stained Glass"
+    case doveSky = "Dove Sky"
+    case blur = "Privacy Blur"
+
+    var id: String { rawValue }
+
+    var symbolName: String {
+        switch self {
+        case .none: return "camera.fill"
+        case .crossSunrise: return "cross.fill"
+        case .scriptureLight: return "book.closed.fill"
+        case .worshipGlow: return "music.note"
+        case .peaceGarden: return "leaf.fill"
+        case .stainedGlass: return "sparkles"
+        case .doveSky: return "bird.fill"
+        case .blur: return "camera.filters"
+        }
+    }
+
+    var isVirtualBackground: Bool {
+        self != .none
+    }
+}
+
 /// Returns the bundled asset image for a faith preset, or nil if the asset is not in the app bundle. Use this to show the real thumbnail in the preset strip; use platformImageFromFaithPreset when you need an image (bundled or fallback) for upload.
 func platformBundledImageForFaithPreset(_ preset: FaithThumbnailPreset, size: CGSize = CGSize(width: 400, height: 224)) -> PlatformImage? {
     #if os(iOS)
@@ -261,7 +315,120 @@ func platformImageFromFaithPreset(_ preset: FaithThumbnailPreset, size: CGSize =
     #endif
 }
 
+/// Renders a user-designed live session thumbnail. The output uses the same image pipeline as uploaded photos and presets.
+func platformImageFromCustomThumbnail(
+    title: String,
+    subtitle: String,
+    style: CustomThumbnailStyle,
+    symbolName: String,
+    size: CGSize = CGSize(width: 1200, height: 675)
+) -> PlatformImage? {
+    #if os(iOS)
+    let renderer = UIGraphicsImageRenderer(size: size)
+    return renderer.image { context in
+        let rect = CGRect(origin: .zero, size: size)
+        let colors = customThumbnailUIColorPair(style)
+        if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [colors.0.cgColor, colors.1.cgColor] as CFArray, locations: [0, 1]) {
+            context.cgContext.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: size.width, y: size.height), options: [])
+        }
+        drawCustomThumbnailTextIOS(title: title, subtitle: subtitle, symbolName: symbolName, in: rect)
+    }
+    #elseif os(macOS)
+    let image = NSImage(size: NSSize(width: size.width, height: size.height))
+    image.lockFocus()
+    let rect = NSRect(origin: .zero, size: size)
+    let colors = customThumbnailNSColorPair(style)
+    NSGradient(starting: colors.0, ending: colors.1)?.draw(in: rect, angle: 315)
+    drawCustomThumbnailTextMac(title: title, subtitle: subtitle, symbolName: symbolName, in: rect)
+    image.unlockFocus()
+    return image
+    #else
+    return nil
+    #endif
+}
+
+/// Renders a live stream background at 16:9. Keep the center calm because the host's face/body will usually be there.
+func platformImageFromFaithLiveBackground(
+    _ preset: FaithLiveBackgroundPreset,
+    size: CGSize = CGSize(width: 1280, height: 720)
+) -> PlatformImage? {
+    guard preset != .none && preset != .blur else { return nil }
+    #if os(iOS)
+    let renderer = UIGraphicsImageRenderer(size: size)
+    return renderer.image { context in
+        let rect = CGRect(origin: .zero, size: size)
+        drawFaithLiveBackgroundIOS(preset, in: rect, context: context.cgContext)
+    }
+    #elseif os(macOS)
+    let image = NSImage(size: NSSize(width: size.width, height: size.height))
+    image.lockFocus()
+    drawFaithLiveBackgroundMac(preset, in: NSRect(origin: .zero, size: size))
+    image.unlockFocus()
+    return image
+    #else
+    return nil
+    #endif
+}
+
+/// Writes the generated live stream background to Caches and returns a file URL suitable for Agora's virtual background API.
+func platformFaithLiveBackgroundFileURL(for preset: FaithLiveBackgroundPreset) throws -> URL {
+    guard let image = platformImageFromFaithLiveBackground(preset),
+          let data = platformImageToJPEGData(image, quality: 0.9) else {
+        throw NSError(domain: "FaithLiveBackground", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not render live background."])
+    }
+    let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        .appendingPathComponent("FaithLiveBackgrounds", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let filename = preset.rawValue
+        .lowercased()
+        .replacingOccurrences(of: " ", with: "-")
+        .appending(".jpg")
+    let url = directory.appendingPathComponent(filename)
+    try data.write(to: url, options: [.atomic])
+    return url
+}
+
 #if os(iOS)
+private func customThumbnailUIColorPair(_ style: CustomThumbnailStyle) -> (UIColor, UIColor) {
+    switch style {
+    case .sunrise: return (UIColor(red: 0.98, green: 0.64, blue: 0.24, alpha: 1), UIColor(red: 0.54, green: 0.23, blue: 0.72, alpha: 1))
+    case .violet: return (UIColor(red: 0.43, green: 0.25, blue: 0.79, alpha: 1), UIColor(red: 0.13, green: 0.14, blue: 0.32, alpha: 1))
+    case .ocean: return (UIColor(red: 0.04, green: 0.48, blue: 0.64, alpha: 1), UIColor(red: 0.05, green: 0.18, blue: 0.34, alpha: 1))
+    case .forest: return (UIColor(red: 0.12, green: 0.48, blue: 0.32, alpha: 1), UIColor(red: 0.05, green: 0.22, blue: 0.18, alpha: 1))
+    case .rose: return (UIColor(red: 0.82, green: 0.25, blue: 0.43, alpha: 1), UIColor(red: 0.33, green: 0.13, blue: 0.29, alpha: 1))
+    case .midnight: return (UIColor(red: 0.06, green: 0.09, blue: 0.20, alpha: 1), UIColor(red: 0.22, green: 0.27, blue: 0.48, alpha: 1))
+    }
+}
+
+private func drawCustomThumbnailTextIOS(title: String, subtitle: String, symbolName: String, in rect: CGRect) {
+    let paragraph = NSMutableParagraphStyle()
+    paragraph.alignment = .left
+    paragraph.lineBreakMode = .byWordWrapping
+    let shadow = NSShadow()
+    shadow.shadowColor = UIColor.black.withAlphaComponent(0.25)
+    shadow.shadowOffset = CGSize(width: 0, height: 3)
+    shadow.shadowBlurRadius = 12
+    if let symbol = UIImage(systemName: symbolName, withConfiguration: UIImage.SymbolConfiguration(pointSize: 88, weight: .semibold))?.withTintColor(.white.withAlphaComponent(0.95), renderingMode: .alwaysOriginal) {
+        symbol.draw(in: CGRect(x: 82, y: 78, width: 112, height: 112))
+    }
+    let titleText = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Live Session" : title
+    let subtitleText = subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    (titleText as NSString).draw(in: CGRect(x: 82, y: 246, width: rect.width - 164, height: 220), withAttributes: [
+        .font: UIFont.systemFont(ofSize: 78, weight: .bold),
+        .foregroundColor: UIColor.white,
+        .paragraphStyle: paragraph,
+        .shadow: shadow
+    ])
+    if !subtitleText.isEmpty {
+        (subtitleText as NSString).draw(in: CGRect(x: 86, y: 488, width: rect.width - 172, height: 82), withAttributes: [
+            .font: UIFont.systemFont(ofSize: 34, weight: .medium),
+            .foregroundColor: UIColor.white.withAlphaComponent(0.88),
+            .paragraphStyle: paragraph,
+            .shadow: shadow
+        ])
+    }
+}
+
 private func presetGradientColors(_ preset: FaithThumbnailPreset) -> (UIColor, UIColor) {
     switch preset {
     case .prayer: return (UIColor(red: 0.85, green: 0.65, blue: 0.2, alpha: 1), UIColor(red: 0.6, green: 0.4, blue: 0.1, alpha: 1))
@@ -276,7 +443,99 @@ private func presetGradientColors(_ preset: FaithThumbnailPreset) -> (UIColor, U
     case .faith: return (UIColor(red: 0.6, green: 0.4, blue: 0.75, alpha: 1), UIColor(red: 0.9, green: 0.7, blue: 0.2, alpha: 1))
     }
 }
+
+private func drawFaithLiveBackgroundIOS(_ preset: FaithLiveBackgroundPreset, in rect: CGRect, context: CGContext) {
+    let colors = faithLiveBackgroundUIColorPair(preset)
+    if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [colors.0.cgColor, colors.1.cgColor] as CFArray, locations: [0, 1]) {
+        context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: 0), end: CGPoint(x: rect.maxX, y: rect.maxY), options: [])
+    }
+    context.setFillColor(UIColor.white.withAlphaComponent(0.10).cgColor)
+    for index in 0..<7 {
+        let diameter = rect.width * CGFloat(0.12 + Double(index % 3) * 0.035)
+        let x = rect.width * CGFloat(0.08 + Double(index) * 0.145)
+        let y = rect.height * CGFloat(index.isMultiple(of: 2) ? 0.18 : 0.72)
+        context.fillEllipse(in: CGRect(x: x, y: y, width: diameter, height: diameter))
+    }
+    let symbolName = preset.symbolName
+    if let symbol = UIImage(systemName: symbolName, withConfiguration: UIImage.SymbolConfiguration(pointSize: 150, weight: .light))?.withTintColor(.white.withAlphaComponent(0.18), renderingMode: .alwaysOriginal) {
+        symbol.draw(in: CGRect(x: rect.maxX - 280, y: 86, width: 170, height: 170))
+    }
+    if preset == .crossSunrise {
+        context.setFillColor(UIColor.white.withAlphaComponent(0.22).cgColor)
+        context.fill(CGRect(x: rect.midX - 10, y: 105, width: 20, height: 190))
+        context.fill(CGRect(x: rect.midX - 70, y: 165, width: 140, height: 18))
+    } else if preset == .stainedGlass {
+        context.setStrokeColor(UIColor.white.withAlphaComponent(0.16).cgColor)
+        context.setLineWidth(3)
+        for x in stride(from: rect.minX + 80, through: rect.maxX - 80, by: 120) {
+            context.move(to: CGPoint(x: x, y: rect.minY))
+            context.addLine(to: CGPoint(x: x + 70, y: rect.maxY))
+        }
+        for y in stride(from: rect.minY + 70, through: rect.maxY - 70, by: 100) {
+            context.move(to: CGPoint(x: rect.minX, y: y))
+            context.addLine(to: CGPoint(x: rect.maxX, y: y + 20))
+        }
+        context.strokePath()
+    }
+    let vignette = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [UIColor.clear.cgColor, UIColor.black.withAlphaComponent(0.28).cgColor] as CFArray, locations: [0.55, 1])
+    if let vignette {
+        context.drawRadialGradient(vignette, startCenter: CGPoint(x: rect.midX, y: rect.midY), startRadius: 80, endCenter: CGPoint(x: rect.midX, y: rect.midY), endRadius: rect.width * 0.65, options: [])
+    }
+}
+
+private func faithLiveBackgroundUIColorPair(_ preset: FaithLiveBackgroundPreset) -> (UIColor, UIColor) {
+    switch preset {
+    case .crossSunrise: return (UIColor(red: 0.95, green: 0.55, blue: 0.22, alpha: 1), UIColor(red: 0.20, green: 0.28, blue: 0.58, alpha: 1))
+    case .scriptureLight: return (UIColor(red: 0.12, green: 0.42, blue: 0.54, alpha: 1), UIColor(red: 0.08, green: 0.12, blue: 0.27, alpha: 1))
+    case .worshipGlow: return (UIColor(red: 0.50, green: 0.24, blue: 0.66, alpha: 1), UIColor(red: 0.12, green: 0.09, blue: 0.24, alpha: 1))
+    case .peaceGarden: return (UIColor(red: 0.18, green: 0.54, blue: 0.40, alpha: 1), UIColor(red: 0.06, green: 0.22, blue: 0.23, alpha: 1))
+    case .stainedGlass: return (UIColor(red: 0.18, green: 0.24, blue: 0.68, alpha: 1), UIColor(red: 0.67, green: 0.25, blue: 0.45, alpha: 1))
+    case .doveSky: return (UIColor(red: 0.34, green: 0.64, blue: 0.86, alpha: 1), UIColor(red: 0.10, green: 0.20, blue: 0.42, alpha: 1))
+    case .none, .blur: return (UIColor.black, UIColor.darkGray)
+    }
+}
 #elseif os(macOS)
+private func customThumbnailNSColorPair(_ style: CustomThumbnailStyle) -> (NSColor, NSColor) {
+    switch style {
+    case .sunrise: return (NSColor(red: 0.98, green: 0.64, blue: 0.24, alpha: 1), NSColor(red: 0.54, green: 0.23, blue: 0.72, alpha: 1))
+    case .violet: return (NSColor(red: 0.43, green: 0.25, blue: 0.79, alpha: 1), NSColor(red: 0.13, green: 0.14, blue: 0.32, alpha: 1))
+    case .ocean: return (NSColor(red: 0.04, green: 0.48, blue: 0.64, alpha: 1), NSColor(red: 0.05, green: 0.18, blue: 0.34, alpha: 1))
+    case .forest: return (NSColor(red: 0.12, green: 0.48, blue: 0.32, alpha: 1), NSColor(red: 0.05, green: 0.22, blue: 0.18, alpha: 1))
+    case .rose: return (NSColor(red: 0.82, green: 0.25, blue: 0.43, alpha: 1), NSColor(red: 0.33, green: 0.13, blue: 0.29, alpha: 1))
+    case .midnight: return (NSColor(red: 0.06, green: 0.09, blue: 0.20, alpha: 1), NSColor(red: 0.22, green: 0.27, blue: 0.48, alpha: 1))
+    }
+}
+
+private func drawCustomThumbnailTextMac(title: String, subtitle: String, symbolName: String, in rect: NSRect) {
+    if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
+        let configured = symbol.withSymbolConfiguration(.init(pointSize: 88, weight: .semibold)) ?? symbol
+        configured.draw(in: NSRect(x: 82, y: rect.height - 190, width: 112, height: 112), from: .zero, operation: .sourceOver, fraction: 0.95)
+    }
+    let paragraph = NSMutableParagraphStyle()
+    paragraph.alignment = .left
+    paragraph.lineBreakMode = .byWordWrapping
+    let shadow = NSShadow()
+    shadow.shadowColor = NSColor.black.withAlphaComponent(0.25)
+    shadow.shadowOffset = CGSize(width: 0, height: -3)
+    shadow.shadowBlurRadius = 12
+    let titleText = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Live Session" : title
+    let subtitleText = subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    (titleText as NSString).draw(in: NSRect(x: 82, y: rect.height - 466, width: rect.width - 164, height: 220), withAttributes: [
+        .font: NSFont.systemFont(ofSize: 78, weight: .bold),
+        .foregroundColor: NSColor.white,
+        .paragraphStyle: paragraph,
+        .shadow: shadow
+    ])
+    if !subtitleText.isEmpty {
+        (subtitleText as NSString).draw(in: NSRect(x: 86, y: rect.height - 570, width: rect.width - 172, height: 82), withAttributes: [
+            .font: NSFont.systemFont(ofSize: 34, weight: .medium),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.88),
+            .paragraphStyle: paragraph,
+            .shadow: shadow
+        ])
+    }
+}
+
 private func presetGradientColorsMac(_ preset: FaithThumbnailPreset) -> (NSColor, NSColor) {
     switch preset {
     case .prayer: return (NSColor(red: 0.85, green: 0.65, blue: 0.2, alpha: 1), NSColor(red: 0.6, green: 0.4, blue: 0.1, alpha: 1))
@@ -289,6 +548,52 @@ private func presetGradientColorsMac(_ preset: FaithThumbnailPreset) -> (NSColor
     case .hope: return (NSColor(red: 0.95, green: 0.8, blue: 0.25, alpha: 1), NSColor(red: 0.85, green: 0.6, blue: 0.1, alpha: 1))
     case .devotional: return (NSColor(red: 0.35, green: 0.3, blue: 0.65, alpha: 1), NSColor(red: 0.2, green: 0.2, blue: 0.5, alpha: 1))
     case .faith: return (NSColor(red: 0.6, green: 0.4, blue: 0.75, alpha: 1), NSColor(red: 0.9, green: 0.7, blue: 0.2, alpha: 1))
+    }
+}
+
+private func drawFaithLiveBackgroundMac(_ preset: FaithLiveBackgroundPreset, in rect: NSRect) {
+    let colors = faithLiveBackgroundNSColorPair(preset)
+    NSGradient(starting: colors.0, ending: colors.1)?.draw(in: rect, angle: 315)
+    NSColor.white.withAlphaComponent(0.10).setFill()
+    for index in 0..<7 {
+        let diameter = rect.width * CGFloat(0.12 + Double(index % 3) * 0.035)
+        let x = rect.width * CGFloat(0.08 + Double(index) * 0.145)
+        let y = rect.height * CGFloat(index.isMultiple(of: 2) ? 0.18 : 0.72)
+        NSBezierPath(ovalIn: NSRect(x: x, y: y, width: diameter, height: diameter)).fill()
+    }
+    if let symbol = NSImage(systemSymbolName: preset.symbolName, accessibilityDescription: nil) {
+        let configured = symbol.withSymbolConfiguration(.init(pointSize: 150, weight: .light)) ?? symbol
+        configured.draw(in: NSRect(x: rect.maxX - 280, y: rect.maxY - 256, width: 170, height: 170), from: .zero, operation: .sourceOver, fraction: 0.18)
+    }
+    if preset == .crossSunrise {
+        NSColor.white.withAlphaComponent(0.22).setFill()
+        NSRect(x: rect.midX - 10, y: rect.maxY - 295, width: 20, height: 190).fill()
+        NSRect(x: rect.midX - 70, y: rect.maxY - 225, width: 140, height: 18).fill()
+    } else if preset == .stainedGlass {
+        NSColor.white.withAlphaComponent(0.16).setStroke()
+        let path = NSBezierPath()
+        path.lineWidth = 3
+        for x in stride(from: rect.minX + 80, through: rect.maxX - 80, by: 120) {
+            path.move(to: NSPoint(x: x, y: rect.minY))
+            path.line(to: NSPoint(x: x + 70, y: rect.maxY))
+        }
+        for y in stride(from: rect.minY + 70, through: rect.maxY - 70, by: 100) {
+            path.move(to: NSPoint(x: rect.minX, y: y))
+            path.line(to: NSPoint(x: rect.maxX, y: y + 20))
+        }
+        path.stroke()
+    }
+}
+
+private func faithLiveBackgroundNSColorPair(_ preset: FaithLiveBackgroundPreset) -> (NSColor, NSColor) {
+    switch preset {
+    case .crossSunrise: return (NSColor(red: 0.95, green: 0.55, blue: 0.22, alpha: 1), NSColor(red: 0.20, green: 0.28, blue: 0.58, alpha: 1))
+    case .scriptureLight: return (NSColor(red: 0.12, green: 0.42, blue: 0.54, alpha: 1), NSColor(red: 0.08, green: 0.12, blue: 0.27, alpha: 1))
+    case .worshipGlow: return (NSColor(red: 0.50, green: 0.24, blue: 0.66, alpha: 1), NSColor(red: 0.12, green: 0.09, blue: 0.24, alpha: 1))
+    case .peaceGarden: return (NSColor(red: 0.18, green: 0.54, blue: 0.40, alpha: 1), NSColor(red: 0.06, green: 0.22, blue: 0.23, alpha: 1))
+    case .stainedGlass: return (NSColor(red: 0.18, green: 0.24, blue: 0.68, alpha: 1), NSColor(red: 0.67, green: 0.25, blue: 0.45, alpha: 1))
+    case .doveSky: return (NSColor(red: 0.34, green: 0.64, blue: 0.86, alpha: 1), NSColor(red: 0.10, green: 0.20, blue: 0.42, alpha: 1))
+    case .none, .blur: return (NSColor.black, NSColor.darkGray)
     }
 }
 #endif
@@ -397,4 +702,3 @@ enum PlatformPasteboard {
         #endif
     }
 }
-

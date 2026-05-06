@@ -722,6 +722,7 @@ struct BroadcastStreamView_HLS: View {
             }
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
             #endif
             #if os(iOS)
             .toolbarBackground(.black, for: .navigationBar)
@@ -741,13 +742,6 @@ struct BroadcastStreamView_HLS: View {
                         .foregroundColor(.white)
                         .font(.body)
                     }
-                }
-                ToolbarItem(placement: .automatic) {
-                    Button("Done") {
-                        Task { await stopAndDismiss() }
-                    }
-                    .foregroundColor(.white)
-                    .font(.body)
                 }
             }
             .onAppear {
@@ -1770,15 +1764,16 @@ struct BroadcastStreamView_HLS: View {
         if let fileURL = recordingFileURL {
             if uploadReplayToCloud {
                 let sessionId = session.id
-                Task.detached(priority: .utility) { [firebaseSync] in
-                    do {
-                        let urlString = try await firebaseSync.uploadRecording(sessionId: sessionId, fileURL: fileURL)
-                        await MainActor.run {
-                            firebaseSync.saveRecordingURL(sessionId: sessionId, urlString: urlString)
-                        }
-                    } catch {
-                        print("⚠️ [RECORDING] Upload failed: \(error.localizedDescription)")
-                    }
+                do {
+                    let urlString = try await firebaseSync.uploadRecording(sessionId: sessionId, fileURL: fileURL)
+                    session.recordingURL = urlString
+                    do { try modelContext.save() } catch { print("⚠️ [LIVE SESSION] Failed to save cloud recording URL: \(error)") }
+                    firebaseSync.saveRecordingURL(sessionId: sessionId, urlString: urlString)
+                    await firebaseSync.syncLiveSessionPublic(session)
+                } catch {
+                    print("⚠️ [RECORDING] Upload failed: \(error.localizedDescription)")
+                    session.recordingURL = fileURL.absoluteString
+                    do { try modelContext.save() } catch { print("⚠️ [LIVE SESSION] Failed to save local recording URL: \(error)") }
                 }
             } else {
                 // Free: replay only on this device; don't upload

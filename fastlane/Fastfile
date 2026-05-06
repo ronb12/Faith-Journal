@@ -1,0 +1,45 @@
+default_platform(:ios)
+
+platform :ios do
+  workspace = "Faith Journal.xcworkspace"
+  scheme = "Faith Journal"
+  external_root = "/Volumes/My Passport for Mac/Developer"
+  derived_data_path = "#{external_root}/XcodeDerivedDataGlobal"
+  archive_path = "#{external_root}/Archives/Faith Journal.xcarchive"
+  output_directory = "#{external_root}/AppStoreBuilds"
+  xcargs = [
+    "-skipPackageUpdates",
+    "-clonedSourcePackagesDirPath '#{external_root}/XcodeExternal/SwiftPMClones'",
+    "-packageCachePath '#{external_root}/XcodePackageCache'",
+    "DEVELOPMENT_TEAM=4SQJ3AH62S"
+  ].join(" ")
+
+  desc "Build an App Store archive"
+  lane :appstore_build do
+    build_app(
+      workspace: workspace,
+      scheme: scheme,
+      clean: true,
+      export_method: "app-store",
+      include_symbols: true,
+      include_bitcode: false,
+      derived_data_path: derived_data_path,
+      archive_path: archive_path,
+      output_directory: output_directory,
+      output_name: "FaithJournal.ipa",
+      xcargs: xcargs
+    )
+  end
+
+  desc "Upload the current app build to App Store Connect/TestFlight"
+  lane :appstore_upload do
+    appstore_build
+    upload_to_testflight(
+      app_identifier: "com.ronellbradley.FaithJournal",
+      username: "ronellbradley@gmail.com",
+      ipa: "#{output_directory}/FaithJournal.ipa",
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
+    )
+  end
+end

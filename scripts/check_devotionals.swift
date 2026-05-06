@@ -88,7 +88,7 @@ for dayOffset in 0..<1000 {
     let author = seeds.authors[(dayOffset * authorStep) % seeds.authors.count]
     _ = seeds.categories[(dayOffset * categoryStep) % seeds.categories.count]
 
-    let title = "Day \(dayOffset + 1) — \(theme)"
+    let title = theme
     let content = classicDevotionalBody(reflection: reflection, prayer: prayer)
     let key = "\(norm(title))|\(norm(s))|\(norm(content))|\(norm(author))"
     if !seen.insert(key).inserted {

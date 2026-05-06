@@ -1,15 +1,25 @@
 import SwiftUI
 
 @available(iOS 17.0, macOS 14.0, *)
-class ThemeManager: ObservableObject {
-    @AppStorage("selectedTheme") private var storedTheme: String = Theme.default.rawValue
-    
-    var currentTheme: Theme {
-        get { Theme(rawValue: storedTheme) ?? .default }
-        set { storedTheme = newValue.rawValue; objectWillChange.send() }
-    }
-    
+final class ThemeManager: ObservableObject {
+    private static let selectedThemeKey = "selectedTheme"
+    private static let legacySelectedThemeKey = "selectedColorTheme"
+
     static let shared = ThemeManager()
+
+    @Published var currentTheme: Theme {
+        didSet {
+            UserDefaults.standard.set(currentTheme.rawValue, forKey: Self.selectedThemeKey)
+            UserDefaults.standard.set(currentTheme.rawValue, forKey: Self.legacySelectedThemeKey)
+        }
+    }
+
+    private init(defaults: UserDefaults = .standard) {
+        let rawTheme = defaults.string(forKey: Self.selectedThemeKey)
+            ?? defaults.string(forKey: Self.legacySelectedThemeKey)
+            ?? Theme.default.rawValue
+        currentTheme = Theme(rawValue: rawTheme) ?? .default
+    }
     
     enum Theme: String, CaseIterable {
         case `default` = "Default"

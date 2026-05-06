@@ -51,6 +51,9 @@ class AgoraService: NSObject, ObservableObject {
     @Published var remoteUsers: [UInt] = []
     @Published var currentRole: AgoraUserRole = .audience
     @Published var canPromoteToPresenter = false
+    @Published private(set) var activeVirtualBackground: FaithLiveBackgroundPreset = .none
+    @Published private(set) var activeVirtualBackgroundTitle: String = FaithLiveBackgroundPreset.none.rawValue
+    @Published private(set) var virtualBackgroundError: String?
     /// Agora-assigned UID after join (join uses 0 = auto-assign). Used for active-speaker matching.
     @Published private(set) var localRtcUid: UInt = 0
     /// Who is currently driving the active-speaker spotlight (volume indication).
@@ -72,6 +75,7 @@ class AgoraService: NSObject, ObservableObject {
     private var userId: String?
     private var userName: String?
     private var channelName: String?
+    private var pendingVirtualBackground: FaithLiveBackgroundPreset = .none
     
     // Agora credentials — read from AgoraSecrets.plist (add file to Copy Bundle Resources).
     private static func agoraSecrets() -> [String: Any]? {
@@ -235,6 +239,7 @@ class AgoraService: NSObject, ObservableObject {
                 if case .broadcaster = joinRole, self.isVideoEnabled {
                     self.agoraKit?.enableLocalVideo(true)
                     self.agoraKit?.startPreview()
+                    self.applyPendingVirtualBackgroundIfNeeded()
                 }
             }
         }
@@ -274,6 +279,9 @@ class AgoraService: NSObject, ObservableObject {
                 self.adaptiveVideoTier = 0
                 self.lastAdaptiveVideoChange = .distantPast
                 self.lastLocalVideoRenderView = nil
+                self.activeVirtualBackground = .none
+                self.activeVirtualBackgroundTitle = FaithLiveBackgroundPreset.none.rawValue
+                self.virtualBackgroundError = nil
                 print("✅ [AGORA] Left channel")
             }
             // Delay destroy so Core Audio can release the AU and avoid _auv3 != nil crash
@@ -293,6 +301,7 @@ class AgoraService: NSObject, ObservableObject {
         if isVideoEnabled {
             agoraKit?.enableLocalVideo(true)
             agoraKit?.startPreview()
+            applyPendingVirtualBackgroundIfNeeded()
         } else {
             agoraKit?.enableLocalVideo(false)
             agoraKit?.stopPreview()
@@ -441,6 +450,7 @@ class AgoraService: NSObject, ObservableObject {
         
         isVideoEnabled = true
         isAudioEnabled = true
+        applyPendingVirtualBackgroundIfNeeded()
         
         print("✅ [AGORA] Promoted to presenter")
         #endif
@@ -462,6 +472,140 @@ class AgoraService: NSObject, ObservableObject {
         
         print("✅ [AGORA] Demoted to audience")
         #endif
+    }
+
+    /// Applies or clears Agora's virtual background for the local publisher. Remotes see the processed video stream.
+    @discardableResult
+    func setVirtualBackground(_ preset: FaithLiveBackgroundPreset) -> Bool {
+        pendingVirtualBackground = preset
+        #if canImport(AgoraRtcKit) || (os(macOS) && canImport(AgoraRtcKit1))
+        guard let kit = agoraKit else {
+            activeVirtualBackground = preset
+            activeVirtualBackgroundTitle = preset.rawValue
+            virtualBackgroundError = nil
+            return true
+        }
+
+        guard currentRole == .broadcaster else {
+            virtualBackgroundError = "Backgrounds are available when you are on camera."
+            return false
+        }
+
+        if preset == .none {
+            let code = kit.enableVirtualBackground(false, backData: nil, segData: nil)
+            if code == 0 {
+                activeVirtualBackground = .none
+                activeVirtualBackgroundTitle = FaithLiveBackgroundPreset.none.rawValue
+                virtualBackgroundError = nil
+                print("✅ [AGORA] Virtual background disabled")
+                return true
+            }
+            virtualBackgroundError = virtualBackgroundFailureMessage(code)
+            print("⚠️ [AGORA] Failed to disable virtual background: \(code)")
+            return false
+        }
+
+        let source = AgoraVirtualBackgroundSource()
+        if preset == .blur {
+            source.backgroundSourceType = AgoraVirtualBackgroundSourceType(rawValue: 3)!
+            source.blurDegree = AgoraBlurDegree(rawValue: 3)!
+        } else {
+            do {
+                let url = try platformFaithLiveBackgroundFileURL(for: preset)
+                source.backgroundSourceType = AgoraVirtualBackgroundSourceType(rawValue: 2)!
+                source.source = url.path
+                source.color = 0x111827
+            } catch {
+                virtualBackgroundError = error.localizedDescription
+                return false
+            }
+        }
+
+        let segmentation = AgoraSegmentationProperty()
+        segmentation.modelType = SegModelType(rawValue: 1)!
+        let code = kit.enableVirtualBackground(true, backData: source, segData: segmentation)
+        if code == 0 {
+            activeVirtualBackground = preset
+            activeVirtualBackgroundTitle = preset.rawValue
+            virtualBackgroundError = nil
+            print("✅ [AGORA] Virtual background enabled: \(preset.rawValue)")
+            return true
+        }
+
+        virtualBackgroundError = virtualBackgroundFailureMessage(code)
+        print("⚠️ [AGORA] Virtual background failed with code \(code)")
+        return false
+        #else
+        activeVirtualBackground = preset
+        activeVirtualBackgroundTitle = preset.rawValue
+        virtualBackgroundError = "Agora virtual backgrounds require the Agora SDK."
+        return false
+        #endif
+    }
+
+    /// Applies a downloaded image file as the Agora virtual background.
+    @discardableResult
+    func setVirtualBackgroundImage(fileURL: URL, title: String) -> Bool {
+        pendingVirtualBackground = .none
+        #if canImport(AgoraRtcKit) || (os(macOS) && canImport(AgoraRtcKit1))
+        guard let kit = agoraKit else {
+            activeVirtualBackground = .none
+            activeVirtualBackgroundTitle = title
+            virtualBackgroundError = nil
+            return true
+        }
+
+        guard currentRole == .broadcaster else {
+            virtualBackgroundError = "Backgrounds are available when you are on camera."
+            return false
+        }
+
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            virtualBackgroundError = "The selected background image is not available."
+            return false
+        }
+
+        let source = AgoraVirtualBackgroundSource()
+        source.backgroundSourceType = AgoraVirtualBackgroundSourceType(rawValue: 2)!
+        source.source = fileURL.path
+        source.color = 0x111827
+
+        let segmentation = AgoraSegmentationProperty()
+        segmentation.modelType = SegModelType(rawValue: 1)!
+        let code = kit.enableVirtualBackground(true, backData: source, segData: segmentation)
+        if code == 0 {
+            activeVirtualBackground = .none
+            activeVirtualBackgroundTitle = title
+            virtualBackgroundError = nil
+            print("✅ [AGORA] Virtual background enabled: \(title)")
+            return true
+        }
+
+        virtualBackgroundError = virtualBackgroundFailureMessage(code)
+        print("⚠️ [AGORA] Virtual background image failed with code \(code)")
+        return false
+        #else
+        activeVirtualBackground = .none
+        activeVirtualBackgroundTitle = title
+        virtualBackgroundError = "Agora virtual backgrounds require the Agora SDK."
+        return false
+        #endif
+    }
+
+    private func applyPendingVirtualBackgroundIfNeeded() {
+        guard pendingVirtualBackground != .none else { return }
+        _ = setVirtualBackground(pendingVirtualBackground)
+    }
+
+    private func virtualBackgroundFailureMessage(_ code: Int32) -> String {
+        switch code {
+        case -4:
+            return "This device does not support virtual backgrounds."
+        case -7:
+            return "Agora's video segmentation extension is missing from the app build."
+        default:
+            return "Could not apply the live background. Agora returned code \(code)."
+        }
     }
     
     /// Re-fetch token and renew in-channel (long sessions; also used when SDK warns before expiry).

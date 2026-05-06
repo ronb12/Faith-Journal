@@ -91,6 +91,65 @@ class DevotionalManager: ObservableObject {
         return "\(trimmedReflection)\n\nPrayer: \(prayer.trimmingCharacters(in: .whitespacesAndNewlines))"
     }
 
+    private func devotionalPrayer(basePrayer: String, theme: String, scripture: String, category: String, reflection: String, dayOffset: Int) -> String {
+        let cleanBase = basePrayer.trimmingCharacters(in: .whitespacesAndNewlines)
+        let focus = prayerFocus(from: reflection)
+
+        let heartPostures = [
+            "Shape my heart around \(theme), and help me notice where You are already at work.",
+            "Let \(scripture) become more than words I read; let it become a truth I live today.",
+            "Guide my thoughts, words, and choices so this \(category.lowercased()) devotional bears real fruit in me.",
+            "Teach me to slow down, listen well, and respond to Your voice with obedience.",
+            "Give me a steady spirit when the day feels rushed, uncertain, or heavy.",
+            "Renew my mind with Your truth, and make my next step clear and faithful.",
+            "Help me receive Your grace without striving and share that grace with others.",
+            "Open my eyes to the quiet ways You are leading, protecting, and providing.",
+            "Make my faith practical today in the way I love, serve, forgive, and speak.",
+            "Keep me close to You when distractions compete for my attention."
+        ]
+
+        let responses = [
+            "I surrender this day to You.",
+            "I choose to trust Your timing.",
+            "I welcome Your peace into the places I have been carrying alone.",
+            "I place my plans, fears, and hopes in Your hands.",
+            "I ask for courage to follow where You lead.",
+            "I receive Your mercy for today and let yesterday rest with You.",
+            "I want my life to reflect Your goodness.",
+            "I will look for Your presence in ordinary moments.",
+            "I give You room to correct, comfort, and strengthen me.",
+            "I believe You are faithful in both the seen and unseen."
+        ]
+
+        let closingLines = [
+            "Amen.",
+            "In Jesus' name, amen.",
+            "Let it be so in my life today. Amen.",
+            "Thank You for hearing me. Amen.",
+            "Lead me forward with grace. Amen."
+        ]
+
+        let posture = heartPostures[(dayOffset * 7) % heartPostures.count]
+        let response = responses[(dayOffset * 11) % responses.count]
+        let closing = closingLines[(dayOffset * 13) % closingLines.count]
+
+        return "\(cleanBase) Let this truth take root in me: \(focus) \(posture) \(response) \(closing)"
+    }
+
+    private func prayerFocus(from reflection: String) -> String {
+        let trimmed = reflection
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+
+        guard trimmed.count > 160 else { return trimmed }
+
+        let clipped = String(trimmed.prefix(160))
+        if let lastSpace = clipped.lastIndex(of: " ") {
+            return String(clipped[..<lastSpace]) + "..."
+        }
+        return clipped + "..."
+    }
+
     #if DEBUG
     private func debugAssertNoDuplicateDevotionals(_ devotionals: [Devotional]) {
         func norm(_ s: String) -> String {
@@ -109,6 +168,27 @@ class DevotionalManager: ObservableObject {
             }
         }
     }
+
+    private func debugAssertNoDuplicatePrayerSections(_ devotionals: [Devotional]) {
+        func normalizedPrayer(from content: String) -> String {
+            guard let range = content.range(of: "Prayer:") else { return "" }
+            return content[range.upperBound...]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .lowercased()
+        }
+
+        var seen = Set<String>()
+        for d in devotionals {
+            let prayer = normalizedPrayer(from: d.content)
+            guard !prayer.isEmpty else { continue }
+            if !seen.insert(prayer).inserted {
+                assertionFailure("Duplicate devotional prayer detected: \(d.title)")
+                return
+            }
+        }
+    }
+
     #endif
     
     private func userDefaultsKey(for date: Date) -> String {
@@ -121,6 +201,20 @@ class DevotionalManager: ObservableObject {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate, .withDashSeparatorInDate]
         return "devotional_user_note_\(formatter.string(from: date))"
+    }
+
+    func resetLocalAccountState() {
+        let defaults = UserDefaults.standard
+        let keys = Array(defaults.dictionaryRepresentation().keys)
+        for key in keys where key.hasPrefix("devotional_completed_") || key.hasPrefix("devotional_user_note_") {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.synchronize()
+
+        for index in devotionals.indices {
+            devotionals[index].isCompleted = false
+        }
+        objectWillChange.send()
     }
     
     func userNote(for devotional: Devotional) -> String {
@@ -253,12 +347,20 @@ class DevotionalManager: ObservableObject {
             let s = seedFile.scriptures[(dayOffset * scriptureStep) % seedFile.scriptures.count]
             let theme = seedFile.themes[(dayOffset * themeStep) % seedFile.themes.count]
             let reflection = reflectionBodies[dayOffset]
-            let prayer = seedFile.prayers[(dayOffset * prayerStep) % seedFile.prayers.count]
+            let basePrayer = seedFile.prayers[(dayOffset * prayerStep) % seedFile.prayers.count]
             let author = seedFile.authors[(dayOffset * authorStep) % seedFile.authors.count]
             let category = seedFile.categories[(dayOffset * categoryStep) % seedFile.categories.count]
 
             let dayNumber = dayOffset + 1
-            let title = "Day \(dayNumber) — \(theme)"
+            let title = theme
+            let prayer = devotionalPrayer(
+                basePrayer: basePrayer,
+                theme: theme,
+                scripture: s,
+                category: category,
+                reflection: reflection,
+                dayOffset: dayOffset
+            )
             let content = classicDevotionalBody(reflection: reflection, prayer: prayer)
 
             // Stable UUID derived from the day number (good enough to stay stable across installs/builds).
@@ -284,6 +386,7 @@ class DevotionalManager: ObservableObject {
         #if DEBUG
         debugAssertUniqueReflectionBodies(reflectionBodies)
         debugAssertNoDuplicateDevotionals(sorted)
+        debugAssertNoDuplicatePrayerSections(sorted)
         #endif
 
         return sorted

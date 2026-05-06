@@ -26,7 +26,18 @@ struct SettingsView: View {
         if !profileManager.userName.isEmpty { return profileManager.userName }
         return userProfile?.name ?? ""
     }
-    @AppStorage("selectedTheme") private var selectedTheme: String = "System"
+    /// Email shown here should match the active Firebase Auth account, not a stale local profile.
+    private var profileDisplayEmail: String? {
+        if let email = profileManager.email?.trimmingCharacters(in: .whitespacesAndNewlines), !email.isEmpty {
+            return email
+        }
+        #if canImport(FirebaseAuth)
+        if let email = Auth.auth().currentUser?.email?.trimmingCharacters(in: .whitespacesAndNewlines), !email.isEmpty {
+            return email
+        }
+        #endif
+        return userProfile?.email
+    }
     // Default notification times (users can change these in settings)
     // Bible Verse: 7am, Journal Reminder: 8am, Devotional: 9am
     @AppStorage("reminderEnabled") private var reminderEnabled: Bool = true
@@ -182,12 +193,12 @@ struct SettingsView: View {
     }
     
     @ViewBuilder
-    private func profileInfoView(profile: UserProfile?, displayName: String) -> some View {
+    private func profileInfoView(profile: UserProfile?, displayName: String, displayEmail: String?) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(displayName.isEmpty ? "No Profile Set" : displayName)
                 .font(.headline)
             
-            if let email = profile?.email, !email.isEmpty {
+            if let email = displayEmail, !email.isEmpty {
                 Text(email)
                     .font(.caption)
                     .foregroundColor(.primary)
@@ -284,11 +295,11 @@ struct SettingsView: View {
     
     private var settingsContent: some View {
         ZStack {
-            // Gradient background matching other pages (Devotionals, etc.)
+            // Gradient background matching the selected color theme.
             LinearGradient(
                 colors: [
-                    Color.purple.opacity(0.1),
-                    Color.blue.opacity(0.05),
+                    themeManager.colors.primary.opacity(0.10),
+                    themeManager.colors.secondary.opacity(0.05),
                     Color.platformSystemGroupedBackground
                 ],
                 startPoint: .topLeading,
@@ -308,9 +319,9 @@ struct SettingsView: View {
                                 profileAvatarViewFromManager(profile: profile)
                                     .id(profileManager.profileImageURL ?? "no-avatar")
                                 
-                                profileInfoView(profile: profile, displayName: profileDisplayName)
+                                profileInfoView(profile: profile, displayName: profileDisplayName, displayEmail: profileDisplayEmail)
                             } else if !profileDisplayName.isEmpty {
-                                profileInfoView(profile: nil, displayName: profileDisplayName)
+                                profileInfoView(profile: nil, displayName: profileDisplayName, displayEmail: profileDisplayEmail)
                             } else {
                                 noProfileView()
                             }
@@ -794,6 +805,20 @@ struct SettingsView: View {
     // LOGOUT
     private func logout() {
         print("🚪 [LOGOUT] Logging out user...")
+
+        #if canImport(FirebaseAuth)
+        if FirebaseInitializer.shared.isConfigured {
+            do {
+                try Auth.auth().signOut()
+                print("✅ [LOGOUT] Firebase Auth signed out")
+            } catch {
+                print("❌ [LOGOUT] Firebase sign-out failed: \(error.localizedDescription)")
+            }
+        }
+        #endif
+
+        ProfileManager.shared.clearProfile()
+        FirebaseSyncService.shared.stopListening()
         
         // Reset login state completely to show login screen
         hasLoggedIn = false

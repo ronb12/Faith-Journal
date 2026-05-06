@@ -2,6 +2,22 @@ import SwiftUI
 import SwiftData
 
 @available(iOS 17.0, macOS 14.0, *)
+private enum MoreFeatureDestination: String, Identifiable {
+    case bible
+    case bibleStudy
+    case bibleGame
+    case liveSessions
+    case faithFriends
+    case moodAnalytics
+    case readingPlans
+    case statistics
+    case globalSearch
+    case settings
+
+    var id: String { rawValue }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
 struct MoreView: View {
     @Binding var selectedTab: Int
     @EnvironmentObject private var nav: AppNavigation
@@ -26,6 +42,7 @@ struct MoreView: View {
     @State private var showingReadingPlans = false
     @State private var showingStatistics = false
     @State private var showingGlobalSearch = false
+    @State private var presentedFeature: MoreFeatureDestination?
     
     var body: some View {
         NavigationStack {
@@ -59,108 +76,98 @@ struct MoreView: View {
                 }
                 // Features Section
                 Section(header: Text("Features")) {
-                    NavigationLink {
-                        BibleView()
-                    } label: {
+                    Button { presentedFeature = .bible } label: {
                         MenuRowContent(
                             icon: "book.closed.fill",
                             title: "Bible",
                             color: themeManager.colors.primary
                         )
                     }
+                    .buttonStyle(.plain)
                     
-                    NavigationLink {
-                        BibleStudyView()
-                    } label: {
+                    Button { presentedFeature = .bibleStudy } label: {
                         MenuRowContent(
                             icon: "book.pages.fill",
                             title: "Bible Study",
                             color: themeManager.colors.secondary
                         )
                     }
+                    .buttonStyle(.plain)
 
-                    NavigationLink {
-                        BibleStudyGameView()
-                    } label: {
+                    Button { presentedFeature = .bibleGame } label: {
                         MenuRowContent(
                             icon: "gamecontroller.fill",
                             title: "Bible Game",
                             color: themeManager.colors.primary
                         )
                     }
+                    .buttonStyle(.plain)
                     
-                    NavigationLink {
-                        LiveSessionsView()
-                    } label: {
+                    Button { presentedFeature = .liveSessions } label: {
                         MenuRowContent(
                             icon: "person.3.fill",
                             title: "Live Sessions",
                             color: themeManager.colors.accent
                         )
                     }
+                    .buttonStyle(.plain)
 
-                    NavigationLink {
-                        FaithFriendsView()
-                    } label: {
+                    Button { presentedFeature = .faithFriends } label: {
                         MenuRowContent(
                             icon: "person.2.fill",
                             title: "Faith Friends",
                             color: themeManager.colors.primary
                         )
                     }
+                    .buttonStyle(.plain)
                     
-                    NavigationLink {
-                        MoodAnalyticsView()
-                    } label: {
+                    Button { presentedFeature = .moodAnalytics } label: {
                         MenuRowContent(
                             icon: "chart.bar.fill",
                             title: "Mood Analytics",
                             color: themeManager.colors.accent
                         )
                     }
+                    .buttonStyle(.plain)
                     
-                    NavigationLink {
-                        ReadingPlansView()
-                    } label: {
+                    Button { presentedFeature = .readingPlans } label: {
                         MenuRowContent(
                             icon: "calendar",
                             title: "Reading Plans",
                             color: themeManager.colors.secondary
                         )
                     }
+                    .buttonStyle(.plain)
                     
-                    NavigationLink {
-                        StatisticsView()
-                    } label: {
+                    Button { presentedFeature = .statistics } label: {
                         MenuRowContent(
                             icon: "chart.pie.fill",
                             title: "Statistics",
                             color: themeManager.colors.primary
                         )
                     }
+                    .buttonStyle(.plain)
                     
-                    NavigationLink {
-                        GlobalSearchView()
-                    } label: {
+                    Button { presentedFeature = .globalSearch } label: {
                         MenuRowContent(
                             icon: "magnifyingglass",
                             title: "Global Search",
                             color: themeManager.colors.secondary
                         )
                     }
+                    .buttonStyle(.plain)
                 }
                 
                 // Settings Section
                 Section(header: Text("Settings")) {
-                    NavigationLink {
-                        SettingsView()
-                    } label: {
+                    Button { presentedFeature = .settings } label: {
                         MenuRowContent(
                             icon: "gearshape.fill",
                             title: "Settings",
                             color: .gray
                         )
                     }
+                    .buttonStyle(.plain)
                 }
 
                 #if os(macOS)
@@ -204,20 +211,17 @@ struct MoreView: View {
             .toolbarBackground(contentBackground, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             #endif
-            .navigationDestination(isPresented: $navigateToBible) {
-                BibleView()
-            }
             .onChange(of: nav.bibleTarget) { oldValue, newValue in
-                if newValue != nil && selectedTab == 4 && !navigateToBible {
+                if newValue != nil && selectedTab == 4 && presentedFeature != .bible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        navigateToBible = true
+                        presentedFeature = .bible
                     }
                 }
             }
             .onChange(of: selectedTab) { oldValue, newValue in
-                if newValue == 4 && nav.bibleTarget != nil && !navigateToBible {
+                if newValue == 4 && nav.bibleTarget != nil && presentedFeature != .bible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        navigateToBible = true
+                        presentedFeature = .bible
                     }
                 }
             }
@@ -228,13 +232,37 @@ struct MoreView: View {
                 }
             }
             #if os(iOS)
+            .fullScreenCover(item: $presentedFeature) { destination in
+                MoreFeaturePresentation(destination: destination) {
+                    presentedFeature = nil
+                }
+            }
             .fullScreenCover(isPresented: $showFaithFriendsFromNotification) {
-                FaithFriendsView()
+                MoreFeaturePresentation(destination: .faithFriends) {
+                    showFaithFriendsFromNotification = false
+                }
+            }
+            .fullScreenCover(isPresented: $showingLiveSessions) {
+                MoreFeaturePresentation(destination: .liveSessions) {
+                    showingLiveSessions = false
+                }
             }
             #elseif os(macOS)
+            .sheet(item: $presentedFeature) { destination in
+                MoreFeaturePresentation(destination: destination) {
+                    presentedFeature = nil
+                }
+                .macOSSheetFrameLarge()
+            }
             .sheet(isPresented: $showFaithFriendsFromNotification) {
                 FaithFriendsView()
                     .macOSSheetFrameStandard()
+            }
+            .sheet(isPresented: $showingLiveSessions) {
+                NavigationStack {
+                    LiveSessionsView()
+                }
+                .macOSSheetFrameLarge()
             }
             #endif
             .onAppear {
@@ -253,11 +281,69 @@ struct MoreView: View {
                 #endif
                 if nav.bibleTarget != nil && !navigateToBible {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                        navigateToBible = true
+                        presentedFeature = .bible
                     }
                 }
             }
         }
+        }
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+private struct MoreFeaturePresentation: View {
+    let destination: MoreFeatureDestination
+    let onDone: () -> Void
+
+    var body: some View {
+        content
+            .navigationBarBackButtonHidden(true)
+            .safeAreaInset(edge: .bottom) {
+                Button(action: onDone) {
+                    Label("Close", systemImage: "xmark")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+                .background(.ultraThinMaterial)
+                .accessibilityLabel("Close")
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch destination {
+        case .bible:
+            BibleView()
+        case .bibleStudy:
+            BibleStudyView()
+        case .bibleGame:
+            BibleStudyGameView()
+        case .liveSessions:
+            NavigationStack {
+                LiveSessionsView()
+                    .navigationBarBackButtonHidden(true)
+            }
+        case .faithFriends:
+            NavigationStack {
+                FaithFriendsView()
+                    .navigationBarBackButtonHidden(true)
+            }
+        case .moodAnalytics:
+            MoodAnalyticsView()
+        case .readingPlans:
+            ReadingPlansView()
+        case .statistics:
+            StatisticsView()
+        case .globalSearch:
+            GlobalSearchView()
+        case .settings:
+            SettingsView()
         }
     }
 }
@@ -307,4 +393,3 @@ struct MenuRowContent: View {
         MoreView(selectedTab: .constant(0))
     }
 }
-

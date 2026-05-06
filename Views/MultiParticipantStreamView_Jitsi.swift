@@ -15,8 +15,7 @@ import JitsiMeetSDK
 @available(iOS 17.0, *)
 struct MultiParticipantStreamView_Jitsi: View {
     let session: LiveSession
-    // Use regular property for singleton, not @StateObject
-    private let jitsiService = JitsiService.shared
+    @ObservedObject private var jitsiService = JitsiService.shared
     // Use regular property for singleton, not @StateObject
     private let userService = LocalUserService.shared
     @Environment(\.dismiss) private var dismiss
@@ -192,4 +191,3 @@ struct JitsiMeetViewWrapper: UIViewRepresentable {
     }
 }
 #endif
-

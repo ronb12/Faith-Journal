@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "2620"
+   version = "1.8">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "MAC009A2B3C4D5E6F78901234C"
+               BuildableName = "Faith Journal.app"
+               BlueprintName = "Faith Journal macOS"
+               ReferencedContainer = "container:Faith Journal.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES">
+      <Testables>
+      </Testables>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "MAC009A2B3C4D5E6F78901234C"
+            BuildableName = "Faith Journal.app"
+            BlueprintName = "Faith Journal macOS"
+            ReferencedContainer = "container:Faith Journal.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "LIVEKIT_SERVER_URL"
+            value = "wss://faith-journal-juqej6sx.livekit.cloud"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "LIVEKIT_API_KEY"
+            value = "APIo3PpGD4FqusS"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "LIVEKIT_API_SECRET"
+            value = "50BHjegysVKEhOTmF4XWuVrAwfvwjegCoa8HRgSz54vB"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "1">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "MAC009A2B3C4D5E6F78901234C"
+            BuildableName = "Faith Journal.app"
+            BlueprintName = "Faith Journal macOS"
+            ReferencedContainer = "container:Faith Journal.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "LIVEKIT_SERVER_URL"
+            value = "wss://faith-journal-juqej6sx.livekit.cloud"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "LIVEKIT_API_KEY"
+            value = "APIo3PpGD4FqusS"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "LIVEKIT_API_SECRET"
+            value = "50BHjegysVKEhOTmF4XWuVrAwfvwjegCoa8HRgSz54vB"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+      <BuildableReference
+         BuildableIdentifier = "primary"
+         BlueprintIdentifier = "MAC009A2B3C4D5E6F78901234C"
+         BuildableName = "Faith Journal.app"
+         BlueprintName = "Faith Journal macOS"
+         ReferencedContainer = "container:Faith Journal.xcodeproj">
+      </BuildableReference>
+   </ArchiveAction>
+</Scheme>

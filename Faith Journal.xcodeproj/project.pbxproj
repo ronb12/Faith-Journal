@@ -51,6 +51,7 @@
 		474B2DD22F4355F400C6EF70 /* FaithFriend.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1THF1END000000000001 /* FaithFriend.swift */; };
 		474B2DD32F4355F400C6EF70 /* FaithFriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1THF2END000000000002 /* FaithFriendsView.swift */; };
 		47919B3B2F59E134008E663E /* RtcBasic in Frameworks */ = {isa = PBXBuildFile; productRef = AGORA_IOS_PROD2BE49F1E248D27E0 /* RtcBasic */; };
+		47919B3E2F64ACD9008E663E /* VirtualBackground in Frameworks */ = {isa = PBXBuildFile; productRef = AGORA_IOS_VBPROD2BE49F1E0 /* VirtualBackground */; };
 		47919B3D2F59E134008E663E /* AgoraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AgoraSvc1A2B3C4D5E6F78901 /* AgoraService.swift */; };
 		479865372F21C22600AFE22F /* Faith Journal/Faith Journal/DevotionalCompletion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 479865362F21C22600AFE22F /* Faith Journal/Faith Journal/DevotionalCompletion.swift */; };
 		47C014792F5F1108002798CF /* MultiParticipantStreamView_Agora.swift in Sources */ = {isa = PBXBuildFile; fileRef = AgoraMP1A2B3C4D5E6F78901 /* MultiParticipantStreamView_Agora.swift */; };
@@ -321,6 +322,7 @@
 		E1F2000FB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2000CB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift */; };
 		E1F20010B2C34D5E6F78901A01 /* LiveStreamingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2000DB2C34D5E6F78901A01 /* LiveStreamingUITests.swift */; };
 		E1F20014B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F20013B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift */; };
+		E1F20015B2C34D5E6F78901A01 /* AuthenticatedFeatureSmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F20016B2C34D5E6F78901A01 /* AuthenticatedFeatureSmokeUITests.swift */; };
 		E3B55FAB2E85F8DD175B2FE7 /* MoodSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 422F94095D028BCEACE40101 /* MoodSettingsView.swift */; };
 		E4F239F32D301F0429ED4AD0 /* InviteUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54930461BCFE5AC38544443 /* InviteUsersView.swift */; };
 		E5DBAD13258EFEB0A702222F /* StatisticsInsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37ABBCA50341AE78CF1542D7 /* StatisticsInsightsView.swift */; };
@@ -538,6 +540,7 @@
 		E1F2000CB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Faith_JournalUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		E1F2000DB2C34D5E6F78901A01 /* LiveStreamingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveStreamingUITests.swift; sourceTree = "<group>"; };
 		E1F20013B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabBarFeaturesUITests.swift; sourceTree = "<group>"; };
+		E1F20016B2C34D5E6F78901A01 /* AuthenticatedFeatureSmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticatedFeatureSmokeUITests.swift; sourceTree = "<group>"; };
 		E46F4B6AA049DD0353F7CEA6 /* StreamModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamModerationService.swift; sourceTree = "<group>"; };
 		E54930461BCFE5AC38544443 /* InviteUsersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteUsersView.swift; sourceTree = "<group>"; };
 		E90C128D8CE56FE3F69E79A4 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -594,6 +597,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				47919B3B2F59E134008E663E /* RtcBasic in Frameworks */,
+				47919B3E2F64ACD9008E663E /* VirtualBackground in Frameworks */,
 				8C614C44BF284AECA3B9E8C1 /* FirebaseAuth in Frameworks */,
 				856A556ABEBB6966F381D660 /* FirebaseFirestore in Frameworks */,
 				FUNC1A2B3C4D5E6F78901234 /* FirebaseFunctions in Frameworks */,
@@ -955,12 +959,13 @@
 		};
 		E1F20012B2C34D5E6F78901A01 /* Faith Journal/Faith Journal/Faith JournalUITests */ = {
 			isa = PBXGroup;
-			children = (
-				E1F2000BB2C34D5E6F78901A01 /* Faith_JournalUITests.swift */,
-				E1F2000CB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift */,
-				E1F2000DB2C34D5E6F78901A01 /* LiveStreamingUITests.swift */,
-				E1F20013B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift */,
-			);
+				children = (
+					E1F2000BB2C34D5E6F78901A01 /* Faith_JournalUITests.swift */,
+					E1F2000CB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift */,
+					E1F2000DB2C34D5E6F78901A01 /* LiveStreamingUITests.swift */,
+					E1F20013B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift */,
+					E1F20016B2C34D5E6F78901A01 /* AuthenticatedFeatureSmokeUITests.swift */,
+				);
 			path = "Faith Journal/Faith Journal/Faith JournalUITests";
 			sourceTree = "<group>";
 		};
@@ -998,6 +1003,7 @@
 			name = "Faith Journal";
 			packageProductDependencies = (
 				AGORA_IOS_PROD2BE49F1E248D27E0 /* RtcBasic */,
+				AGORA_IOS_VBPROD2BE49F1E0 /* VirtualBackground */,
 				7D1399874EFA5C591677ED1F /* FirebaseAuth */,
 				FAD0B24B73963064C38A57E4 /* FirebaseFirestore */,
 				FUNC2A2B3C4D5E6F78901235 /* FirebaseFunctions */,
@@ -1426,12 +1432,13 @@
 		E1F20003B2C34D5E6F78901A01 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (
-				E1F2000EB2C34D5E6F78901A01 /* Faith_JournalUITests.swift in Sources */,
-				E1F2000FB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift in Sources */,
-				E1F20010B2C34D5E6F78901A01 /* LiveStreamingUITests.swift in Sources */,
-				E1F20014B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift in Sources */,
-			);
+				files = (
+					E1F2000EB2C34D5E6F78901A01 /* Faith_JournalUITests.swift in Sources */,
+					E1F2000FB2C34D5E6F78901A01 /* Faith_JournalUITestsLaunchTests.swift in Sources */,
+					E1F20010B2C34D5E6F78901A01 /* LiveStreamingUITests.swift in Sources */,
+					E1F20014B2C34D5E6F78901A01 /* TabBarFeaturesUITests.swift in Sources */,
+					E1F20015B2C34D5E6F78901A01 /* AuthenticatedFeatureSmokeUITests.swift in Sources */,
+				);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		MAC00CA2B3C4D5E6F78901234E /* Sources */ = {
@@ -1628,9 +1635,10 @@
 				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 46;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
@@ -1651,6 +1659,7 @@
 				SDKROOT = iphoneos;
 				STRIP_BITCODE_FROM_COPIED_FILES = NO;
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_CONST_VALUE_PROTOCOLS = "";
 				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1798,9 +1807,10 @@
 				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 36;
+				CURRENT_PROJECT_VERSION = 46;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Faith Journal";
@@ -1821,6 +1831,7 @@
 				SDKROOT = iphoneos;
 				STRIP_BITCODE_FROM_COPIED_FILES = NO;
 				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_CONST_VALUE_PROTOCOLS = "";
 				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -1831,16 +1842,18 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 46;
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournalTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+					PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournalTests;
+					PRODUCT_NAME = "$(TARGET_NAME)";
+					SDKROOT = iphoneos;
+					SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+					SWIFT_EMIT_LOC_STRINGS = NO;
+					SWIFT_VERSION = 5.0;
+					TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Faith Journal.app/Faith Journal";
 			};
 			name = Debug;
@@ -1850,16 +1863,18 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 46;
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournalTests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+					PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournalTests;
+					PRODUCT_NAME = "$(TARGET_NAME)";
+					SDKROOT = iphoneos;
+					SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+					SWIFT_EMIT_LOC_STRINGS = NO;
+					SWIFT_VERSION = 5.0;
+					TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Faith Journal.app/Faith Journal";
 			};
 			name = Release;
@@ -1868,16 +1883,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 46;
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournalUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+					PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournalUITests;
+					PRODUCT_NAME = "$(TARGET_NAME)";
+					SDKROOT = iphoneos;
+					SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+					SWIFT_EMIT_LOC_STRINGS = NO;
+					SWIFT_VERSION = 5.0;
+					TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = "Faith Journal";
 			};
 			name = Debug;
@@ -1886,16 +1903,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 46;
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournalUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+					PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournalUITests;
+					PRODUCT_NAME = "$(TARGET_NAME)";
+					SDKROOT = iphoneos;
+					SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+					SWIFT_EMIT_LOC_STRINGS = NO;
+					SWIFT_VERSION = 5.0;
+					TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = "Faith Journal";
 			};
 			name = Release;
@@ -1907,8 +1926,9 @@
 				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 46;
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
@@ -1932,6 +1952,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
 				PRODUCT_NAME = "Faith Journal";
 				SDKROOT = macosx;
+				SWIFT_EMIT_CONST_VALUE_PROTOCOLS = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 			};
@@ -1944,8 +1965,9 @@
 				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Faith Journal/Faith Journal macOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 46;
 				DEVELOPMENT_TEAM = 4SQJ3AH62S;
+				ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(SRCROOT)/Faith Journal/Info.plist";
@@ -1969,6 +1991,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.ronellbradley.FaithJournal;
 				PRODUCT_NAME = "Faith Journal";
 				SDKROOT = macosx;
+				SWIFT_EMIT_CONST_VALUE_PROTOCOLS = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 			};
@@ -2081,6 +2104,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AGORA_IOS_REF2BE49F1E248D27E0 /* XCRemoteSwiftPackageReference "AgoraRtcEngine_iOS" */;
 			productName = RtcBasic;
+		};
+		AGORA_IOS_VBPROD2BE49F1E0 /* VirtualBackground */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AGORA_IOS_REF2BE49F1E248D27E0 /* XCRemoteSwiftPackageReference "AgoraRtcEngine_iOS" */;
+			productName = VirtualBackground;
 		};
 		C5E284E4EC2F3E403008F105 /* FirebaseStorage */ = {
 			isa = XCSwiftPackageProductDependency;

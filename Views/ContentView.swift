@@ -29,7 +29,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 #if os(iOS)
                 BannerAdView()
-                    .frame(height: 60)
+                    .frame(height: BannerAdView.preferredHeight)
                     .fixedSize(horizontal: false, vertical: true)
                     .background(contentBackground)
                 #endif
@@ -79,6 +79,7 @@ struct ContentView: View {
                 }
                 .tag(4)
             }
+                .tint(themeManager.colors.primary)
                 .accentColor(themeManager.colors.primary)
                 #if os(iOS)
                 .toolbar(.visible, for: .tabBar)

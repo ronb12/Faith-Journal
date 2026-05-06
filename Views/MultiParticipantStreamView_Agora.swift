@@ -8,6 +8,9 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+#if canImport(FirebaseFunctions)
+import FirebaseFunctions
+#endif
 #if os(iOS)
 import QuickLook
 import AVFoundation
@@ -45,6 +48,10 @@ struct MultiParticipantStreamView_Agora: View {
     @State private var showingPresentationSheet = false
     @State private var showingBibleStudySelector = false
     @State private var showingBibleSheet = false
+    @State private var showingBackgroundPicker = false
+    @State private var selectedLiveBackground: FaithLiveBackgroundPreset = .none
+    @State private var showingBackgroundError = false
+    @State private var liveBackgroundErrorMessage: String?
     /// When true, Bible is shown in the same full-screen path as Bible Study (overlay + PIP) instead of a plain sheet. Audience still uses the sheet.
     @State private var isPresentingBibleOverlay = false
     @State private var showingMaterialPicker = false
@@ -64,6 +71,8 @@ struct MultiParticipantStreamView_Agora: View {
     @AppStorage("uploadReplayToCloud") private var uploadReplayToCloud = false
     /// True after we've started recording this session (so we don't start twice).
     @State private var hasStartedRecordingThisSession = false
+    @State private var cloudRecordingActive = false
+    @State private var cloudRecordingError: String?
     /// User chose Jitsi after an Agora failure (same session; only used when Jitsi SDK is linked).
     @State private var useJitsiInstead = false
     /// Host toggles “open floor” in Firebase so broadcast audience can present.
@@ -85,6 +94,9 @@ struct MultiParticipantStreamView_Agora: View {
     private var role: AgoraUserRole {
         if session.typedStreamMode == .broadcast { return isHost ? .broadcaster : .audience }
         return .broadcaster
+    }
+    private var liveBackgroundIsOff: Bool {
+        agoraService.activeVirtualBackgroundTitle == FaithLiveBackgroundPreset.none.rawValue
     }
 
     /// Keeps the floating chat row above `liveSessionBottomBar` so it does not cover mic/camera/end icons.
@@ -220,6 +232,24 @@ struct MultiParticipantStreamView_Agora: View {
             .presentationDetents([.large])
             #endif
         }
+        .sheet(isPresented: $showingBackgroundPicker) {
+            LiveBackgroundPickerSheet(
+                selectedPreset: $selectedLiveBackground,
+                onSelect: applyLiveBackground,
+                onSelectPexels: applyPexelsLiveBackground,
+                onSelectUploadedPhoto: applyUploadedLiveBackground,
+                onDismiss: { showingBackgroundPicker = false }
+            )
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            .presentationBackground(.regularMaterial)
+            #endif
+        }
+        .alert("Live background", isPresented: $showingBackgroundError) {
+            Button("OK") { showingBackgroundError = false }
+        } message: {
+            Text(liveBackgroundErrorMessage ?? agoraService.virtualBackgroundError ?? "The background could not be applied.")
+        }
         .sheet(isPresented: $showingLiveChat) {
             LiveSessionChatView(session: session, canSend: agoraService.isConnected)
             #if os(iOS)
@@ -228,6 +258,7 @@ struct MultiParticipantStreamView_Agora: View {
         }
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarBackground(Color.black.opacity(0.85), for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
@@ -240,15 +271,7 @@ struct MultiParticipantStreamView_Agora: View {
             }
             hasJoined = true
             joinTimedOut = false
-            #if os(iOS)
-            requestCameraAndMicIfNeeded()
-            #elseif os(macOS)
-            requestCameraAndMicIfNeededMac()
-            #endif
-            startPresentationListener()
-            startFloorListener()
-            startChatListener()
-            Task { await joinChannel() }
+            Task { await prepareAndJoinChannel() }
             Task {
                 try? await Task.sleep(for: .seconds(15))
                 await MainActor.run {
@@ -263,18 +286,13 @@ struct MultiParticipantStreamView_Agora: View {
                 hasStartedRecordingThisSession = true
                 recordNextSession = false
                 Task {
-                    do {
-                        try await StreamRecordingService.shared.startRecording(sessionId: session.id, title: session.title, quality: .hd)
-                        RecordingCaptureFeeder.shared.start()
-                    } catch {
-                        print("⚠️ [AGORA RECORDING] Failed to start: \(error.localizedDescription)")
-                    }
+                    await startReplayRecording()
                 }
             }
         }
         .onDisappear {
             if hasJoined {
-                if isHost && StreamRecordingService.shared.isRecording {
+                if isHost && (StreamRecordingService.shared.isRecording || cloudRecordingActive) {
                     Task {
                         await stopRecordingAndSave()
                         await MainActor.run { agoraService.leaveChannel() }
@@ -328,7 +346,7 @@ struct MultiParticipantStreamView_Agora: View {
                             joinTimedOut = false
                             joinError = nil
                             agoraService.errorMessage = nil
-                            Task { await joinChannel() }
+                            Task { await prepareAndJoinChannel() }
                         }
                         .buttonStyle(.borderedProminent).tint(.white).foregroundColor(.black)
                     }
@@ -408,67 +426,63 @@ struct MultiParticipantStreamView_Agora: View {
     @ToolbarContentBuilder
     private var agoraToolbarContent: some ToolbarContent {
         #if os(iOS)
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Leave") { leaveAndDismiss() }
+                .foregroundColor(.white)
+        }
         ToolbarItem(placement: .principal) {
             Text(streamModeLabel).font(.subheadline).foregroundColor(.white.opacity(0.9))
-        }
-        if role == .broadcaster {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showingMaterialPicker = true } label: { Image(systemName: "doc.richtext") }
-                    .disabled(!agoraService.isConnected)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showingBibleStudySelector = true } label: { Image(systemName: "book.circle.fill") }
-                    .accessibilityLabel("Bible Study")
-                    .disabled(!agoraService.isConnected)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { openBibleForCurrentRole() } label: { Image(systemName: "text.book.closed") }
-                    .accessibilityLabel("Bible")
-                    .disabled(!agoraService.isConnected)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showChatOverlay.toggle() } label: { Image(systemName: showChatOverlay ? "bubble.left.fill" : "bubble.left") }
-                    .accessibilityLabel(showChatOverlay ? "Hide chat overlay" : "Show chat overlay")
-            }
-            if hasActivePresentation {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showingPresentationSheet = true } label: { Image(systemName: "eye.circle.fill") }
-                }
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { agoraService.toggleAudio() } label: { Image(systemName: agoraService.isAudioEnabled ? "mic" : "mic.slash") }
-                    .disabled(!agoraService.isConnected)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { agoraService.toggleVideo() } label: { Image(systemName: agoraService.isVideoEnabled ? "video" : "video.slash") }
-                    .disabled(!agoraService.isConnected)
-            }
-        } else {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { openBibleForCurrentRole() } label: { Image(systemName: "text.book.closed") }
-                    .accessibilityLabel("Bible")
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showChatOverlay.toggle() } label: { Image(systemName: showChatOverlay ? "bubble.left.fill" : "bubble.left") }
-                    .accessibilityLabel(showChatOverlay ? "Hide chat overlay" : "Show chat overlay")
-            }
-            if hasActivePresentation {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showingPresentationSheet = true } label: { Image(systemName: "eye.circle.fill") }
-                }
-            }
         }
         if isHost {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(role: .destructive, action: { showingEndSessionConfirmation = true }) {
-                    Image(systemName: "stop.circle.fill")
-                    Text("End session")
+                    Image(systemName: "stop.circle.fill").foregroundColor(.red)
                 }
+                .accessibilityLabel("End session")
                 .font(.subheadline.weight(.medium))
             }
         }
         ToolbarItem(placement: .navigationBarTrailing) {
-            Button("Done") { leaveAndDismiss() }
+            Menu {
+                if role == .broadcaster {
+                    Button { showingMaterialPicker = true } label: {
+                        Label("Present file", systemImage: "doc.richtext")
+                    }
+                    .disabled(!agoraService.isConnected)
+                    Button { showingBibleStudySelector = true } label: {
+                        Label("Share Bible study", systemImage: "book.circle.fill")
+                    }
+                    .disabled(!agoraService.isConnected)
+                }
+                Button { openBibleForCurrentRole() } label: {
+                    Label("Open Bible", systemImage: "text.book.closed")
+                }
+                .disabled(!agoraService.isConnected)
+                Button { showChatOverlay.toggle() } label: {
+                    Label(showChatOverlay ? "Hide chat overlay" : "Show chat overlay", systemImage: showChatOverlay ? "bubble.left.fill" : "bubble.left")
+                }
+                if hasActivePresentation {
+                    Button { showingPresentationSheet = true } label: {
+                        Label("View presentation", systemImage: "eye.circle.fill")
+                    }
+                }
+                if role == .broadcaster {
+                    Button { showingBackgroundPicker = true } label: {
+                        Label("Live background", systemImage: liveBackgroundIsOff ? "camera.filters" : "person.crop.rectangle.badge.plus")
+                    }
+                    .disabled(!agoraService.isConnected || !agoraService.isVideoEnabled)
+                    Button { agoraService.switchCamera() } label: {
+                        Label("Switch camera", systemImage: "camera.rotate.fill")
+                    }
+                    .disabled(!agoraService.isConnected)
+                }
+                Button(role: .cancel) { leaveAndDismiss() } label: {
+                    Label("Leave session", systemImage: "xmark.circle.fill")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .accessibilityLabel("More live session controls")
         }
         #else
         ToolbarItem(placement: .cancellationAction) {
@@ -495,6 +509,11 @@ struct MultiParticipantStreamView_Agora: View {
             ToolbarItem(placement: .automatic) {
                 Button { showChatOverlay.toggle() } label: { Image(systemName: showChatOverlay ? "bubble.left.fill" : "bubble.left") }
                     .accessibilityLabel(showChatOverlay ? "Hide chat overlay" : "Show chat overlay")
+            }
+            ToolbarItem(placement: .automatic) {
+                Button { showingBackgroundPicker = true } label: { Image(systemName: liveBackgroundIsOff ? "camera.filters" : "person.crop.rectangle.badge.plus") }
+                    .accessibilityLabel("Live background")
+                    .disabled(!agoraService.isConnected || !agoraService.isVideoEnabled)
             }
             if hasActivePresentation {
                 ToolbarItem(placement: .automatic) {
@@ -537,30 +556,52 @@ struct MultiParticipantStreamView_Agora: View {
     }
 
     #if os(iOS)
-    private func requestCameraAndMicIfNeeded() {
-        Task {
-            let cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
-            if cameraStatus == .notDetermined {
-                _ = await AVCaptureDevice.requestAccess(for: .video)
-            }
-            let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-            if micStatus == .notDetermined {
-                _ = await AVCaptureDevice.requestAccess(for: .audio)
-            }
+    private func requestCameraAndMicIfNeeded() async -> Bool {
+        let cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        let cameraGranted: Bool
+        if cameraStatus == .authorized {
+            cameraGranted = true
+        } else if cameraStatus == .notDetermined {
+            cameraGranted = await AVCaptureDevice.requestAccess(for: .video)
+        } else {
+            cameraGranted = false
         }
+
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        let micGranted: Bool
+        if micStatus == .authorized {
+            micGranted = true
+        } else if micStatus == .notDetermined {
+            micGranted = await AVCaptureDevice.requestAccess(for: .audio)
+        } else {
+            micGranted = false
+        }
+
+        return cameraGranted && micGranted
     }
     #elseif os(macOS)
-    private func requestCameraAndMicIfNeededMac() {
-        Task {
-            let cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
-            if cameraStatus == .notDetermined {
-                _ = await AVCaptureDevice.requestAccess(for: .video)
-            }
-            let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-            if micStatus == .notDetermined {
-                _ = await AVCaptureDevice.requestAccess(for: .audio)
-            }
+    private func requestCameraAndMicIfNeededMac() async -> Bool {
+        let cameraStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        let cameraGranted: Bool
+        if cameraStatus == .authorized {
+            cameraGranted = true
+        } else if cameraStatus == .notDetermined {
+            cameraGranted = await AVCaptureDevice.requestAccess(for: .video)
+        } else {
+            cameraGranted = false
         }
+
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        let micGranted: Bool
+        if micStatus == .authorized {
+            micGranted = true
+        } else if micStatus == .notDetermined {
+            micGranted = await AVCaptureDevice.requestAccess(for: .audio)
+        } else {
+            micGranted = false
+        }
+
+        return cameraGranted && micGranted
     }
     #endif
 
@@ -611,6 +652,7 @@ struct MultiParticipantStreamView_Agora: View {
     }
 
     private func startFloorListener() {
+        guard floorListener == nil else { return }
         let sid = session.id
         floorListener = FirebaseSyncService.shared.startListeningBroadcastOpenFloor(sessionId: sid) { open in
             let wasOpen = self.broadcastOpenFloor
@@ -625,6 +667,7 @@ struct MultiParticipantStreamView_Agora: View {
     }
 
     private func startPresentationListener() {
+        guard presentationListener == nil else { return }
         let sid = session.id
         presentationListener = FirebaseSyncService.shared.startListeningToSessionPresentation(sessionId: sid) { type, pdfURL, imageURL, bibleStudyDayOfYear in
             self.applyPresentationUpdate(type: type, pdfURL: pdfURL, imageURL: imageURL, bibleStudyDayOfYear: bibleStudyDayOfYear)
@@ -726,6 +769,60 @@ struct MultiParticipantStreamView_Agora: View {
         }
     }
 
+    private func applyLiveBackground(_ preset: FaithLiveBackgroundPreset) {
+        liveBackgroundErrorMessage = nil
+        selectedLiveBackground = preset
+        let applied = agoraService.setVirtualBackground(preset)
+        if applied {
+            showingBackgroundPicker = false
+        } else {
+            showingBackgroundError = true
+        }
+    }
+
+    private func applyPexelsLiveBackground(_ photo: PexelsAPI.Photo) async {
+        do {
+            let url = try await PexelsAPI.cachedBackgroundURL(for: photo)
+            await MainActor.run {
+                liveBackgroundErrorMessage = nil
+                selectedLiveBackground = .none
+                let title = "Pexels: \(photo.photographer)"
+                let applied = agoraService.setVirtualBackgroundImage(fileURL: url, title: title)
+                if applied {
+                    showingBackgroundPicker = false
+                } else {
+                    showingBackgroundError = true
+                }
+            }
+        } catch {
+            await MainActor.run {
+                liveBackgroundErrorMessage = error.localizedDescription
+                showingBackgroundError = true
+            }
+        }
+    }
+
+    private func applyUploadedLiveBackground(_ image: PlatformImage) async {
+        do {
+            let url = try LiveBackgroundImageStore.cachedUploadedBackgroundURL(for: image)
+            await MainActor.run {
+                liveBackgroundErrorMessage = nil
+                selectedLiveBackground = .none
+                let applied = agoraService.setVirtualBackgroundImage(fileURL: url, title: "Your photo")
+                if applied {
+                    showingBackgroundPicker = false
+                } else {
+                    showingBackgroundError = true
+                }
+            }
+        } catch {
+            await MainActor.run {
+                liveBackgroundErrorMessage = error.localizedDescription
+                showingBackgroundError = true
+            }
+        }
+    }
+
     private func startChatListener() {
         guard chatListener == nil else { return }
         let sid = session.id
@@ -812,12 +909,22 @@ struct MultiParticipantStreamView_Agora: View {
                 .foregroundColor(.white)
             }
             .disabled(!agoraService.isConnected)
-            Button { showChatOverlay.toggle() } label: {
+                Button { showChatOverlay.toggle() } label: {
                 VStack(spacing: 4) {
                     Image(systemName: showChatOverlay ? "bubble.left.fill" : "bubble.left").font(.title2)
                     liveSessionBottomControlCaption(showChatOverlay ? "Chat On" : "Chat Off")
                 }
                 .foregroundColor(.white)
+            }
+            if role == .broadcaster {
+                Button { showingBackgroundPicker = true } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: liveBackgroundIsOff ? "camera.filters" : "person.crop.rectangle.badge.plus").font(.title2)
+                        liveSessionBottomControlCaption(liveBackgroundIsOff ? "BG" : "BG On")
+                    }
+                    .foregroundColor(liveBackgroundIsOff ? .white : .green)
+                }
+                .disabled(!agoraService.isConnected || !agoraService.isVideoEnabled)
             }
             if hasActivePresentation {
                 Button { showingPresentationSheet = true } label: {
@@ -914,6 +1021,14 @@ struct MultiParticipantStreamView_Agora: View {
                 Label(showChatOverlay ? "Chat On" : "Chat Off", systemImage: showChatOverlay ? "bubble.left.fill" : "bubble.left")
             }
             .buttonStyle(.borderedProminent)
+            if role == .broadcaster {
+                Button { showingBackgroundPicker = true } label: {
+                    Label(liveBackgroundIsOff ? "Background" : agoraService.activeVirtualBackgroundTitle, systemImage: liveBackgroundIsOff ? "camera.filters" : "person.crop.rectangle.badge.plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(liveBackgroundIsOff ? nil : .green)
+                .disabled(!agoraService.isConnected || !agoraService.isVideoEnabled)
+            }
             if hasActivePresentation {
                 Button { showingPresentationSheet = true } label: {
                     Label("View presentation", systemImage: "eye.circle.fill")
@@ -1108,7 +1223,7 @@ struct MultiParticipantStreamView_Agora: View {
                 Button("Try again") {
                     joinError = nil
                     agoraService.errorMessage = nil
-                    Task { await joinChannel() }
+                    Task { await prepareAndJoinChannel() }
                 }
                 .buttonStyle(.borderedProminent).tint(.white).foregroundColor(.black)
                 Button("Done") { leaveAndDismiss() }
@@ -1127,6 +1242,27 @@ struct MultiParticipantStreamView_Agora: View {
             }
             .padding(24)
         }
+    }
+
+    private func prepareAndJoinChannel() async {
+        if role == .broadcaster {
+            #if os(iOS)
+            let permissionsGranted = await requestCameraAndMicIfNeeded()
+            #elseif os(macOS)
+            let permissionsGranted = await requestCameraAndMicIfNeededMac()
+            #else
+            let permissionsGranted = true
+            #endif
+            guard permissionsGranted else {
+                joinError = "Camera and microphone access are required to go live. Enable both in Settings, then try again."
+                return
+            }
+        }
+
+        startPresentationListener()
+        startFloorListener()
+        startChatListener()
+        await joinChannel()
     }
 
     private func joinChannel() async {
@@ -1156,7 +1292,7 @@ struct MultiParticipantStreamView_Agora: View {
 
     private func leaveAndDismiss() {
         isPresentingBibleOverlay = false
-        if isHost && StreamRecordingService.shared.isRecording {
+        if isHost && (StreamRecordingService.shared.isRecording || cloudRecordingActive) {
             Task {
                 await stopRecordingAndSave()
                 await MainActor.run {
@@ -1176,7 +1312,7 @@ struct MultiParticipantStreamView_Agora: View {
         session.isActive = false
         session.endTime = Date()
         if archive { session.isArchived = true }
-        if StreamRecordingService.shared.isRecording {
+        if StreamRecordingService.shared.isRecording || cloudRecordingActive {
             Task {
                 await stopRecordingAndSave()
                 await MainActor.run {
@@ -1196,8 +1332,67 @@ struct MultiParticipantStreamView_Agora: View {
         }
     }
 
-    /// Stop recording feeder and StreamRecordingService; upload to cloud or save local URL to session.
+    private func startReplayRecording() async {
+        if uploadReplayToCloud {
+            do {
+                let response = try await AgoraCloudRecordingClient.shared.start(sessionId: session.id)
+                await MainActor.run {
+                    cloudRecordingActive = true
+                    cloudRecordingError = nil
+                    session.isRecording = true
+                    try? modelContext.save()
+                }
+                print("✅ [AGORA CLOUD RECORDING] Started: sid=\(response.sid)")
+                return
+            } catch {
+                await MainActor.run {
+                    cloudRecordingError = error.localizedDescription
+                }
+                print("⚠️ [AGORA CLOUD RECORDING] Failed to start, falling back to local recording: \(error.localizedDescription)")
+            }
+        }
+
+        do {
+            try await StreamRecordingService.shared.startRecording(sessionId: session.id, title: session.title, quality: .hd)
+            RecordingCaptureFeeder.shared.start()
+        } catch {
+            print("⚠️ [AGORA RECORDING] Failed to start local fallback: \(error.localizedDescription)")
+        }
+    }
+
+    /// Stop Agora Cloud Recording when active; otherwise stop local StreamRecordingService and upload/save as before.
     private func stopRecordingAndSave() async {
+        if cloudRecordingActive {
+            do {
+                let response = try await AgoraCloudRecordingClient.shared.stop(sessionId: session.id)
+                await MainActor.run {
+                    cloudRecordingActive = false
+                    session.isRecording = false
+                    if let urlString = response.recordingURL, !urlString.isEmpty {
+                        session.recordingURL = urlString
+                    }
+                    try? modelContext.save()
+                }
+                if let urlString = response.recordingURL, !urlString.isEmpty {
+                    FirebaseSyncService.shared.saveRecordingURL(sessionId: session.id, urlString: urlString)
+                    print("✅ [AGORA CLOUD RECORDING] Stopped and saved replay URL")
+                } else {
+                    await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+                    print("⚠️ [AGORA CLOUD RECORDING] Stopped, but no replay URL was returned yet")
+                }
+            } catch {
+                await MainActor.run {
+                    cloudRecordingError = error.localizedDescription
+                    cloudRecordingActive = false
+                    session.isRecording = false
+                    try? modelContext.save()
+                }
+                await FirebaseSyncService.shared.syncLiveSessionPublic(session)
+                print("⚠️ [AGORA CLOUD RECORDING] Failed to stop: \(error.localizedDescription)")
+            }
+            return
+        }
+
         RecordingCaptureFeeder.shared.stop()
         guard StreamRecordingService.shared.isRecording else { return }
         guard let rec = try? await StreamRecordingService.shared.stopRecording(sessionId: session.id, title: session.title) else { return }
@@ -1207,8 +1402,10 @@ struct MultiParticipantStreamView_Agora: View {
             do {
                 let urlString = try await FirebaseSyncService.shared.uploadRecording(sessionId: sessionId, fileURL: fileURL)
                 await MainActor.run {
-                    FirebaseSyncService.shared.saveRecordingURL(sessionId: sessionId, urlString: urlString)
+                    session.recordingURL = urlString
+                    try? modelContext.save()
                 }
+                FirebaseSyncService.shared.saveRecordingURL(sessionId: sessionId, urlString: urlString)
             } catch {
                 print("⚠️ [AGORA RECORDING] Upload failed: \(error.localizedDescription)")
                 await MainActor.run {
@@ -1225,6 +1422,389 @@ struct MultiParticipantStreamView_Agora: View {
         await FirebaseSyncService.shared.syncLiveSessionPublic(session)
     }
     #endif // (os(iOS) || os(macOS)) && canImport(AgoraRtcKit)
+}
+#endif
+
+// MARK: - Faith live backgrounds
+
+#if os(iOS) || os(macOS)
+@available(iOS 17.0, macOS 14.0, *)
+private struct LiveBackgroundPickerSheet: View {
+    @Binding var selectedPreset: FaithLiveBackgroundPreset
+    let onSelect: (FaithLiveBackgroundPreset) -> Void
+    let onSelectPexels: (PexelsAPI.Photo) async -> Void
+    let onSelectUploadedPhoto: (PlatformImage) async -> Void
+    let onDismiss: () -> Void
+    @State private var pexelsPhotos: [PexelsAPI.Photo] = []
+    @State private var isLoadingPexels = false
+    @State private var pexelsError: String?
+    @State private var applyingPhotoID: Int?
+    @State private var showingPhotoPicker = false
+    @State private var selectedUploadedPhoto: PlatformImage?
+    @State private var isApplyingUploadedPhoto = false
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Built in")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(FaithLiveBackgroundPreset.allCases) { preset in
+                                Button {
+                                    selectedPreset = preset
+                                    onSelect(preset)
+                                } label: {
+                                    LiveBackgroundPresetCard(
+                                        preset: preset,
+                                        isSelected: selectedPreset == preset
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Your photo")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+
+                        Button {
+                            showingPhotoPicker = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.platformSecondarySystemBackground)
+                                    if let selectedUploadedPhoto {
+                                        platformImage(selectedUploadedPhoto)
+                                            .resizable()
+                                            .scaledToFill()
+                                    } else {
+                                        Image(systemName: "photo.badge.plus")
+                                            .font(.title2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if isApplyingUploadedPhoto {
+                                        Color.black.opacity(0.36)
+                                        ProgressView()
+                                            .tint(.white)
+                                    }
+                                }
+                                .frame(width: 96, height: 54)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Upload from device")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    Text("Use your own landscape photo as the live background.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(12)
+                            .background(Color.platformSecondarySystemBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.platformSeparator, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isApplyingUploadedPhoto)
+                        .padding(.horizontal, 16)
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("Pexels photos")
+                                .font(.headline)
+                            Spacer()
+                            if isLoadingPexels {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Button { Task { await loadPexelsPhotos(force: true) } } label: {
+                                    Image(systemName: "arrow.clockwise")
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Refresh Pexels photos")
+                            }
+                        }
+                        .padding(.horizontal, 16)
+
+                        if PexelsAPI.apiKey == nil {
+                            Text("Add a Pexels API key to enable photo backgrounds.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 16)
+                        } else if let pexelsError {
+                            Text(pexelsError)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 16)
+                        } else if pexelsPhotos.isEmpty && isLoadingPexels {
+                            ProgressView("Loading backgrounds")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 18)
+                        } else {
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(pexelsPhotos) { photo in
+                                    Button {
+                                        applyingPhotoID = photo.id
+                                        Task {
+                                            await onSelectPexels(photo)
+                                            await MainActor.run { applyingPhotoID = nil }
+                                        }
+                                    } label: {
+                                        PexelsLiveBackgroundCard(
+                                            photo: photo,
+                                            isApplying: applyingPhotoID == photo.id
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(applyingPhotoID != nil)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+
+                        Link("Photos provided by Pexels", destination: URL(string: "https://www.pexels.com")!)
+                            .font(.footnote.weight(.medium))
+                            .padding(.horizontal, 16)
+                    }
+                }
+                .padding(.vertical, 16)
+            }
+            .navigationTitle("Live Background")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { onDismiss() }
+                }
+            }
+        }
+        .task {
+            await loadPexelsPhotos(force: false)
+        }
+        .sheet(isPresented: $showingPhotoPicker) {
+            #if os(iOS)
+            ImagePicker(image: Binding(
+                get: { selectedUploadedPhoto },
+                set: { image in
+                    selectedUploadedPhoto = image
+                    if let image {
+                        Task { await applyUploadedPhoto(image) }
+                    }
+                }
+            ))
+            .macOSSheetFrameCompact()
+            #elseif os(macOS)
+            MacImagePicker(image: Binding(
+                get: { selectedUploadedPhoto },
+                set: { image in
+                    selectedUploadedPhoto = image
+                    if let image {
+                        Task { await applyUploadedPhoto(image) }
+                    }
+                }
+            ))
+            .macOSSheetFrameCompact()
+            #endif
+        }
+    }
+
+    private func loadPexelsPhotos(force: Bool) async {
+        guard PexelsAPI.apiKey != nil else { return }
+        guard force || pexelsPhotos.isEmpty else { return }
+        await MainActor.run {
+            isLoadingPexels = true
+            pexelsError = nil
+        }
+        let queries = [
+            "church worship prayer",
+            "cross sunrise peaceful",
+            "bible prayer peaceful"
+        ]
+        var allPhotos: [PexelsAPI.Photo] = []
+        for query in queries {
+            let photos = await PexelsAPI.searchPhotos(query: query, perPage: 6)
+            allPhotos.append(contentsOf: photos)
+        }
+        let uniquePhotos = Array(Dictionary(grouping: allPhotos, by: \.id).compactMap { $0.value.first }.prefix(12))
+        await MainActor.run {
+            pexelsPhotos = uniquePhotos
+            pexelsError = uniquePhotos.isEmpty ? "No Pexels backgrounds were found. Try refreshing in a moment." : nil
+            isLoadingPexels = false
+        }
+    }
+
+    private func applyUploadedPhoto(_ image: PlatformImage) async {
+        await MainActor.run { isApplyingUploadedPhoto = true }
+        await onSelectUploadedPhoto(image)
+        await MainActor.run { isApplyingUploadedPhoto = false }
+    }
+}
+
+private enum LiveBackgroundImageStore {
+    static func cachedUploadedBackgroundURL(for image: PlatformImage) throws -> URL {
+        guard let data = platformImageToJPEGData(platformImageResized(image, maxDimension: 1920), quality: 0.88) else {
+            throw NSError(domain: "LiveBackgroundImageStore", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare the selected photo."])
+        }
+
+        let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("FaithLiveBackgrounds/Uploads", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let fileURL = directory.appendingPathComponent("uploaded-\(UUID().uuidString).jpg")
+        try data.write(to: fileURL, options: .atomic)
+        return fileURL
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+private struct LiveBackgroundPresetCard: View {
+    let preset: FaithLiveBackgroundPreset
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                preview
+                    .aspectRatio(16 / 9, contentMode: .fill)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                if preset == .none || preset == .blur {
+                    Image(systemName: preset.symbolName)
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+
+                if isSelected {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.white, Color.green)
+                                .padding(8)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            Text(preset.rawValue)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundStyle(.primary)
+        }
+        .padding(8)
+        .background(isSelected ? Color.green.opacity(0.14) : Color.platformSecondarySystemBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? Color.green : Color.platformSeparator, lineWidth: isSelected ? 2 : 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(preset.rawValue) live background")
+    }
+
+    @ViewBuilder
+    private var preview: some View {
+        if preset == .none {
+            LinearGradient(colors: [.black, .gray], startPoint: .topLeading, endPoint: .bottomTrailing)
+        } else if preset == .blur {
+            LinearGradient(colors: [.gray, .black], startPoint: .topLeading, endPoint: .bottomTrailing)
+                .blur(radius: 4)
+        } else if let image = platformImageFromFaithLiveBackground(preset, size: CGSize(width: 360, height: 203)) {
+            platformImage(image)
+                .resizable()
+                .scaledToFill()
+        } else {
+            LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+private struct PexelsLiveBackgroundCard: View {
+    let photo: PexelsAPI.Photo
+    let isApplying: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                AsyncImage(url: photo.previewURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ZStack {
+                            LinearGradient(colors: [.gray.opacity(0.35), .black.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            ProgressView()
+                        }
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        LinearGradient(colors: [.gray, .black], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            .overlay(Image(systemName: "photo").foregroundStyle(.white))
+                    @unknown default:
+                        Color.black
+                    }
+                }
+                .aspectRatio(16 / 9, contentMode: .fill)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                if isApplying {
+                    Color.black.opacity(0.42)
+                    ProgressView()
+                        .tint(.white)
+                }
+            }
+            .background(Color.black)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            Text(photo.photographer)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundStyle(.primary)
+        }
+        .padding(8)
+        .background(Color.platformSecondarySystemBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.platformSeparator, lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Pexels live background by \(photo.photographer)")
+    }
 }
 #endif
 
@@ -1311,6 +1891,79 @@ private struct AgoraLiveChatOverlay: View {
             Color(red: 0.96, green: 0.26, blue: 0.45),
         ]
         return palette[msg.colorIndex % palette.count]
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, *)
+private final class AgoraCloudRecordingClient {
+    static let shared = AgoraCloudRecordingClient()
+
+    struct StartResponse {
+        let status: String
+        let resourceId: String
+        let sid: String
+        let uid: String
+        let alreadyStarted: Bool
+    }
+
+    struct StopResponse {
+        let status: String
+        let recordingURL: String?
+        let fileName: String?
+    }
+
+    private init() {}
+
+    func start(sessionId: UUID) async throws -> StartResponse {
+        #if canImport(FirebaseFunctions)
+        let result = try await Functions.functions().httpsCallable("startAgoraCloudRecording").call([
+            "sessionId": sessionId.uuidString
+        ])
+        guard let data = result.data as? [String: Any] else {
+            throw AgoraCloudRecordingError.invalidResponse
+        }
+        return StartResponse(
+            status: data["status"] as? String ?? "",
+            resourceId: data["resourceId"] as? String ?? "",
+            sid: data["sid"] as? String ?? "",
+            uid: data["uid"] as? String ?? "",
+            alreadyStarted: data["alreadyStarted"] as? Bool ?? false
+        )
+        #else
+        throw AgoraCloudRecordingError.functionsUnavailable
+        #endif
+    }
+
+    func stop(sessionId: UUID) async throws -> StopResponse {
+        #if canImport(FirebaseFunctions)
+        let result = try await Functions.functions().httpsCallable("stopAgoraCloudRecording").call([
+            "sessionId": sessionId.uuidString
+        ])
+        guard let data = result.data as? [String: Any] else {
+            throw AgoraCloudRecordingError.invalidResponse
+        }
+        return StopResponse(
+            status: data["status"] as? String ?? "",
+            recordingURL: data["recordingURL"] as? String,
+            fileName: data["fileName"] as? String
+        )
+        #else
+        throw AgoraCloudRecordingError.functionsUnavailable
+        #endif
+    }
+}
+
+private enum AgoraCloudRecordingError: LocalizedError {
+    case functionsUnavailable
+    case invalidResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .functionsUnavailable:
+            return "Firebase Functions is not available in this build."
+        case .invalidResponse:
+            return "Cloud recording returned an invalid response."
+        }
     }
 }
 #endif

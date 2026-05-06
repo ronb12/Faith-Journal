@@ -90,6 +90,8 @@ class FirebaseSyncService: ObservableObject {
         let sessionTitle: String
         let sessionId: String
     }
+
+    private let activeFirebaseUserDefaultsKey = "activeFirebaseUserId"
     
     private var cancellables = Set<AnyCancellable>()
     private var modelContext: ModelContext?
@@ -128,10 +130,11 @@ class FirebaseSyncService: ObservableObject {
         if let userId = getCurrentUserId() {
             print("✅ [FIREBASE] Using shared test user ID for simulator sync testing: \(userId)")
             print("✅ [FIREBASE] Both simulators will use this same ID to test cross-device sync")
-            // Test Firebase connectivity first
-            Task {
-                await testFirebaseConnection()
-            }
+            #if canImport(FirebaseAuth)
+            prepareLocalStoreForAuthenticatedUser(userId: userId, email: Auth.auth().currentUser?.email)
+            #else
+            prepareLocalStoreForAuthenticatedUser(userId: userId, email: nil)
+            #endif
             startListening()
             Task {
                 await ensureCurrentUserInSearchProfiles()
@@ -144,8 +147,12 @@ class FirebaseSyncService: ObservableObject {
         // Check if user is authenticated before starting listener
         if let userId = getCurrentUserId() {
             print("✅ [FIREBASE] User authenticated: \(userId), starting listener")
+            #if canImport(FirebaseAuth)
+            prepareLocalStoreForAuthenticatedUser(userId: userId, email: Auth.auth().currentUser?.email)
+            #else
+            prepareLocalStoreForAuthenticatedUser(userId: userId, email: nil)
+            #endif
             Task {
-                await testFirebaseConnection()
                 await ensureCurrentUserInSearchProfiles()
                 await ensureFriendCodeOnSignIn()
             }
@@ -158,6 +165,11 @@ class FirebaseSyncService: ObservableObject {
                 if self.modelContext != nil, getCurrentUserId() != nil {
                     print("✅ [FIREBASE] Auth restored late - starting listener now")
                     self.syncError = nil
+                    #if canImport(FirebaseAuth)
+                    if let user = Auth.auth().currentUser {
+                        self.prepareLocalStoreForAuthenticatedUser(userId: user.uid, email: user.email)
+                    }
+                    #endif
                     startListening()
                     await syncAllData()
                     await ensureCurrentUserInSearchProfiles()
@@ -181,6 +193,8 @@ class FirebaseSyncService: ObservableObject {
                         print("⚠️ [FIREBASE] ModelContext not set yet; will start listening after configure(modelContext:)")
                         return
                     }
+
+                    self.prepareLocalStoreForAuthenticatedUser(userId: user.uid, email: user.email)
                     
                     // Start listeners + run an initial sync right away.
                     self.restartListening()
@@ -221,6 +235,132 @@ class FirebaseSyncService: ObservableObject {
         hasReceivedInitialPrayerIntercessorSnapshot = false
         hasReceivedInitialInvitationSnapshot = false
         #endif
+    }
+
+    func stopListening() {
+        stopListeningInternal()
+        syncError = nil
+        isSyncing = false
+        print("✅ [FIREBASE] Sync listeners stopped")
+    }
+
+    @discardableResult
+    func prepareLocalStoreForAuthenticatedUser(userId: String, email: String?) -> Bool {
+        guard let modelContext else {
+            print("⚠️ [ACCOUNT] Cannot prepare local store yet - modelContext not set")
+            return false
+        }
+
+        let defaults = UserDefaults.standard
+        let previousUserId = defaults.string(forKey: activeFirebaseUserDefaultsKey)
+        let localProfileEmail = fetchLocalProfileEmail(from: modelContext)
+        let hasLocalAccountData = hasLocalAccountData(in: modelContext)
+        let normalizedNewEmail = email?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedLocalEmail = localProfileEmail?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        let signedIntoDifferentUser = previousUserId != nil && previousUserId != userId
+        let localProfileBelongsToDifferentEmail = previousUserId == nil
+            && normalizedNewEmail != nil
+            && normalizedLocalEmail != nil
+            && normalizedNewEmail != normalizedLocalEmail
+        let unownedLocalDataBeforeFirstFirebaseBinding = previousUserId == nil
+            && hasLocalAccountData
+            && normalizedNewEmail != nil
+            && normalizedLocalEmail == nil
+
+        guard signedIntoDifferentUser || localProfileBelongsToDifferentEmail || unownedLocalDataBeforeFirstFirebaseBinding else {
+            defaults.set(userId, forKey: activeFirebaseUserDefaultsKey)
+            return false
+        }
+
+        print("🧹 [ACCOUNT] Clearing local account data before Firebase sync for new user: \(userId)")
+
+        do {
+            try deleteAllLocalAccountModels(from: modelContext)
+            clearAccountScopedDefaults()
+            DevotionalManager.shared.resetLocalAccountState()
+            try modelContext.save()
+            defaults.set(userId, forKey: activeFirebaseUserDefaultsKey)
+            print("✅ [ACCOUNT] Local account data cleared before syncing authenticated user")
+            return true
+        } catch {
+            syncError = "Could not reset local account data: \(error.localizedDescription)"
+            print("❌ [ACCOUNT] Failed to clear local account data: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    private func fetchLocalProfileEmail(from modelContext: ModelContext) -> String? {
+        guard let profiles = try? modelContext.fetch(FetchDescriptor<UserProfile>()) else { return nil }
+        return profiles.first?.email
+    }
+
+    private func hasLocalAccountData(in modelContext: ModelContext) -> Bool {
+        hasAny(JournalEntry.self, in: modelContext)
+            || hasAny(PrayerRequest.self, in: modelContext)
+            || hasAny(MoodEntry.self, in: modelContext)
+            || hasAny(MoodGoal.self, in: modelContext)
+            || hasAny(MoodAchievement.self, in: modelContext)
+            || hasAny(UserProfile.self, in: modelContext)
+            || hasAny(ReadingPlan.self, in: modelContext)
+            || hasAny(BookmarkedVerse.self, in: modelContext)
+            || hasAny(BibleHighlight.self, in: modelContext)
+            || hasAny(BibleNote.self, in: modelContext)
+            || hasAny(BibleReadingHistory.self, in: modelContext)
+            || hasAny(LiveSession.self, in: modelContext)
+            || hasAny(LiveSessionParticipant.self, in: modelContext)
+            || hasAny(ChatMessage.self, in: modelContext)
+            || hasAny(SessionInvitation.self, in: modelContext)
+            || hasAny(FaithFriend.self, in: modelContext)
+            || hasAny(StatisticAchievement.self, in: modelContext)
+    }
+
+    private func hasAny<T: PersistentModel>(_ modelType: T.Type, in modelContext: ModelContext) -> Bool {
+        var descriptor = FetchDescriptor<T>()
+        descriptor.fetchLimit = 1
+        return ((try? modelContext.fetch(descriptor))?.isEmpty == false)
+    }
+
+    private func deleteAllLocalAccountModels(from modelContext: ModelContext) throws {
+        try deleteAll(JournalEntry.self, from: modelContext)
+        try deleteAll(PrayerRequest.self, from: modelContext)
+        try deleteAll(MoodEntry.self, from: modelContext)
+        try deleteAll(MoodGoal.self, from: modelContext)
+        try deleteAll(MoodAchievement.self, from: modelContext)
+        try deleteAll(UserProfile.self, from: modelContext)
+        try deleteAll(ReadingPlan.self, from: modelContext)
+        try deleteAll(BookmarkedVerse.self, from: modelContext)
+        try deleteAll(BibleHighlight.self, from: modelContext)
+        try deleteAll(BibleNote.self, from: modelContext)
+        try deleteAll(BibleReadingHistory.self, from: modelContext)
+        try deleteAll(LiveSession.self, from: modelContext)
+        try deleteAll(LiveSessionParticipant.self, from: modelContext)
+        try deleteAll(ChatMessage.self, from: modelContext)
+        try deleteAll(SessionInvitation.self, from: modelContext)
+        try deleteAll(FaithFriend.self, from: modelContext)
+        try deleteAll(StatisticAchievement.self, from: modelContext)
+    }
+
+    private func deleteAll<T: PersistentModel>(_ modelType: T.Type, from modelContext: ModelContext) throws {
+        let models = try modelContext.fetch(FetchDescriptor<T>())
+        for model in models {
+            modelContext.delete(model)
+        }
+    }
+
+    private func clearAccountScopedDefaults() {
+        let defaults = UserDefaults.standard
+        let prefixes = [
+            "devotional_completed_",
+            "devotional_user_note_"
+        ]
+        let keys = Array(defaults.dictionaryRepresentation().keys)
+        for key in keys where prefixes.contains(where: { key.hasPrefix($0) }) {
+            defaults.removeObject(forKey: key)
+        }
+        defaults.removeObject(forKey: "pendingUsername")
+        defaults.removeObject(forKey: "pendingEmail")
+        defaults.synchronize()
     }
     
     /// Test Firebase connection by writing a test document
@@ -435,10 +575,6 @@ class FirebaseSyncService: ObservableObject {
         // Check if user is authenticated before starting listener
         if let userId = getCurrentUserId() {
             print("✅ [FIREBASE] User authenticated: \(userId), restarting listener")
-            // Test Firebase connection when restarting (especially after sign-in)
-            Task {
-                await testFirebaseConnection()
-            }
             startListening()
             print("🔄 [FIREBASE] Restarted Firebase listeners for authenticated user")
         } else {
@@ -610,15 +746,20 @@ class FirebaseSyncService: ObservableObject {
     
     /// Delete a journal entry from Firebase
     func deleteJournalEntry(_ entry: JournalEntry) async {
+        await deleteJournalEntry(id: entry.id)
+    }
+
+    /// Delete a journal entry from Firebase by id.
+    func deleteJournalEntry(id entryId: UUID) async {
         #if canImport(FirebaseFirestore)
         guard let db = db, let userId = getCurrentUserId() else { return }
         
         do {
             let entryRef = db.collection("users").document(userId)
-                .collection("journalEntries").document(entry.id.uuidString)
+                .collection("journalEntries").document(entryId.uuidString)
             
             try await entryRef.delete()
-            print("✅ [FIREBASE] Deleted journal entry: \(entry.id.uuidString)")
+            print("✅ [FIREBASE] Deleted journal entry: \(entryId.uuidString)")
         } catch {
             print("❌ [FIREBASE] Failed to delete journal entry: \(error.localizedDescription)")
         }
@@ -812,6 +953,7 @@ class FirebaseSyncService: ObservableObject {
     
     /// Handle document changes from Firebase
     #if canImport(FirebaseFirestore)
+    @MainActor
     private func handleDocumentChange(_ change: DocumentChange) {
         guard let modelContext = modelContext else {
             print("⚠️ [FIREBASE] Cannot handle change - modelContext is nil")
@@ -825,6 +967,12 @@ class FirebaseSyncService: ObservableObject {
         
         switch change.type {
         case .added:
+            if isLegacyTestJournalEntry(data) {
+                removeLegacyTestJournalEntryLocally(entryId: entryId)
+                deleteLegacyTestJournalEntryRemotely(entryId: entryId)
+                return
+            }
+
             // New entry from Firebase - check if it exists locally
             // Convert entryId string to UUID for comparison
             guard let entryUUID = UUID(uuidString: entryId) else {
@@ -855,6 +1003,12 @@ class FirebaseSyncService: ObservableObject {
             }
             
         case .modified:
+            if isLegacyTestJournalEntry(data) {
+                removeLegacyTestJournalEntryLocally(entryId: entryId)
+                deleteLegacyTestJournalEntryRemotely(entryId: entryId)
+                return
+            }
+
             // Entry was modified in Firebase - update local if newer
             // Convert entryId string to UUID for comparison
             guard let entryUUID = UUID(uuidString: entryId) else {
@@ -1028,6 +1182,12 @@ class FirebaseSyncService: ObservableObject {
     /// Create local entry from Firebase data
     private func createLocalEntry(from data: [String: Any], id: String) {
         #if canImport(FirebaseFirestore)
+        guard !isLegacyTestJournalEntry(data) else {
+            deleteLegacyTestJournalEntryRemotely(entryId: id)
+            print("🗑️ [FIREBASE] Skipped legacy test journal entry from Firebase: \(id)")
+            return
+        }
+
         guard let modelContext = modelContext,
               let uuid = UUID(uuidString: id) else { return }
         
@@ -1066,6 +1226,62 @@ class FirebaseSyncService: ObservableObject {
         modelContext.insert(entry)
         try? modelContext.save()
         print("✅ [FIREBASE] Created local entry from Firebase: \(id)")
+        #endif
+    }
+
+    private func isLegacyTestJournalEntry(_ data: [String: Any]) -> Bool {
+        let title = normalizedJournalText(data["title"] as? String)
+        let content = normalizedJournalText(data["content"] as? String)
+        let tags = (data["tags"] as? [String] ?? []).map { normalizedJournalText($0) }
+
+        if title == "test" || content == "test" { return true }
+        if title == "test entry" || title == "test journal entry" { return true }
+        if title.contains("test journal entry") || title.contains("cloudkit test entry") { return true }
+        if content.contains("test journal entry created") || content.contains("created via cli") { return true }
+        if content.contains("cloudkit sync") || content.contains("cloudkit verification") { return true }
+        if tags.contains("test") && (title.contains("test") || content.contains("test")) { return true }
+
+        return false
+    }
+
+    private func normalizedJournalText(_ value: String?) -> String {
+        (value ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    @MainActor
+    private func removeLegacyTestJournalEntryLocally(entryId: String) {
+        guard let modelContext = modelContext,
+              let entryUUID = UUID(uuidString: entryId) else { return }
+
+        let descriptor = FetchDescriptor<JournalEntry>(
+            predicate: #Predicate<JournalEntry> { $0.id == entryUUID }
+        )
+        guard let entry = try? modelContext.fetch(descriptor).first else { return }
+
+        modelContext.delete(entry)
+        do {
+            try modelContext.save()
+            print("🗑️ [FIREBASE] Removed legacy test journal entry locally: \(entryId)")
+        } catch {
+            print("❌ [FIREBASE] Failed to remove legacy test journal entry locally: \(error.localizedDescription)")
+        }
+    }
+
+    private func deleteLegacyTestJournalEntryRemotely(entryId: String) {
+        #if canImport(FirebaseFirestore)
+        guard let db = db, let userId = getCurrentUserId() else { return }
+        Task {
+            do {
+                try await db.collection("users").document(userId)
+                    .collection("journalEntries").document(entryId)
+                    .delete()
+                print("🗑️ [FIREBASE] Deleted legacy test journal entry remotely: \(entryId)")
+            } catch {
+                print("❌ [FIREBASE] Failed to delete legacy test journal entry remotely: \(error.localizedDescription)")
+            }
+        }
         #endif
     }
     
@@ -1254,6 +1470,8 @@ class FirebaseSyncService: ObservableObject {
             "tags": session.tags,
             "isPrivate": session.isPrivate,
             "isActive": session.isActive,
+            "isArchived": session.isArchived,
+            "isRecording": session.isRecording,
             "maxParticipants": session.maxParticipants,
             "currentParticipants": session.currentParticipants,
             "currentBroadcasters": session.currentBroadcasters,
@@ -1415,6 +1633,8 @@ class FirebaseSyncService: ObservableObject {
             session.hostBio = data["hostBio"] as? String ?? session.hostBio
             session.isPrivate = (data["isPrivate"] as? Bool) ?? false
             session.isActive = data["isActive"] as? Bool ?? session.isActive
+            session.isArchived = data["isArchived"] as? Bool ?? session.isArchived
+            session.isRecording = data["isRecording"] as? Bool ?? session.isRecording
             session.currentParticipants = data["currentParticipants"] as? Int ?? session.currentParticipants
             session.streamMode = data["streamMode"] as? String ?? session.streamMode
             session.durationLimitMinutes = data["durationLimitMinutes"] as? Int ?? session.durationLimitMinutes
@@ -1466,6 +1686,8 @@ class FirebaseSyncService: ObservableObject {
                 session.hostBio = data["hostBio"] as? String ?? session.hostBio
                 session.isPrivate = (data["isPrivate"] as? Bool) ?? false
                 session.isActive = data["isActive"] as? Bool ?? session.isActive
+                session.isArchived = data["isArchived"] as? Bool ?? session.isArchived
+                session.isRecording = data["isRecording"] as? Bool ?? session.isRecording
                 session.currentParticipants = data["currentParticipants"] as? Int ?? session.currentParticipants
                 session.currentBroadcasters = data["currentBroadcasters"] as? Int ?? session.currentBroadcasters
                 session.streamMode = data["streamMode"] as? String ?? session.streamMode
@@ -3737,4 +3959,3 @@ class FirebaseSyncService: ObservableObject {
     }
     #endif
 }
-
